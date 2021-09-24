@@ -1,10 +1,10 @@
+#include"cconfig"
 #include"lexer.h"
 #include"parser.h"
-#include<iostream>
-#include<fstream>
+#include<cstdio>
 typedef xxx::Token_Settings TS;
 int main(){
-    std::ifstream file("test.txt");
+    FILE* file=fopen("test.txt","r");
     xxx::Lexer lexer(file);
     xxx::Parser parser(&lexer);
     parser.parse();

@@ -1,190 +1,192 @@
 // Definition for the parsing tables and the parsing function.
+#include"cconfig"
 #include<yuki/ParserGen/lr1.hpp>
 #include"parser.h"
 constinit xxx::Parser::Action_Table_t xxx::Parser::action_table = {
-    {0,0,{1,3}}, {0,1,{1,3}}, {0,2,{2,2}}, {0,3,{1,6}}, {0,4,{2,1}}, {0,6,{1,6}}, {0,7,{2,4}}, {0,8,{2,3}},
-    {1,3,{1,7}}, {1,5,{1,8}}, {1,6,{1,10}}, {1,9,{1,11}}, {1,10,{2,4}}, {1,11,{2,3}},
-    {2,1,{2,0}}, {2,2,{2,2}}, {2,4,{2,1}}, {2,7,{2,4}}, {2,8,{2,3}},
+    {0,2,{1,3}},
+    {1,2,{1,3}}, {1,4,{2,0}},
+    {2,2,{2,2}}, {2,4,{2,2}},
+    {3,2,{1,6}}, {3,3,{1,7}},
+    {4,2,{2,1}}, {4,4,{2,1}},
+    {5,3,{1,8}},
+    {6,2,{1,6}}, {6,3,{1,10}},
+    {7,2,{2,4}}, {7,4,{2,4}},
+    {8,2,{2,3}}, {8,4,{2,3}},
+    {9,3,{1,11}},
+    {10,3,{2,4}},
+    {11,3,{2,3}},
 };
 
 constinit xxx::Parser::Goto_Table_t xxx::Parser::goto_table = {
-    {3,0,1},
-    {4,0,2}, {4,1,4}, {4,3,5}, {4,6,9},
+    {0,0,1},{0,1,2},
+    {1,1,4},
+    {3,1,5},
+    {6,1,9},
 };
 
 int xxx::Parser::parse(){
-    typedef Token_Settings::any_token any_token;
-    typedef Token_Settings::Terminal Terminal;
-    typedef Token_Settings::NTerminal NTerminal;
-    typedef Token_Settings::Token_Kind Token_Kind;
     namespace ypg = yuki::pg;
 
-    initialize();
+    reset();
 
-    any_token token_ahead_ = lexer_ptr->lex();
+    Any_Token token_ahead_ = lexer_->lex();
 
     while(true){
-        switch(action_table(token_ahead_.get_kind(),state_).get_kind()){
+        switch(action_table(state_,token_ahead_.kind()).kind()){
             case ypg::lr1::Action_Kind::S : {
-                state_ = action_table(token_ahead_.get_kind(),state_).get_state();
-                vec_.push_back({std::move(token_ahead_),state_});
-                token_ahead_ = lexer_ptr->lex();
+                state_ = action_table(state_,token_ahead_.kind()).state();
+                stack_.push_back({std::move(token_ahead_),state_});
+                token_ahead_ = lexer_->lex();
                 goto loop_end_;
             }
             case ypg::lr1::Action_Kind::R : {
-                switch(action_table(token_ahead_.get_kind(),state_).get_rule()){
+                switch(action_table(state_,token_ahead_.kind()).rule()){
                     case 0: {
-                        assert(vec_.size()>=1);
-                        size_t start_ = vec_.size()-1-(1-1);
-                        size_t end_ = vec_.size()-1;
-                        auto& token0_ = vec_[start_].token.static_get<NTerminal::List>();
+                        assert(stack_.size()>=1);
+                        size_t start_ = stack_.size()-1-(1-1);
+                        size_t end_ = stack_.size()-1;
+                        Token::List& token0_ = stack_[start_].token.get<Token::List>();
 
                         { // User codes.
-                            std::cout<<token0_.s0<<'\n';
-                            std::cout<<'(';
-                            for(const size_t e : token0_.s1){
-                                 std::cout<<e<<' ';
-                            }
-                            std::cout<<')'<<std::endl;
+                            printf("%d\n",token0_.zeroth);
+                            printf("(");
+                            for(const size_t e : token0_.first)
+                                 printf("%d ",e);
+                            printf(")\n");
+                            fflush(stdout);
                         }
 
-                        vec_[start_].token.static_free<NTerminal::List>();
-                        vec_.pop_back();
+                        stack_[start_].token.static_destroy_deallocate<Token::List>();
+                        stack_.pop_back();
 
-                        token_ahead_.static_free<Terminal::EoF>();
+                        token_ahead_.static_destroy_deallocate<Token::EOF_>();
 
                         return 0;
                     }
                     case 1 : {
-                        assert(vec_.size()>=2);
-                        size_t start_ = vec_.size()-1-(2-1);
-                        size_t end_ = vec_.size()-1;
-                        auto& token0_ = vec_[start_].token.static_get<NTerminal::List>();
-                        auto& token1_ = vec_[start_+1].token.static_get<NTerminal::Pair>();
+                        assert(stack_.size()>=2);
+                        size_t start_ = stack_.size()-1-(2-1);
+                        size_t end_ = stack_.size()-1;
+                        Token::List& token0_ = stack_[start_].token.get<Token::List>();
+                        Token::Pair& token1_ = stack_[start_+1].token.get<Token::Pair>();
 
-                        any_token any_token_target_ = Token_Settings::make_any_token<NTerminal::List>();
-                        auto& token_target_ = any_token_target_.static_get<NTerminal::List>();
+                        auto p_token_target_ = Any_Token::alloc.template allocate<Token::List>();
+                        YUKI_CONSTRUCT(p_token_target_,{token0_.zeroth+token1_.zeroth});
 
                         { // User codes.
-                            token_target_.s0=token0_.s0+token1_.s0;
-                            token_target_.s1.merge(token0_.s1);
-                            token_target_.s1.merge(token1_.s1);
-                            token_target_.s1.push_back(1);
+                            p_token_target_->first.merge(token0_.first);
+                            p_token_target_->first.merge(token1_.first);
+                            p_token_target_->first.push_back(1);
                         }
 
-                        vec_[start_+1].token.static_free<NTerminal::Pair>();
-                        vec_.pop_back();
-                        vec_[start_].token.static_free<NTerminal::List>();
-                        vec_.pop_back();
+                        stack_[start_+1].token.static_destroy_deallocate<Token::Pair>();
+                        stack_.pop_back();
+                        stack_[start_].token.static_destroy_deallocate<Token::List>();
+                        stack_.pop_back();
 
-                        if(!vec_.empty()){
-                            state_ = goto_table(Token_Kind::List,vec_.back().state);
+                        if(!stack_.empty()){
+                            state_ = goto_table(stack_.back().state,Token_Kind::List);
                         }else{
-                            state_ = goto_table(Token_Kind::List,0);
+                            state_ = goto_table(STATE_INITIAL,Token_Kind::List);
                         }
 
-                        vec_.push_back({std::move(any_token_target_),state_});
+                        stack_.push_back({Any_Token(p_token_target_),state_});
 
                         goto loop_end_;
                     }
                     case 2 : {
-                        assert(vec_.size()>=1);
-                        size_t start_ = vec_.size()-1-(1-1);
-                        size_t end_ = vec_.size()-1;
-                        auto& token0_ = vec_[start_].token.static_get<NTerminal::Pair>();
+                        assert(stack_.size()>=1);
+                        size_t start_ = stack_.size()-1-(1-1);
+                        size_t end_ = stack_.size()-1;
+                        auto& token0_ = stack_[start_].token.get<Token::Pair>();
 
-                        any_token any_token_target_ = Token_Settings::make_any_token<NTerminal::List>();
-                        auto& token_target_ = any_token_target_.static_get<NTerminal::List>();
+                        auto p_token_target_ = Any_Token::alloc.template allocate<Token::List>();
+                        YUKI_CONSTRUCT(p_token_target_,{token0_.zeroth,std::move(token0_.first)});
 
                         { // User codes.
-                            token_target_.s0=token0_.s0;
-                            token_target_.s1=std::move(token0_.s1);
-                            token_target_.s1.push_back(2);
+                            p_token_target_->first.push_back(2);
                         }
 
-                        vec_[start_].token.static_free<NTerminal::Pair>();
-                        vec_.pop_back();
+                        stack_[start_].token.static_destroy_deallocate<Token::Pair>();
+                        stack_.pop_back();
 
-                        if(!vec_.empty()){
-                            state_ = goto_table(Token_Kind::List,vec_.back().state);
+                        if(!stack_.empty()){
+                            state_ = goto_table(stack_.back().state,Token_Kind::List);
                         }else{
-                            state_ = goto_table(Token_Kind::List,0);
+                            state_ = goto_table(STATE_INITIAL,Token_Kind::List);
                         }
 
-                        vec_.push_back({std::move(any_token_target_),state_});
+                        stack_.push_back({Any_Token(p_token_target_),state_});
 
                         goto loop_end_;
                     }
                     case 3 : {
-                        assert(vec_.size()>=3);
-                        size_t start_ = vec_.size()-1-(3-1);
-                        size_t end_ = vec_.size()-1;
-                        auto& token0_ = vec_[start_].token.static_get<Terminal::LB>();
-                        auto& token1_ = vec_[start_+1].token.static_get<NTerminal::Pair>();
-                        auto& token2_ = vec_[start_+2].token.static_get<Terminal::RB>();
+                        assert(stack_.size()>=3);
+                        size_t start_ = stack_.size()-1-(3-1);
+                        size_t end_ = stack_.size()-1;
+                        auto& token0_ = stack_[start_].token.get<Token::LB>();
+                        auto& token1_ = stack_[start_+1].token.get<Token::Pair>();
+                        auto& token2_ = stack_[start_+2].token.get<Token::RB>();
 
-                        any_token any_token_target_ = Token_Settings::make_any_token<NTerminal::Pair>();
-                        auto& token_target_ = any_token_target_.static_get<NTerminal::Pair>();
+                        auto p_token_target_ = Any_Token::alloc.template allocate<Token::Pair>();
+                        YUKI_CONSTRUCT(p_token_target_,{token1_.zeroth,std::move(token1_.first)});
 
                         { // User codes.
-                            token_target_.s0+=token1_.s0;
-                            token_target_.s1=std::move(token1_.s1);
-                            token_target_.s1.push_back(3);
+                            p_token_target_->first.push_back(3);
                         }
 
-                        vec_[start_+2].token.static_free<Terminal::RB>();
-                        vec_.pop_back();
-                        vec_[start_+1].token.static_free<NTerminal::Pair>();
-                        vec_.pop_back();
-                        vec_[start_].token.static_free<Terminal::LB>();
-                        vec_.pop_back();
+                        stack_[start_+2].token.static_destroy_deallocate<Token::RB>();
+                        stack_.pop_back();
+                        stack_[start_+1].token.static_destroy_deallocate<Token::Pair>();
+                        stack_.pop_back();
+                        stack_[start_].token.static_destroy_deallocate<Token::LB>();
+                        stack_.pop_back();
 
-                        if(!vec_.empty()){
-                            state_ = goto_table(Token_Kind::Pair,vec_.back().state);
+                        if(!stack_.empty()){
+                            state_ = goto_table(stack_.back().state,Token_Kind::Pair);
                         }else{
-                            state_ = goto_table(Token_Kind::Pair,0);
+                            state_ = goto_table(STATE_INITIAL,Token_Kind::Pair);
                         }
 
-                        vec_.push_back({std::move(any_token_target_),state_});
+                        stack_.push_back({Any_Token(p_token_target_),state_});
 
                         goto loop_end_;
                     }
                     case 4 : {
-                        assert(vec_.size()>=2);
-                        size_t start_ = vec_.size()-1-(2-1);
-                        size_t end_ = vec_.size()-1;
-                        auto& token0_ = vec_[start_].token.static_get<Terminal::LB>();
-                        auto& token1_ = vec_[start_+1].token.static_get<Terminal::RB>();
+                        assert(stack_.size()>=2);
+                        size_t start_ = stack_.size()-1-(2-1);
+                        size_t end_ = stack_.size()-1;
+                        auto& token0_ = stack_[start_].token.get<Token::LB>();
+                        auto& token1_ = stack_[start_+1].token.get<Token::RB>();
 
-                        any_token any_token_target_ = Token_Settings::make_any_token<NTerminal::Pair>();
-                        auto& token_target_ = any_token_target_.static_get<NTerminal::Pair>();
+                        auto p_token_target_ = Any_Token::alloc.template allocate<Token::Pair>();
+                        YUKI_CONSTRUCT(p_token_target_,{1,{4}});
 
                         { // User codes.
-                            ++token_target_.s0;
-                            token_target_.s1.push_back(4);
                         }
 
-                        vec_[start_+1].token.static_free<Terminal::RB>();
-                        vec_.pop_back();
-                        vec_[start_].token.static_free<Terminal::LB>();
-                        vec_.pop_back();
+                        stack_[start_+1].token.static_destroy_deallocate<Token::RB>();
+                        stack_.pop_back();
+                        stack_[start_].token.static_destroy_deallocate<Token::LB>();
+                        stack_.pop_back();
 
-                        if(!vec_.empty()){
-                            state_ = goto_table(Token_Kind::Pair,vec_.back().state);
+                        if(!stack_.empty()){
+                            state_ = goto_table(stack_.back().state,Token_Kind::Pair);
                         }else{
-                            state_ = goto_table(Token_Kind::Pair,0);
+                            state_ = goto_table(STATE_INITIAL,Token_Kind::Pair);
                         }
 
-                        vec_.push_back({std::move(any_token_target_),state_});
+                        stack_.push_back({Any_Token(p_token_target_),state_});
 
                         goto loop_end_;
                     }
+                    default : return 2;
                 }
             }
             case ypg::lr1::Action_Kind::ERR : {
-                std::cerr<<"Syntax Error!"<<std::endl;
-                initialize();
-                std::cerr<<"Stack Clear!"<<std::endl;
+                yuki::print_error(stderr,"Syntax Error!\n");
+                reset();
+                yuki::print_error(stderr,"Stack Clear!\n");
                 return 1;
             }
         }

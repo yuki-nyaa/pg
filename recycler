@@ -1,0 +1,109 @@
+namespace yuki{
+    template<std::unsigned_integral Token_Kind_t>
+    struct rough_less<pg::lr1::LR1_Item<Token_Kind_t>>{
+        bool operator()(const pg::lr1::LR1_Item<Token_Kind_t>& lhs, const pg::lr1::LR1_Item<Token_Kind_t>& rhs) const noexcept {
+            if(lhs.left<rhs.left)
+                return true;
+            else if(rhs.left<lhs.left)
+                return false;
+            else if(lhs.rights.size()<rhs.rights.size())
+                return true;
+            else if(rhs.rights.size()<lhs.rights.size())
+                return false;
+            else if(lhs.lookahead<rhs.lookahead)
+                return true;
+            else if(rhs.lookahead<lhs.lookahead)
+                return false;
+            else if(lhs.cursor<rhs.cursor)
+                return true;
+            else if(rhs.cursor<lhs.cursor)
+                return false;
+            return false;
+        }
+    };
+
+    template<std::unsigned_integral Token_Kind_t>
+    struct rough_greater<pg::lr1::LR1_Item<Token_Kind_t>>{
+        bool operator()(const pg::lr1::LR1_Item<Token_Kind_t>& lhs, const pg::lr1::LR1_Item<Token_Kind_t>& rhs) const noexcept {
+            if(lhs.left>rhs.left)
+                return true;
+            else if(rhs.left>lhs.left)
+                return false;
+            else if(lhs.rights.size()>rhs.rights.size())
+                return true;
+            else if(rhs.rights.size()>lhs.rights.size())
+                return false;
+            else if(lhs.lookahead>rhs.lookahead)
+                return true;
+            else if(rhs.lookahead>lhs.lookahead)
+                return false;
+            else if(lhs.cursor>rhs.cursor)
+                return true;
+            else if(rhs.cursor>lhs.cursor)
+                return false;
+            return false;
+        }
+    };
+} // namespace yuki
+namespace yuki::pg::lr1{
+    template<std::unsigned_integral Token_Kind_t>
+    using LR1_Item_Set = yuki::multiset<LR1_Item<Token_Kind_t>,yuki::rough_less<LR1_Item<Token_Kind_t>>>;
+
+    template<std::unsigned_integral Token_Kind_t>
+    void closure(LR1_Item_Set<Token_Kind_t>& items,const Rule_Set<Token_Kind_t>& rules,const First_Table<Token_Kind_t>& ftable){
+        const Token_Info& ti=ftable.get_token_info();
+        size_t items_size = items.size();
+        bool items_changed = true;
+        while(items_changed){
+            items_changed=false;
+            for(const LR1_Item<Token_Kind_t>& item : items){
+                if(!item.processed){
+                    item.processed=true;
+                    if(!item.is_complete() && is_nterminal(ti,item.rights[item.cursor])){
+                        typename Rule_Set<Token_Kind_t>::const_iterator b = begin_with_left(rules,item.rights[item.cursor]);
+                        typename Rule_Set<Token_Kind_t>::const_iterator e = end_with_left(rules,item.rights[item.cursor]);
+                        if(b!=rules.end()){
+                            for(;b!=e;++b){
+                                typename First_Table<Token_Kind_t>::extended_const_iterator e_i(&ftable,std::basic_string_view<Token_Kind_t>(item.rights).substr(item.cursor+1),item.lookahead);
+                                do{
+                                    items.insert_equal({item.rights[item.cursor],b->rights,*e_i,0});
+                                }while(e_i.increment_if_not_last());
+                                if(*e_i==ti.epsilon_)
+                                    items.erase_equal({item.rights[item.cursor],b->rights,*e_i,0});
+                                if(items.size()>items_size){
+                                    items_changed=true;
+                                    items_size=items.size();
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    template<std::unsigned_integral Token_Kind_t>
+    LR1_Item_Set<Token_Kind_t> go_to(const LR1_Item_Set<Token_Kind_t>& items,const std::type_identity_t<Token_Kind_t> kind,const Rule_Set<Token_Kind_t>& rules,const First_Table<Token_Kind_t>& ftable){
+        LR1_Item_Set<Token_Kind_t> moved{};
+        for(const LR1_Item<Token_Kind_t>& item : items){
+            if(!item.is_complete() && item.rights[item.cursor]==kind)
+                moved.insert_equal({item.left,item.rights,item.lookahead,item.cursor+1});
+        }
+        closure(moved,rules,ftable);
+        return moved;
+    }
+
+    template<std::unsigned_integral Token_Kind_t>
+    LR1_Item_Set<Token_Kind_t> generate_initial_items(const std::type_identity_t<Token_Kind_t> goal_symbol,const Rule_Set<Token_Kind_t>& rules,const First_Table<Token_Kind_t>& ftable){
+        const Token_Info& ti=ftable.get_token_info();
+        LR1_Item_Set<Token_Kind_t> items{};
+        typename Rule_Set<Token_Kind_t>::const_iterator b = begin_with_left(rules,goal_symbol);
+        typename Rule_Set<Token_Kind_t>::const_iterator e = end_with_left(rules,goal_symbol);
+        if(b!=rules.end()){
+            for(;b!=e;++b)
+                items.insert_equal({goal_symbol,b->rights,static_cast<Token_Kind_t>(ti.EOF_),0});
+        }
+        closure(items,rules,ftable);
+        return items;
+    }
+} // namespace yuki::pg::lr1

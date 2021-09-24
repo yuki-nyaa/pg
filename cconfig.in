@@ -1,0 +1,4 @@
+#pragma once
+#define YUKI_PG_VERSION_MAJOR @yuki.pg_VERSION_MAJOR@
+#define YUKI_PG_VERSION_MINOR @yuki.pg_VERSION_MINOR@
+#define DEBUG_REFLEX TEST

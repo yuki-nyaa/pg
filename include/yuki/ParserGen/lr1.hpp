@@ -4,179 +4,195 @@
 #include<concepts>
 #include<cassert>
 #include<initializer_list>
-#include<iostream>
 #include<vector>
 #include<yuki/ParserGen/core.hpp>
+#ifdef YUKI_PG_TARGET_PRINT
+#include<fmt/core.h>
+#endif
 namespace yuki::pg{
-    namespace lr1{}
-    namespace lalr1 = lr1;
+namespace lr1{}
+namespace lalr1 = lr1;
 }
 
 namespace yuki::pg::lr1{
-    typedef unsigned char Action_Kind_t;
-    struct Action_Kind{
-        enum Enum : Action_Kind_t {ERR=0,S=1,R=2,ACC=3}; // The values are set explicitly, so that instead of writing the tedious "Action_Kind::XXX" we can simply write a number in the generated parsing table, thus reducing the file size, (but at the cost of some readability).
-    };
-
-    inline std::ostream& operator<<(std::ostream& o, const Action_Kind_t ak){
-        o<<static_cast<int>(ak);
-        return o;
+enum struct Action_Kind : unsigned char {ERR=0,S=1,R=2,ACC=3}; // The values are set explicitly, so that instead of writing the tedious "Action_Kind::XXX" we can simply write a number in the generated parsing table, thus reducing the file size, (but at the cost of some readability).
+}
+#ifdef YUKI_PG_TARGET_PRINT
+template<typename CharT>
+fmt::formatter<yuki::pg::lr1::Action_Kind,CharT> : yuki::simple_formatter<yuki::pg::lr1::Action_Kind,CharT> {
+    template<typename FormatContext>
+    auto format(Action_Kind ak,FormatContext& ctx){
+        return fmt::format_to(ctx.out(),"{}",static_cast<unsigned>(ak));
     }
-
-    template<std::unsigned_integral state_t,std::unsigned_integral rule_num_t>
-    struct Action_Entry{
-        private:
-            Action_Kind_t kind;
-            union{
-                state_t state;
-                rule_num_t rule;
-            };
-        public:
-            constexpr Action_Entry() noexcept : kind(Action_Kind::ERR){}
-
-            template<typename S_R>
-            constexpr void set(Action_Kind_t kind_target, S_R s_r) noexcept {
-                kind=kind_target;
-                switch(kind){
-                    case Action_Kind::S :{ state=s_r; break; }
-                    case Action_Kind::R :{ rule=s_r; break; }
-                }
-            }
-
-            template<typename S_R>
-            constexpr Action_Entry(Action_Kind_t kind_target, S_R s_r) noexcept {set(kind_target,s_r);}
-
-            constexpr Action_Kind_t get_kind() const noexcept {return kind;}
-
-            constexpr state_t get_state() const noexcept {
-                assert(kind==Action_Kind::S);
-                return state;
-            }
-            constexpr rule_num_t get_rule() const noexcept {
-                assert(kind==Action_Kind::R);
-                return rule;
-            }
+};
+#endif
+namespace yuki::pg::lr1{
+template<std::unsigned_integral state_t,std::unsigned_integral rule_num_t>
+struct Action_Entry{
+  private:
+    Action_Kind kind_;
+    union{
+        state_t state_;
+        rule_num_t rule_;
     };
+  public:
+    constexpr Action_Entry() noexcept : kind_(Action_Kind::ERR), state_(){}
 
-    template<std::unsigned_integral state_t,std::unsigned_integral rule_num_t>
-    std::ostream& operator<<(std::ostream& o,const Action_Entry<state_t,rule_num_t>& ae){
-        Action_Kind_t k=ae.get_kind();
-        o<<"("<<k<<",";
-        switch(k){
-            case Action_Kind::S : { o<<ae.get_state(); break; }
-            case Action_Kind::R : { o<<ae.get_rule(); break; }
+    template<typename S_R>
+    constexpr void set(Action_Kind kind_target, S_R s_r) noexcept {
+        kind_=kind_target;
+        switch(kind_){
+            case Action_Kind::S :{ state_=s_r; break; }
+            case Action_Kind::R :{ rule_=s_r; break; }
         }
-        o<<")";
-        return o;
+    }
+    template<typename S_R>
+    constexpr void set(unsigned kind_target, S_R s_r) noexcept {set<S_R>(static_cast<Action_Kind>(kind_target),s_r);}
+
+    template<typename S_R>
+    constexpr Action_Entry(Action_Kind kind_target, S_R s_r) noexcept {set(kind_target,s_r);}
+    template<typename S_R>
+    constexpr Action_Entry(unsigned kind_target, S_R s_r) noexcept {set(static_cast<Action_Kind>(kind_target),s_r);}
+
+    constexpr Action_Kind kind() const noexcept {return kind_;}
+
+    constexpr state_t state() const noexcept {
+        assert(kind_==Action_Kind::S);
+        return state_;
+    }
+    constexpr rule_num_t rule() const noexcept {
+        assert(kind_==Action_Kind::R);
+        return rule_;
+    }
+}; // struct Action_Entry<state_t,rule_num_t>
+} // namespace yuki::pg::lr1
+#ifdef YUKI_PG_TARGET_PRINT
+template<typename CharT,std::unsigned_integral state_t,std::unsigned_integral rule_num_t>
+fmt::formatter<yuki::pg::lr1::Action_Entry<state_t,rule_num_t>,CharT> : yuki::simple_formatter<yuki::pg::lr1::Action_Entry<state_t,rule_num_t>,CharT> {
+    template<typename FormatContext>
+    auto format(const Action_Entry<state_t,rule_num_t>& ae,FormatContext& ctx){
+        Action_Kind k=ae.get_kind();
+        fmt::format_to(ctx.out(),"({},",l);
+        switch(k){
+            case Action_Kind::S : {fmt::format_to(ctx.out(),"{}",ae.get_state());break;}
+            case Action_Kind::R : {fmt::format_to(ctx.out(),"{}",ae.get_rule());break;}
+        }
+        return fmt::format_to(ctx.out(),")");
+    }
+};
+#endif
+namespace yuki::pg::lr1{
+template<std::unsigned_integral state_t>
+using Goto_Entry = state_t;
+
+template<typename TS, size_t state_size_, size_t rule_size_>
+struct Action_Table{
+  public:
+    typedef yuki::uint_auto_t<state_size_> state_t;
+    typedef yuki::uint_auto_t<rule_size_> rule_num_t;
+    static constexpr state_t state_size = state_size_;
+    static constexpr rule_num_t rule_size = rule_size_;
+    static constexpr size_t terminal_total = TS::terminal_total;
+  private:
+    Action_Entry<state_t,rule_num_t> table_[state_size][terminal_total];
+    struct Action_Table_Tuple{
+        state_t state;
+        typename TS::Token_Kind_t kind;
+        Action_Entry<state_t,rule_num_t> ae;
+    };
+  public:
+    constexpr Action_Table() noexcept : table_() {}
+    constexpr Action_Table(std::initializer_list<Action_Table_Tuple> l) noexcept : Action_Table() {
+        for(const Action_Table_Tuple& att : l){
+            table_[att.state][TS::terminal_kind_to_index(att.kind)]=att.ae;
+        }
     }
 
-    template<std::unsigned_integral state_t>
-    using Goto_Entry = state_t;
+    constexpr Action_Entry<state_t,rule_num_t>& operator()(state_t state,typename TS::Token_Kind_t kind) noexcept {
+        assert(state<state_size_);
+        return table_[state][TS::terminal_kind_to_index(kind)];
+    }
+    constexpr const Action_Entry<state_t,rule_num_t>& operator()(state_t state,typename TS::Token_Kind_t kind) const noexcept {
+        assert(state<state_size_);
+        return table_[state][TS::terminal_kind_to_index(kind)];
+    }
+};
 
-    template<
-        typename TS,
-        std::unsigned_integral state_t,
-        state_t state_size_,
-        std::unsigned_integral rule_num_t
-    >
-    struct Action_Table{
-        private:
-            Action_Entry<state_t,rule_num_t> table_[TS::terminal_size][state_size_];
-            struct Action_Table_Tuple{
-                typename TS::Token_Kind_t kind;
-                state_t state;
-                Action_Entry<state_t,rule_num_t> ae;
-            };
-        public:
-            static constexpr typename TS::Token_Kind_t terminal_size = TS::terminal_size;
-            static constexpr state_t state_size = state_size_;
-            constexpr Action_Table() noexcept : table_() {}
-            constexpr Action_Table(std::initializer_list<Action_Table_Tuple> l) noexcept : Action_Table() {
-                for(const Action_Table_Tuple& att : l){
-                    table_[TS::terminal_kind_normalize(att.kind)][att.state]=att.ae;
-                }
-            }
+template<typename TS, size_t state_size_>
+struct Goto_Table{
+  public:
+    typedef yuki::uint_auto_t<state_size_> state_t;
+    static constexpr state_t state_size = state_size_;
+    static constexpr size_t nterminal_total = TS::nterminal_total;
+  private:
+    Goto_Entry<state_t> table_[state_size][nterminal_total];
+    struct Goto_Table_Tuple{
+        state_t state;
+        typename TS::Token_Kind_t kind;
+        Goto_Entry<state_t> ge;
+    };
+  public:
+    constexpr Goto_Table() noexcept : table_() {}
+    constexpr Goto_Table(std::initializer_list<Goto_Table_Tuple> l) noexcept : Goto_Table() {
+        for(const Goto_Table_Tuple& gtt : l){
+            table_[gtt.state][TS::nterminal_kind_to_index(gtt.kind)]=gtt.ge;
+        }
+    }
 
-            constexpr Action_Entry<state_t,rule_num_t>& operator()(typename TS::Token_Kind_t kind,state_t state) noexcept {
-                assert(state<state_size_);
-                return table_[TS::terminal_kind_normalize(kind)][state];
-            }
-            constexpr const Action_Entry<state_t,rule_num_t>& operator()(typename TS::Token_Kind_t kind,state_t state) const noexcept {
-                assert(state<state_size_);
-                return table_[TS::terminal_kind_normalize(kind)][state];
-            }
+    constexpr Goto_Entry<state_t>& operator()(state_t state,typename TS::Token_Kind_t kind) noexcept {
+        assert(state<state_size_);
+        return table_[state][TS::nterminal_kind_to_index(kind)];
+    }
+    constexpr const Goto_Entry<state_t>& operator()(state_t state,typename TS::Token_Kind_t kind) const noexcept {
+        assert(state<state_size_);
+        return table_[state][TS::nterminal_kind_to_index(kind)];
+    }
+};
+
+// Abstract (LA)LR1 parser.
+template<typename TS,typename L,unsigned long long STATE_MAX_P,unsigned long long RULE_NUM_MAX_P> requires std::is_same_v<typename L::Token_Settings,TS>
+struct AbsParser{
+  public:
+    typedef TS Token_Settings;
+
+    typedef L Lexer_t;
+
+    typedef yuki::uint_auto_t<STATE_MAX_P> state_t;
+    typedef yuki::uint_auto_t<RULE_NUM_MAX_P> rule_num_t;
+    static constexpr state_t STATE_MAX = STATE_MAX_P;
+    static constexpr state_t STATE_INITIAL = 0;
+    static constexpr rule_num_t RULE_NUM_MAX = RULE_NUM_MAX_P;
+
+    typedef Action_Table<TS,STATE_MAX+1,RULE_NUM_MAX+1> Action_Table_t;
+    typedef Goto_Table<TS,STATE_MAX+1> Goto_Table_t;
+
+    typedef yuki::pg::Any_Token<TS> Any_Token;
+    typedef TS::Token Token;
+    typedef TS::Token_Kind Token_Kind;
+
+    struct Token_State_Pair{
+        Any_Token token;
+        state_t state;
     };
 
-    template<
-        typename TS,
-        std::unsigned_integral state_t,
-        state_t state_size_
-    >
-    struct Goto_Table{
-        private:
-            Goto_Entry<state_t> table_[TS::nterminal_size][state_size_];
-            struct Goto_Table_Tuple{
-                typename TS::Token_Kind_t kind;
-                state_t state;
-                Goto_Entry<state_t> ge;
-            };
-        public:
-            static constexpr typename TS::Token_Kind_t nterminal_size = TS::nterminal_size;
-            static constexpr state_t state_size = state_size_;
-            constexpr Goto_Table() noexcept : table_() {}
-            constexpr Goto_Table(std::initializer_list<Goto_Table_Tuple> l) noexcept : Goto_Table() {
-                for(const Goto_Table_Tuple& gtt : l){
-                    table_[TS::nterminal_kind_normalize(gtt.kind)][gtt.state]=gtt.ge;
-                }
-            }
+    template<typename T>
+    using stack_t = std::vector<T>;
 
-            constexpr Goto_Entry<state_t>& operator()(typename TS::Token_Kind_t kind,state_t state) noexcept {
-                assert(state<state_size_);
-                return table_[TS::nterminal_kind_normalize(kind)][state];
-            }
-            constexpr const Goto_Entry<state_t>& operator()(typename TS::Token_Kind_t kind,state_t state) const noexcept {
-                assert(state<state_size_);
-                return table_[TS::nterminal_kind_normalize(kind)][state];
-            }
-    };
+    // MNumber 500. The number 500 is rather arbitrary, but should suffice for normal parsing.
+    explicit AbsParser(Lexer_t* p=nullptr,state_t state = STATE_INITIAL,size_t stack_depth_expected=500) : lexer_(p), state_(state) {stack_.reserve(stack_depth_expected);}
 
-    // Abstract (LA)LR1 parser.
-    template<typename TS,typename L,auto STATE_MAX_A,auto RULE_NUM_MAX_A,size_t stack_depth_expected=20> requires std::is_same_v<typename L::Token_Settings,TS>
-    struct AbsParser{
-        public:
-            static constexpr bool has_alg(unsigned char a) noexcept {
-                if(a==Parsing_Algorithm::LALR1 || Parsing_Algorithm::LR1)
-                    return true;
-                else
-                    return false;
-            };
-            typedef TS Token_Settings;
+    constexpr state_t state() const noexcept {return state_;}
+    constexpr const stack_t<Token_State_Pair>& stack() const noexcept {return stack_;}
+    constexpr const Lexer_t& lexer() const noexcept {return *lexer_;}
 
-            typedef L Lexer_t;
-            Lexer_t* lexer_ptr=nullptr;
+    void reset(){
+        state_ = STATE_INITIAL;
+        stack_.clear();
+    }
+  protected:
+    Lexer_t* lexer_;
+    stack_t<Token_State_Pair> stack_;
+    state_t state_;
+};
 
-            typedef decltype(STATE_MAX_A) state_t;
-            typedef decltype(RULE_NUM_MAX_A) rule_num_t;
-            static constexpr state_t STATE_MAX = STATE_MAX_A;
-            static constexpr state_t STATE_INITIAL = 0;
-            static constexpr rule_num_t RULE_NUM_MAX = RULE_NUM_MAX_A;
-
-            typedef Action_Table<TS,state_t,STATE_MAX+1,rule_num_t> Action_Table_t;
-            typedef Goto_Table<TS,state_t,STATE_MAX+1> Goto_Table_t;
-
-            struct Token_State_Pair{
-                typename TS::any_token token;
-                state_t state;
-            };
-
-            AbsParser(Lexer_t* p=nullptr,state_t state=STATE_INITIAL) : vec_(),state_(state),lexer_ptr(p) {
-                vec_.reserve(stack_depth_expected);
-            }
-
-            constexpr state_t get_state() const noexcept {return state_;}
-
-        protected:
-            std::vector<Token_State_Pair> vec_;
-            state_t state_=STATE_INITIAL;
-    };
-} // namespace yuki::pg
+} // namespace yuki::pg::lr1

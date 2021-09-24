@@ -1,3 +1,6 @@
+build
 sample/build
-*.exe
 .vscode
+*.code-workspace
+*.exe
+*.log

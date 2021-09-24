@@ -1,6 +1,6 @@
 %option fast unicode nodefault noline
 %option outfile="lexer.cpp" header-file="lexer.h"
-%option namespace="xxx" prefix="bracket" lexer="Lexer" lex="lex" token-type="xxx::Token_Settings::any_token"
+%option namespace="xxx" prefix="bracket" lexer="Lexer" lex="lex" token-type="yuki::pg::Any_Token<xxx::Token_Settings>"
 
 %code_htop{
     #include"parser.common.hpp"
@@ -13,12 +13,26 @@
 %code_class{
     public:
         typedef xxx::Token_Settings Token_Settings;
+        typedef xxx::Token_Settings::Token Token;
+        typedef yuki::pg::Any_Token<xxx::Token_Settings> Any_Token;
 }
 
 %%
 <INITIAL>{
-\(    {return Token_Settings::make_any_token<Token_Settings::Terminal::LB>();}
-\)    {return Token_Settings::make_any_token<Token_Settings::Terminal::RB>();}
-<<EOF>>    {return Token_Settings::make_any_token<Token_Settings::Terminal::EoF>();}
+\(    {
+    auto p = Any_Token::alloc.template allocate<Token::LB>();
+    YUKI_CONSTRUCT(p,{});
+    return Any_Token(p);
+    }
+\)    {
+    auto p = Any_Token::alloc.template allocate<Token::RB>();
+    YUKI_CONSTRUCT(p,{});
+    return Any_Token(p);
+    }
+<<EOF>>    {
+    auto p = Any_Token::alloc.template allocate<Token::EOF_>();
+    YUKI_CONSTRUCT(p,{});
+    return Any_Token(p);
+    }
 }
 %%
