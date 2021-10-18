@@ -618,7 +618,6 @@ struct LR1_Item_Set<Token_Kind_t>::const_iterator{
 namespace yuki::pg::lr1{
 template<std::unsigned_integral Token_Kind_t>
 void closure(LR1_Item_Set<Token_Kind_t>& items,const Rule_Set<Token_Kind_t>& rules,const First_Table<Token_Kind_t>& ftable){
-    const Token_Info& ti=ftable.get_token_info();
     size_t items_size = items.size();
     bool items_changed = true;
     while(items_changed){
@@ -629,7 +628,7 @@ void closure(LR1_Item_Set<Token_Kind_t>& items,const Rule_Set<Token_Kind_t>& rul
             item_loop_head:
             if(!items_b.processed()){
                 items_b.processed()=true;
-                if(!items_b.is_complete() && is_nterminal(ti,items_b.rights()[items_b.cursor()])){
+                if(!items_b.is_complete() && items_b.rights()[items_b.cursor()]<ftable.term_first ){ // `items_b.rights()[items_b.cursor()]` is nterminal.
                     typename Rule_Set<Token_Kind_t>::const_iterator b = begin_with_left(rules,items_b.rights()[items_b.cursor()]);
                     typename Rule_Set<Token_Kind_t>::const_iterator e = end_with_left(rules,items_b.rights()[items_b.cursor()]);
                     if(b!=rules.end()){
@@ -670,91 +669,14 @@ LR1_Item_Set<Token_Kind_t> go_to(const LR1_Item_Set<Token_Kind_t>& items,const s
 
 template<std::unsigned_integral Token_Kind_t>
 LR1_Item_Set<Token_Kind_t> generate_initial_items(const Rule_Set<Token_Kind_t>& rules,const First_Table<Token_Kind_t>& ftable){
-    const Token_Info& ti=ftable.get_token_info();
     LR1_Item_Set<Token_Kind_t> items{};
-    typename Rule_Set<Token_Kind_t>::const_iterator b = begin_with_left(rules,ti.goal);
-    typename Rule_Set<Token_Kind_t>::const_iterator e = end_with_left(rules,ti.goal);
-    if(b!=rules.end()){
-        for(;b!=e;++b)
-            items.insert({static_cast<Token_Kind_t>(ti.goal),b->rights,static_cast<Token_Kind_t>(ti.EOF_),0});
-    }
+    typename Rule_Set<Token_Kind_t>::const_iterator b = begin_with_left(rules,(Token_Kind_t)-1); // `(Token_Kind_t)-1` is the number of "Goal_".
+    typename Rule_Set<Token_Kind_t>::const_iterator e = rules.end();
+    for(;b!=e;++b)
+        items.insert({(Token_Kind_t)-1,b->rights,Token_Kind_t(ftable.token_total()-1),0}); // `ftable.token_total()-1` is the number of "EOF_".
     closure(items,rules,ftable);
     return items;
 }
-
-struct Prec_Table{
-  private:
-    prec_t* p;
-    size_t index_offset;
-  public:
-    // Only terminals have precedence. Assigning precedence to non-terms seems to have little sense.
-    explicit Prec_Table(const Token_Info& ti) noexcept :
-        index_offset(ti.terminal_first)
-    {
-        p = new prec_t[ti.terminal_total()]{};
-    }
-    ~Prec_Table() noexcept {delete[] p;}
-    Prec_Table(const Prec_Table&) = delete;
-    Prec_Table(Prec_Table&& other) noexcept :
-        p(other.p),
-        index_offset(other.index_offset)
-    {other.p = nullptr; other.index_offset = 0;}
-
-    Prec_Table& operator=(const Prec_Table&) = delete;
-    Prec_Table& operator=(Prec_Table&& other) noexcept {
-        if(this!=&other){
-            delete[] p;
-            p = other.p;
-            index_offset = other.index_offset;
-            other.p = nullptr;
-            other.index_offset = 0;
-        }
-        return *this;
-    }
-
-    prec_t& operator[](unsigned long long kind) {assert(kind>=index_offset); return p[kind-index_offset];}
-    const prec_t& operator[](unsigned long long kind) const {assert(kind>=index_offset); return p[kind-index_offset];}
-};
-
-struct Assoc_Table{
-  private:
-    Assoc* p;
-    size_t index_offset;
-  public:
-    Assoc zero;
-
-    // Only terminals have precedence. Assigning precedence to non-terms seems to have little sense.
-    explicit Assoc_Table(const Token_Info& ti,Assoc zero_p) noexcept :
-        index_offset(ti.terminal_first),
-        zero(zero_p)
-    {
-        p = new Assoc[ti.terminal_total()]{};
-    }
-    ~Assoc_Table() noexcept {delete[] p;}
-    Assoc_Table(const Assoc_Table&) = delete;
-    Assoc_Table(Assoc_Table&& other) noexcept :
-        p(other.p),
-        index_offset(other.index_offset),
-        zero(other.zero)
-    {other.p = nullptr; other.index_offset = 0; other.zero = Assoc::RIGHT;}
-
-    Assoc_Table& operator=(const Assoc_Table&) = delete;
-    Assoc_Table& operator=(Assoc_Table&& other) noexcept {
-        if(this!=&other){
-            delete[] p;
-            p = other.p;
-            index_offset = other.index_offset;
-            zero = other.zero;
-            other.p = nullptr;
-            other.index_offset = 0;
-            other.zero = Assoc::RIGHT;
-        }
-        return *this;
-    }
-
-    Assoc& operator[](unsigned long long kind) {assert(kind>=index_offset); return p[kind-index_offset];}
-    const Assoc& operator[](unsigned long long kind) const {assert(kind>=index_offset); return p[kind-index_offset];}
-};
 
 struct Action_Candidates{ // Note that this struct is `memset`able.
     size_t shift; // 0 represents the null value. The state 0 (i.e. the initial state) is actually un-goto-able, so this is fine.
@@ -789,13 +711,22 @@ void resolve_rr_conflict(Action_Candidates& ac1,const size_t rule_num_2,const pr
 
 enum struct Action_Kind {SHIFT,REDUCE}; // There is a enum with the same name in the target-parser header "lr1.hpp". That should be fine, however, since it makes no sense to include the target-parser header in this so to speak "meta-parser" file.
 
-Action_Kind resolve_sr_conflict(const Prec_Table& prec_table,const Assoc_Table& assoc_table,const Action_Candidates& ac,const unsigned long long lookahead){
-    if(ac.reduce.prec_sr<prec_table[lookahead]){
+Action_Kind resolve_sr_conflict(const std::vector<Token_Data>& nterms,const std::vector<Token_Data>& terms,const Assoc assoc0,const Action_Candidates& ac,const unsigned long long lookahead){
+    auto get_prec = [&nterms,&terms](const unsigned long long k) -> prec_t
+    {
+        return (k>=nterms.size() ? terms[k-nterms.size()] : nterms[k]).prec;
+    };
+    auto get_assoc = [&nterms,&terms](const unsigned long long k) -> Assoc
+    {
+        return (k>=nterms.size() ? terms[k-nterms.size()] : nterms[k]).assoc;
+    };
+
+    if(ac.reduce.prec_sr<get_prec(lookahead)){
         return Action_Kind::SHIFT;
-    }else if(ac.reduce.prec_sr>prec_table[lookahead]){
+    }else if(ac.reduce.prec_sr>get_prec(lookahead)){
         return Action_Kind::REDUCE;
     }else{
-        switch(ac.reduce.prec_sr==0 ? assoc_table.zero : assoc_table[lookahead]){
+        switch(ac.reduce.prec_sr==0 ? assoc0 : get_assoc(lookahead)){
             case Assoc::RIGHT : return Action_Kind::SHIFT;
             case Assoc::LEFT : return Action_Kind::REDUCE;
             default : return Action_Kind::SHIFT;

@@ -1,11 +1,11 @@
-%nterm Pair{
-     size_t : count;
-     std::list<size_t> : lst;
-} 4 ;
 %nterm List{
      size_t : count;
      std::list<size_t> : lst;
 };
+%nterm Pair{
+     size_t : count;
+     std::list<size_t> : lst;
+} 4 ;
 %term LB "(" {} yuki::Allocator<Token::LB> ;
 %term RB ")" {};
 

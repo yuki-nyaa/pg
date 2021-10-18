@@ -7,31 +7,34 @@
 #include<yuki/print.hpp>
 
 namespace yuki::pg{
-typedef std::vector<std::string> Token_Name_Table;
-
-struct Token_Info{
-    const size_t nterminal_first;
-    const size_t nterminal_last;
-    const size_t terminal_first;
-    const size_t terminal_last;
-    const Token_Name_Table name_table;
-
-    const size_t EOF_=terminal_last;
-    const size_t epsilon=terminal_last+1;
-    const size_t goal=nterminal_first;
-    Token_Info(size_t a,size_t b,size_t c,size_t d,Token_Name_Table&& name_table_p) : nterminal_first(a),nterminal_last(b),terminal_first(c),terminal_last(d),name_table(std::move(name_table_p)) {}
-    constexpr size_t terminal_total() const noexcept {return terminal_last-terminal_first+1;}
-    constexpr size_t nterminal_total() const noexcept {return nterminal_last-nterminal_first+1;}
-    constexpr size_t token_total() const noexcept {return terminal_total()+nterminal_total();} // Without epslion, of course, since epsilon is really not a token.
-};
-
-constexpr bool is_terminal(const Token_Info& ti,size_t kind) noexcept {return kind>=ti.terminal_first && kind<=ti.terminal_last;}
-constexpr bool is_nterminal(const Token_Info& ti,size_t kind) noexcept {return kind>=ti.nterminal_first && kind<=ti.nterminal_last;}
-constexpr size_t terminal_kind_to_index(const Token_Info& ti,size_t kind) noexcept {assert(is_terminal(ti,kind)); return kind-ti.terminal_first;}
-constexpr size_t nterminal_kind_to_index(const Token_Info& ti,size_t kind) noexcept {assert(is_nterminal(ti,kind)); return kind;}
-
 typedef unsigned short prec_t;
 enum struct Assoc : unsigned char {RIGHT=0,LEFT};
+
+struct Token_Data{
+    std::string name;
+    std::string alias;
+
+    prec_t prec=0;
+    Assoc assoc = Assoc::RIGHT;
+
+    std::vector<std::string> types;
+    std::vector<std::string> names;
+
+    std::string alloc;
+
+    Token_Data(std::string&& n) noexcept :
+        name(std::move(n))
+    {
+        #ifndef YUKI_PG_TOKEN_DATA_RESERVE
+        #define YUKI_PG_TOKEN_DATA_RESERVE 8
+        #endif
+        types.reserve(YUKI_PG_TOKEN_DATA_RESERVE);
+        names.reserve(YUKI_PG_TOKEN_DATA_RESERVE);
+    }
+
+    std::string& name_or_alias() noexcept {return alias.empty() ? name : alias;}
+    const std::string& name_or_alias() const noexcept {return alias.empty() ? name : alias;}
+};
 } // namespace yuki::pg
 template<>
 struct fmt::formatter<yuki::pg::Assoc,char> : yuki::simple_formatter<yuki::pg::Assoc,char> {
@@ -160,8 +163,9 @@ template<std::unsigned_integral Token_Kind_t>
 struct First_Table{
   private:
     std::vector<First_Set<Token_Kind_t>> vec_;
-    Token_Info token_info;
-
+  public:
+    const size_t term_first;
+  private:
     typedef std::vector<First_Set<Token_Kind_t>> table_t;
     typedef typename table_t::iterator iterator;
     typedef typename table_t::reverse_iterator reverse_iterator;
@@ -172,44 +176,49 @@ struct First_Table{
 
 	First_Table() = delete;
 
-    First_Table(const Token_Info& t_info,const Rule_Set<Token_Kind_t>& rules) : token_info(t_info) {
-        vec_.reserve(t_info.token_total()+1);
+    First_Table(const std::vector<Token_Data>& nterms,const std::vector<Token_Data>& terms,const Rule_Set<Token_Kind_t>& rules) noexcept :
+        term_first(nterms.size())
+    {
+        const size_t term_total = terms.size();
+        const size_t token_total = term_first + term_total;
+        vec_.reserve(term_first+term_total+1);
         // From "Engineering A Compiler (2nd Edition)" P104
-        assert(token_info.nterminal_last<token_info.terminal_first);
-        for(Token_Kind_t i = token_info.nterminal_first;i<=token_info.nterminal_last;++i)
+        for(Token_Kind_t i = 0;i<term_first;++i)
             vec_.emplace_back();
-        for(Token_Kind_t i = token_info.terminal_first;i<=token_info.terminal_last;++i)
+        for(Token_Kind_t i = term_first;i<token_total;++i)
             vec_.emplace_back(std::initializer_list<Token_Kind_t>{i});
-        vec_.emplace_back(std::initializer_list<Token_Kind_t>{static_cast<Token_Kind_t>(token_info.epsilon)});
+        vec_.emplace_back(std::initializer_list<Token_Kind_t>{static_cast<Token_Kind_t>(token_total)});
         {
         bool changed = true;
         while(changed==true){
             changed=false;
             for(const Rule<Token_Kind_t>& rule : rules){
-                size_t rule_rights_size = rule.rights.size();
-                First_Set<Token_Kind_t> rhs = vec_[rule.rights[0]];
-                rhs.erase(token_info.epsilon);
-                size_t i = 0;
-                while(i+2<=rule_rights_size && vec_[rule.rights[i]].contains(token_info.epsilon)){
-                    First_Set<Token_Kind_t> set_temp = vec_[rule.rights[i+1]];
-                    set_temp.erase(token_info.epsilon);
-                    rhs.merge(std::move(set_temp));
-                    ++i;
-                }
-                if(i==rule_rights_size-1 && vec_[rule.rights[i]].contains(token_info.epsilon)){
-                    rhs.insert(token_info.epsilon);
-                }
-                size_t size_orig = vec_[rule.left].size();
-                vec_[rule.left].merge(std::move(rhs));
-                if(vec_[rule.left].size()!=size_orig){
-                    changed = true;
+                if(rule.left!=(Token_Kind_t)-1){
+                    size_t rule_rights_size = rule.rights.size();
+                    First_Set<Token_Kind_t> rhs = vec_[rule.rights[0]];
+                    rhs.erase(token_total);
+                    size_t i = 0;
+                    while(i+2<=rule_rights_size && vec_[rule.rights[i]].contains(token_total)){
+                        First_Set<Token_Kind_t> set_temp = vec_[rule.rights[i+1]];
+                        set_temp.erase(token_total);
+                        rhs.merge(std::move(set_temp));
+                        ++i;
+                    }
+                    if(i==rule_rights_size-1 && vec_[rule.rights[i]].contains(token_total)){
+                        rhs.insert(token_total);
+                    }
+                    size_t size_orig = vec_[rule.left].size();
+                    vec_[rule.left].merge(std::move(rhs));
+                    if(vec_[rule.left].size()!=size_orig){
+                        changed = true;
+                    }
                 }
             }
         }
         }
     }
 
-    const Token_Info& get_token_info() const noexcept {return token_info;}
+    size_t token_total() const noexcept {return vec_.size()-1;}
 
     const_iterator begin() const noexcept {return vec_.begin();}
     const_iterator cbegin() const noexcept {return vec_.cbegin();}
@@ -234,7 +243,8 @@ struct First_Table{
         size_t tokens_size = tokens.size();
         bool token2_valid = (token2!=Token_Kind_t(-1));
         assert(!(tokens_size==0 && !token2_valid)); // You shouldn't pass an empty sequence.
-        if(kind==token_info.epsilon){
+        const size_t token_total = vec_.size()-1;
+        if(kind==token_total){
             for(size_t i=0;i+1<=tokens_size;++i){
                 if(!vec_[tokens[i]].contains(kind))
                     return false;
@@ -248,7 +258,7 @@ struct First_Table{
             for(size_t i=0;i+1<=tokens_size;){
                 if(vec_[tokens[i]].contains(kind))
                     return true;
-                else if(vec_[tokens[i]].contains(token_info.epsilon))
+                else if(vec_[tokens[i]].contains(token_total))
                     ++i;
                 else
                     return false;
@@ -268,6 +278,7 @@ struct First_Table{
     set_type extended_get(std::basic_string_view<Token_Kind_t> tokens,const Token_Kind_t token2=Token_Kind_t(-1)) const {
         bool token2_valid = (token2!=Token_Kind_t(-1));
         assert(!(tokens.size()==0 && !token2_valid)); // You shouldn't pass an empty sequence.
+        const size_t token_total = vec_.size()-1;
         set_type result{};
         bool all_epsilon = true;
         typename std::basic_string_view<Token_Kind_t>::const_iterator b = tokens.begin();
@@ -275,16 +286,16 @@ struct First_Table{
         for(;b!=e;++b){
             typename set_type::const_iterator s_e = vec_[*b].end();
             result.insert(vec_[*b].begin(),s_e);
-            if(*std::prev(s_e)!=token_info.epsilon){
-                result.erase(token_info.epsilon);
+            if(*std::prev(s_e)!=token_total){
+                result.erase(token_total);
                 return result;
             }
         }
         if(token2_valid){
             typename set_type::const_iterator s_e = vec_[token2].end();
             result.insert(vec_[token2].begin(),s_e);
-            if(*std::prev(s_e)!=token_info.epsilon){
-                result.erase(token_info.epsilon);
+            if(*std::prev(s_e)!=token_total){
+                result.erase(token_total);
                 return result;
             }
         }
@@ -314,10 +325,11 @@ struct First_Table<Token_Kind_t>::extended_const_iterator{ // TODO comments
     typename set_type::const_iterator y;
     typename set_type::const_iterator y_last; // The last element, not the pass-the-end.
     bool all_epsilon; // Whether all previous sets contain epsilon, recorded when leaving one set.
+
     constexpr bool is_plain_advanceable_() const noexcept {return x!=x_end;}
     void plain_advance_(){ // Well, this is not entirely "plain", since some information must be recorded when leaving a set.
         if(y==y_last){
-            if(*y!=(table_ptr->token_info).epsilon){
+            if(*y!= table_ptr->vec_.size()){
                 all_epsilon = false;
                 tokens[x_end]=tokens[x]; // Records the last set which contains at least one non-epsilon symbol.
                 x=x_end; // Since the current set does not contain epsilon, the iteration halts here.
@@ -341,7 +353,7 @@ struct First_Table<Token_Kind_t>::extended_const_iterator{ // TODO comments
         do{
             plain_advance_();
             a = is_plain_advanceable_();
-            b = *y==(table_ptr->token_info).epsilon;
+            b = *y==table_ptr->vec_.size();
         }while(a&&b);
         if(!a){
             y=y_last;
@@ -377,7 +389,7 @@ struct First_Table<Token_Kind_t>::extended_const_iterator{ // TODO comments
         tokens.push_back(tokens[0]);
         }
 
-        while(is_plain_advanceable_() && *y==(table_ptr->token_info).epsilon){ // Finds the first non-epsilon symbol.
+        while(is_plain_advanceable_() && *y==table_ptr->vec_.size()){ // Finds the first non-epsilon symbol.
             plain_advance_();
         }
     }
@@ -403,7 +415,7 @@ struct First_Table<Token_Kind_t>::extended_const_iterator_ne{ // `extended_const
             x=x_end;
             return *this;
         }
-        while(*y==(table_ptr->token_info).epsilon){
+        while(*y== table_ptr->vec_.size()){
             ++x;
             if(x!=x_end){
                 y=(table_ptr->vec_)[*x].begin();
@@ -426,7 +438,7 @@ struct First_Table<Token_Kind_t>::extended_const_iterator_ne{ // `extended_const
         y=(table_ptr_p->vec_)[*x].begin();
         y_end=(table_ptr_p->vec_)[*x].end();
 
-        while(*y==(table_ptr->token_info).epsilon){
+        while(*y== table_ptr->vec_.size()){
             ++x;
             if(x!=x_end){
                 y=(table_ptr_p->vec_)[*x].begin();
@@ -453,31 +465,3 @@ struct fmt::formatter<yuki::pg::First_Set<Token_Kind_t>,char> : yuki::simple_for
     }
 };
 #endif
-
-namespace yuki::pg{
-struct Token_Data{
-    std::string name;
-    std::string alias;
-
-    prec_t prec=0;
-    Assoc assoc = Assoc::RIGHT;
-
-    std::vector<std::string> types;
-    std::vector<std::string> names;
-
-    std::string alloc;
-
-    Token_Data(std::string&& n) noexcept :
-        name(std::move(n))
-    {
-        #ifndef YUKI_PG_TOKEN_DATA_RESERVE
-        #define YUKI_PG_TOKEN_DATA_RESERVE 8
-        #endif
-        types.reserve(YUKI_PG_TOKEN_DATA_RESERVE);
-        names.reserve(YUKI_PG_TOKEN_DATA_RESERVE);
-    }
-
-    std::string& name_or_alias() noexcept {return alias.empty() ? name : alias;}
-    const std::string& name_or_alias() const noexcept {return alias.empty() ? name : alias;}
-};
-}
