@@ -3,17 +3,19 @@
 #include<type_traits>
 #include<cassert>
 #include<yuki/tmp.hpp>
-#include<yuki/ParserGen/core.hpp>
+#include<yuki/pg/core.hpp>
 
 #include<yuki/allocator.hpp>
 
 #include<list>
 namespace xxx{
 struct Token_Settings{
+    static constexpr bool is_simple_token = false;
+
     static constexpr size_t token_total=5;
     typedef yuki::uint_auto_t<token_total> Token_Kind_t;
     struct Token_Kind{
-        enum Enum : Token_Kind_t {List,Pair, LB,RB,EOF_, EPSILON_}; // This might look sorta ugly. The reason is that I want the enumerators be scoped, while at the same time I don't want to prohibit implicit conversion FROM integers so that in the parsing table definition I can simply write numbers instead of the tedious `Token_Kind::XXX` form. Of course in normal cases magic numbers should be avoided as much as possible for the purpose of readibility, but in the case of a program-generated file I suppose this is not that important.
+        enum Enum : Token_Kind_t {List,Pair, LB,RB,EOF_}; // This might look sorta ugly. The reason is that I want the enumerators be scoped, while at the same time I don't want to prohibit implicit conversion FROM integers so that in the parsing table definition I can simply write numbers instead of the tedious `Token_Kind::XXX` form. Of course in normal cases magic numbers should be avoided as much as possible for the purpose of readibility, but in the case of a program-generated file I suppose this is not that important.
     };
     const char* token_name[token_total]={"List","Pair","(",")","EOF"}; // Used to print error messages.
 
@@ -22,7 +24,6 @@ struct Token_Settings{
     static constexpr Token_Kind_t eof_=Token_Kind::EOF_;
     static constexpr Token_Kind_t nterminal_first=Token_Kind::List;
     static constexpr Token_Kind_t nterminal_last=Token_Kind::Pair;
-    static constexpr Token_Kind_t epsilon=Token_Kind::EPSILON_;
 
     static constexpr size_t terminal_total = terminal_last-terminal_first+1;
     static constexpr size_t nterminal_total = nterminal_last-nterminal_first+1;
@@ -95,43 +96,20 @@ struct Token_Settings::Allocator :
     template<typename T>
     void deallocate(const yuki::pg::Token_Base* p,size_t n=1) {type_to_alloc_t<T>::deallocate(static_cast<const T*>(p),n);}
 
-    void dynamic_destroy_deallocate(Token_Kind_t k,yuki::pg::Token_Base* p){
+    template<typename T>
+    void destroy_deallocate(const yuki::pg::Token_Base* p) {
+        if constexpr(!std::is_trivially_destructible_v<T>)
+            static_cast<const T*>(p) -> ~T();
+        type_to_alloc_t<T>::deallocate(static_cast<const T*>(p));
+    }
+
+    void dynamic_destroy_deallocate(Token_Kind_t k,const yuki::pg::Token_Base* p){
         switch(k){
-            case Token_Kind::List : {
-                typedef Token::List T;
-                if constexpr(!std::is_trivially_destructible_v<T>)
-                    static_cast<T*>(p) -> ~T();
-                deallocate<T>(p);
-                break;
-            }
-            case Token_Kind::Pair : {
-                typedef Token::Pair T;
-                if constexpr(!std::is_trivially_destructible_v<T>)
-                    static_cast<T*>(p) -> ~T();
-                deallocate<T>(p);
-                break;
-            }
-            case Token_Kind::LB : {
-                typedef Token::LB T;
-                if constexpr(!std::is_trivially_destructible_v<T>)
-                    static_cast<T*>(p) -> ~T();
-                deallocate<T>(p);
-                break;
-            }
-            case Token_Kind::RB : {
-                typedef Token::RB T;
-                if constexpr(!std::is_trivially_destructible_v<T>)
-                    static_cast<T*>(p) -> ~T();
-                deallocate<T>(p);
-                break;
-            }
-            case Token_Kind::EOF_ : {
-                typedef Token::EOF_ T;
-                if constexpr(!std::is_trivially_destructible_v<T>)
-                    static_cast<T*>(p) -> ~T();
-                deallocate<T>(p);
-                break;
-            }
+            case Token_Kind::List : {destroy_deallocate<Token::List>(p);break;}
+            case Token_Kind::Pair : {destroy_deallocate<Token::Pair>(p);break;}
+            case Token_Kind::LB : {destroy_deallocate<Token::LB>(p);break;}
+            case Token_Kind::RB : {destroy_deallocate<Token::RB>(p);break;}
+            case Token_Kind::EOF_ : {destroy_deallocate<Token::EOF_>(p);break;}
         }
     }
 };

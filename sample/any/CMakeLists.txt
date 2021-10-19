@@ -29,7 +29,7 @@ endif()
 set(LOCAL_INCLUDE /${USR}/local/include)
 set(LOCAL_LIB /${USR}/local/lib)
 
-set(YUKI_PG_ROOT "..")
+set(YUKI_PG_ROOT "../..")
 
 include_directories(${YUKI_PG_ROOT}/include ${LOCAL_INCLUDE} ${PROJECT_SOURCE_DIR} ${PROJECT_BINARY_DIR})
 link_directories(${LOCAL_LIB})

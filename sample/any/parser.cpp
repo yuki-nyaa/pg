@@ -1,8 +1,8 @@
 // Definition for the parsing tables and the parsing function.
 #include"cconfig"
-#include<yuki/ParserGen/lr1.hpp>
+#include<yuki/pg/lr1.hpp>
 #include"parser.h"
-constinit xxx::Parser::Action_Table_t xxx::Parser::action_table = {
+constinit xxx::Parser::Action_Table xxx::Parser::action_table = {
     {0,2,{1,3}},
     {1,2,{1,3}}, {1,4,{2,0}},
     {2,2,{2,2}}, {2,4,{2,2}},
@@ -17,7 +17,7 @@ constinit xxx::Parser::Action_Table_t xxx::Parser::action_table = {
     {11,3,{2,3}},
 };
 
-constinit xxx::Parser::Goto_Table_t xxx::Parser::goto_table = {
+constinit xxx::Parser::Goto_Table xxx::Parser::goto_table = {
     {0,0,1},{0,1,2},
     {1,1,4},
     {3,1,5},
@@ -33,13 +33,13 @@ int xxx::Parser::parse(){
 
     while(true){
         switch(action_table(state_,token_ahead_.kind()).kind()){
-            case ypg::lr1::Action_Kind::S : {
+            case ypg::LR1_Action_Kind::S : {
                 state_ = action_table(state_,token_ahead_.kind()).state();
                 stack_.push_back({std::move(token_ahead_),state_});
                 token_ahead_ = lexer_->lex();
                 goto loop_end_;
             }
-            case ypg::lr1::Action_Kind::R : {
+            case ypg::LR1_Action_Kind::R : {
                 switch(action_table(state_,token_ahead_.kind()).rule()){
                     case 0: {
                         assert(stack_.size()>=1);
@@ -87,7 +87,7 @@ int xxx::Parser::parse(){
                         if(!stack_.empty()){
                             state_ = goto_table(stack_.back().state,Token_Kind::List);
                         }else{
-                            state_ = goto_table(STATE_INITIAL,Token_Kind::List);
+                            state_ = goto_table(0,Token_Kind::List);
                         }
 
                         stack_.push_back({Any_Token(p_token_target_),state_});
@@ -113,7 +113,7 @@ int xxx::Parser::parse(){
                         if(!stack_.empty()){
                             state_ = goto_table(stack_.back().state,Token_Kind::List);
                         }else{
-                            state_ = goto_table(STATE_INITIAL,Token_Kind::List);
+                            state_ = goto_table(0,Token_Kind::List);
                         }
 
                         stack_.push_back({Any_Token(p_token_target_),state_});
@@ -145,7 +145,7 @@ int xxx::Parser::parse(){
                         if(!stack_.empty()){
                             state_ = goto_table(stack_.back().state,Token_Kind::Pair);
                         }else{
-                            state_ = goto_table(STATE_INITIAL,Token_Kind::Pair);
+                            state_ = goto_table(0,Token_Kind::Pair);
                         }
 
                         stack_.push_back({Any_Token(p_token_target_),state_});
@@ -173,7 +173,7 @@ int xxx::Parser::parse(){
                         if(!stack_.empty()){
                             state_ = goto_table(stack_.back().state,Token_Kind::Pair);
                         }else{
-                            state_ = goto_table(STATE_INITIAL,Token_Kind::Pair);
+                            state_ = goto_table(0,Token_Kind::Pair);
                         }
 
                         stack_.push_back({Any_Token(p_token_target_),state_});
@@ -183,7 +183,7 @@ int xxx::Parser::parse(){
                     default : return 2;
                 }
             }
-            case ypg::lr1::Action_Kind::ERR : {
+            case ypg::LR1_Action_Kind::ERR : {
                 yuki::print_error(stderr,"Syntax Error!\n");
                 reset();
                 yuki::print_error(stderr,"Stack Clear!\n");

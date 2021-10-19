@@ -18,6 +18,19 @@ struct Cmd_Data{
     FILE* fp_out_token = nullptr;
     FILE* fp_out_log = nullptr;
 
+    const char* tmp_goto = "yuki_pg_tmp_goto";
+    FILE* fp_goto = nullptr;
+
+    std::string sp_token;
+    std::string nspace;
+    std::string parser = "Parser";
+    std::string ts = "Token_Settings";
+    std::string lexer;
+
+    bool if_final_function = false;
+    bool if_final_class = false;
+    bool no_default_ctor = false;
+
     ~Cmd_Data() noexcept {close_all();}
 
     void close_all(){
@@ -26,6 +39,7 @@ struct Cmd_Data{
         if(fp_out_h!=nullptr && fp_out_h!=stdout && fp_out_h!=stderr) {fclose(fp_out_h);fp_out_h=nullptr;}
         if(fp_out_token!=nullptr && fp_out_token!=stdout && fp_out_token!=stderr) {fclose(fp_out_token);fp_out_token=nullptr;}
         if(fp_out_log!=nullptr && fp_out_log!=stdout && fp_out_log!=stderr) {fclose(fp_out_log);fp_out_log=nullptr;}
+        if(fp_goto!=nullptr) {fclose(fp_goto);remove(tmp_goto);}
     }
 
     bool post_process();
@@ -49,6 +63,7 @@ namespace cmd_impl{
     }
     inline void version(Cmd_Data&,std::vector<std::string>&){
         fmt::print(stdout,"ParserGen by Yuki, version {}.{}\n",YUKI_PG_VERSION_MAJOR,YUKI_PG_VERSION_MINOR);
+        std::exit(EXIT_SUCCESS);
     }
 }
 
@@ -111,6 +126,13 @@ inline bool Cmd_Data::post_process(){
     if(!out_log.empty()){
         fp_out_log=fopen(out_log.c_str(),"w");
     }
+
+    if((fp_goto=fopen(tmp_goto,"r"))){
+        yuki::print_error(stderr,"Temp file \"{}\" already exists!\n",tmp_goto);
+        fclose(fp_goto); fp_goto = nullptr;
+        return false;
+    }
+    fp_goto = fopen(tmp_goto,"w+");
 
     return true;
 } // bool Cmd_Data::post_process()

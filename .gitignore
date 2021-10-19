@@ -1,4 +1,5 @@
 build
+release
 sample/build
 .vscode
 *.code-workspace

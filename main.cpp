@@ -1,158 +1,10 @@
 #include"cconfig"
 #include"debug.hpp"
-#include<fmt/core.h>
-#include"lr1_gen.hpp"
-namespace yuki::pg::lr1{
-template<std::unsigned_integral Token_Kind_t>
-size_t lr1_table_generate(
-    const std::vector<Token_Data>& nterms,const std::vector<Token_Data>& terms,
-    const Rule_Set<Token_Kind_t>& rules,
-    const Assoc assoc0,
-    FILE* fp_file,FILE* fp_err,FILE* fp_log)
-{
-    assert(fp_file); assert(fp_err); // Log-out is optional.
-    First_Table<Token_Kind_t> first_table(nterms,terms,rules);
-    std::vector<LR1_Item_Set<Token_Kind_t>> cc;
-    #ifndef YUKI_PG_LR1_ITEMS_RESERVE
-    #define YUKI_PG_LR1_ITEMS_RESERVE 65536
-    #endif
-    cc.reserve(YUKI_PG_LR1_ITEMS_RESERVE);
-    size_t cc_next=1;
-    cc.push_back(generate_initial_items(rules,first_table));
-
-    LR1_Item_Set<Token_Kind_t> cc_candidate{};
-
-    const size_t term_total = terms.size();
-    const size_t nterm_total = nterms.size();
-    const size_t token_total = term_total + nterm_total;
-
-    Action_Candidates* action_row = new Action_Candidates[term_total];
-
-    size_t sr_conflict_total = 0;
-    size_t rr_conflict_total = 0;
-
-    for(size_t cc_current=0; cc_current<cc_next && !(cc[cc_current].processed); ++cc_current){
-        cc[cc_current].processed=true;
-        typename LR1_Item_Set<Token_Kind_t>::const_iterator it = cc[cc_current].begin();
-        Token_Kind_t cursored_current=it.cursored();
-
-        while(cursored_current!=Token_Kind_t(-1)){ // Handles "shift" and "goto".
-            assert(cc_candidate.empty());
-            for(;!it.is_end() && it.cursored()==cursored_current; ++it){
-                cc_candidate.insert({it.left(),it.rights(),it.lookahead(),it.cursor()+1});
-            }
-            closure(cc_candidate,rules,first_table);
-
-            size_t cc_candidate_number=0;
-            for(;cc_candidate_number!=cc_next;++cc_candidate_number){
-                if(cc[cc_candidate_number]==cc_candidate){
-                    cc_candidate.clear();
-                    goto cc_candidate_already_exists;
-                }
-            }
-            cc.emplace_back(std::move(cc_candidate));
-            ++cc_next;
-            cc_candidate_already_exists:
-            if(cursored_current>=nterm_total && cursored_current<token_total){ // `cursored_current` is terminal.
-                action_row[cursored_current-nterm_total].shift=cc_candidate_number;
-                // The write of "action(cursored_current(,cc_current)) = shift cc_candidate_number" is postponed until all items in the current item-set are considered.
-            }else if(cursored_current<nterm_total){ // `cursored_current` is nterminal.
-                fmt::print(fp_file,"goto({},{}) = {}\n",cc_current,cursored_current,cc_candidate_number);
-                // Since "goto" cannot have conflicts, we can immediately write "goto(cc_current,symbol)=cc_candidate_number".
-            }
-            YUKI_PG_DBGO("cgoto({},{}) = {}\n",cc_current,cursored_current,cc_candidate_number);
-
-            if(it.is_end()){
-                for(Token_Kind_t i=nterm_total;i<token_total;++i){
-                    if(action_row[i-nterm_total].shift!=0)
-                    fmt::print(fp_file,"action({},{}) = shift {}\n",cc_current,i,(action_row[i-nterm_total].shift));
-                }
-                std::memset(action_row,0, term_total * sizeof(Action_Candidates) );
-                goto loop_1_end;
-            }else{
-                cursored_current=it.cursored();
-            }
-        }
-
-        for(;!it.is_end();++it){ // Handles "reduce".
-            auto rule_it = rules.first_equal({it.left(),it.rights(),0});
-            assert(rule_it!=rules.end());
-            if(Action_Candidates& action_this = action_row[it.lookahead()-nterm_total] ; action_this.reduce.rule_num!=0){
-                yuki::try_print(fp_log,"RR-conflict encountered. action({},{}) = reduce {}({}) / {}({}). ",cc_current,terms[it.lookahead()-nterm_total].name,action_this.reduce.rule_num,action_this.reduce.prec_rr,rule_it->num,rule_it->prec_rr);
-                resolve_rr_conflict(action_this,rule_it->num,rule_it->prec_sr,rule_it->prec_rr);
-                ++rr_conflict_total;
-                yuki::try_print(fp_log,"Resolved to rule {}.",action_this.reduce.rule_num);
-            }else{
-                action_this.reduce={rule_it->num,rule_it->prec_sr,rule_it->prec_rr};
-            }
-        }
-
-        // SR-conflict resolution
-        for(Token_Kind_t i=nterm_total;i<token_total;++i){
-            switch(Action_Candidates& action_this=action_row[i-nterm_total] ; action_this.state()){
-                case Action_Candidates::State::EMPTY : {
-                    continue;
-                }
-                case Action_Candidates::State::S : {
-                    fmt::print(fp_file,"action({},{}) = shift {}\n",cc_current,i,action_this.shift);
-                    std::memset(action_row+(i-nterm_total),0,sizeof(Action_Candidates));
-                    break;
-                }
-                case Action_Candidates::State::R : {
-                    fmt::print(fp_file,"action({},{}) = reduce {}\n",cc_current,i,action_this.reduce.rule_num);
-                    std::memset(action_row+(i-nterm_total),0,sizeof(Action_Candidates));
-                    break;
-                }
-                case Action_Candidates::State::SR : {
-                    yuki::try_print(fp_log,"SR-conflict encountered. action({},{}) = shift {} / reduce {}({}). Prec(lookahead)={}. Assoc(lookahead)={}. ",
-                        cc_current,terms[i-nterm_total].name, action_this.shift,
-                        action_this.reduce.rule_num, action_this.reduce.prec_sr,
-                        terms[i-nterm_total].prec,terms[i-nterm_total].assoc
-                    );
-                    switch(resolve_sr_conflict(nterms,terms,assoc0,action_this,i)){
-                        case Action_Kind::SHIFT : {
-                            yuki::try_print(fp_log,"Resolved to shift {}.\n",action_this.shift);
-                            fmt::print(fp_file,"action({},{}) = shift {}\n",cc_current,i,action_this.shift);
-                            break;
-                        }
-                        case Action_Kind::REDUCE : {
-                            yuki::try_print(fp_log,"Resolved to reduce {}.\n",action_this.reduce.rule_num);
-                            fmt::print(fp_file,"action({},{}) = reduce {}\n",cc_current,i,action_this.reduce.rule_num);
-                            break;
-                        }
-                    }
-                    ++sr_conflict_total;
-                    std::memset(action_row+(i-nterm_total),0,sizeof(Action_Candidates));
-                    break;
-                }
-            }
-        }
-        loop_1_end:;
-        #ifdef YUKI_PG_DBG
-        for(Token_Kind_t i=nterm_total;i<token_total;++i){
-            if(!action_row[i-nterm_total].empty())
-                dbgout("non-empty action_candidates at ({},{}).\n",cc_current,i);
-        }
-        std::memset(action_row,0, term_total * sizeof(Action_Candidates) );
-        #endif
-    }
-
-    // Write the accept action.
-    // The accept item-set might contain reduce-items with lookahead EOF_. Those will be overwritten, WITHOUT diagnostics. Such conflicts should be rare, however. The production-set that entails such conflicts should obviously wrong, like "A -> A".
-    fmt::print(fp_file,"action({},{}) = reduce {}\n",1,token_total-1,0);
-
-    if(sr_conflict_total || rr_conflict_total)
-        fmt::print(fp_err,"{} SR-conflict(s), {} RR-conflict(s) in total. See log for details.\n",sr_conflict_total,rr_conflict_total);
-
-    delete[] action_row;
-
-    return cc.size();
-}
-}
-
+#include"lr1_writer.h"
 #include"cmd.hpp"
 #include"meta_lexer0.h"
 #include"meta_lexer1.h"
+#include<fmt/core.h>
 int main(int argc,char** argv){
     namespace ypg=yuki::pg;
     ypg::Cmd_Data cmd_data;
@@ -163,44 +15,38 @@ int main(int argc,char** argv){
 
     ypg::Meta_Lexer0 meta_lexer0(cmd_data);
     meta_lexer0.lex();
-    meta_lexer0.term_table.emplace_back("EOF_");
 
-    cmd_data.fp_in = freopen(cmd_data.in.c_str(),"r",cmd_data.fp_in);
+    rewind(cmd_data.fp_in);
 
-    switch(yuki::uint_auto_f(meta_lexer0.nterm_table.size()+meta_lexer0.term_table.size())){
+    switch(yuki::uint_auto_f(meta_lexer0.nterms.size()+meta_lexer0.terms.size())){
         case yuki::uint_enum::UCHAR : {
             ypg::Meta_Lexer1<unsigned char> meta_lexer1(std::move(meta_lexer0));
             meta_lexer1.lex();
-            printf("%zu\n",meta_lexer1.rs.size());
-            yuki::pg::lr1::lr1_table_generate<unsigned char>(meta_lexer1.nterm_table,meta_lexer1.term_table,meta_lexer1.rs,meta_lexer0.assoc_zero,cmd_data.fp_out_cpp,stderr,cmd_data.fp_out_log);
+            ypg::LR1_Writer<unsigned char>::write(cmd_data,meta_lexer1.code_htable,meta_lexer1.nterms,meta_lexer1.terms,meta_lexer1.rs,meta_lexer1.assoc0);
             break;
         }
         case yuki::uint_enum::USHORT : {
             ypg::Meta_Lexer1<unsigned short> meta_lexer1(std::move(meta_lexer0));
             meta_lexer1.lex();
-            printf("%zu\n",meta_lexer1.rs.size());
-            yuki::pg::lr1::lr1_table_generate<unsigned short>(meta_lexer1.nterm_table,meta_lexer1.term_table,meta_lexer1.rs,meta_lexer0.assoc_zero,cmd_data.fp_out_cpp,stderr,cmd_data.fp_out_log);
+            ypg::LR1_Writer<unsigned short>::write(cmd_data,meta_lexer1.code_htable,meta_lexer1.nterms,meta_lexer1.terms,meta_lexer1.rs,meta_lexer1.assoc0);
             break;
         }
         case yuki::uint_enum::UINT : {
             ypg::Meta_Lexer1<unsigned> meta_lexer1(std::move(meta_lexer0));
             meta_lexer1.lex();
-            printf("%zu\n",meta_lexer1.rs.size());
-            yuki::pg::lr1::lr1_table_generate<unsigned>(meta_lexer1.nterm_table,meta_lexer1.term_table,meta_lexer1.rs,meta_lexer0.assoc_zero,cmd_data.fp_out_cpp,stderr,cmd_data.fp_out_log);
+            ypg::LR1_Writer<unsigned>::write(cmd_data,meta_lexer1.code_htable,meta_lexer1.nterms,meta_lexer1.terms,meta_lexer1.rs,meta_lexer1.assoc0);
             break;
         }
         case yuki::uint_enum::ULONG : {
             ypg::Meta_Lexer1<unsigned long> meta_lexer1(std::move(meta_lexer0));
             meta_lexer1.lex();
-            printf("%zu\n",meta_lexer1.rs.size());
-            yuki::pg::lr1::lr1_table_generate<unsigned long>(meta_lexer1.nterm_table,meta_lexer1.term_table,meta_lexer1.rs,meta_lexer0.assoc_zero,cmd_data.fp_out_cpp,stderr,cmd_data.fp_out_log);
+            ypg::LR1_Writer<unsigned long>::write(cmd_data,meta_lexer1.code_htable,meta_lexer1.nterms,meta_lexer1.terms,meta_lexer1.rs,meta_lexer1.assoc0);
             break;
         }
         case yuki::uint_enum::ULLONG : {
             ypg::Meta_Lexer1<unsigned long long> meta_lexer1(std::move(meta_lexer0));
             meta_lexer1.lex();
-            printf("%zu\n",meta_lexer1.rs.size());
-            yuki::pg::lr1::lr1_table_generate<unsigned long long>(meta_lexer1.nterm_table,meta_lexer1.term_table,meta_lexer1.rs,meta_lexer0.assoc_zero,cmd_data.fp_out_cpp,stderr,cmd_data.fp_out_log);
+            ypg::LR1_Writer<unsigned long long>::write(cmd_data,meta_lexer1.code_htable,meta_lexer1.nterms,meta_lexer1.terms,meta_lexer1.rs,meta_lexer1.assoc0);
             break;
         }
     }

@@ -1,4 +1,4 @@
-#include<yuki/ParserGen/core.hpp>
+#include<yuki/pg/core.hpp>
 struct Foo{
     Foo()=delete;
 };

@@ -1,11 +1,11 @@
-%nterm List{
-     size_t : count;
-     std::list<size_t> : lst;
-};
 %nterm Pair{
      size_t : count;
      std::list<size_t> : lst;
 } 4 ;
+%nterm List{
+     size_t : count;
+     std::list<size_t> : lst;
+};
 %term LB "(" {} yuki::Allocator<Token::LB> ;
 %term RB ")" {};
 
@@ -21,17 +21,6 @@
 }
 
 %%
-Goal_ :
-    List {} {
-        printf("%d\n",$0[count]);
-        printf("(");
-        for(const size_t e : $0[lst])
-            printf("%d ",e);
-        printf(")\n");
-        fflush(stdout);
-    };
-
-
 List :
     List Pair    %prec "("   %rr 5
     {$0[count]+$1[count]}
@@ -58,6 +47,16 @@ Pair :
     "(" ")"
     {1,{4}}
     {};
+
+Goal_ :
+    List {} {
+        printf("%d\n",$0[count]);
+        printf("(");
+        for(const size_t e : $0[lst])
+            printf("%d ",e);
+        printf(")\n");
+        fflush(stdout);
+    };
 
 %%
 //blah blah blah

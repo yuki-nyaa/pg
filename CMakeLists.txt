@@ -46,5 +46,8 @@ add_custom_command(OUTPUT meta_lexer1.cpp meta_lexer1.h
 add_custom_target(meta_lexer1
     DEPENDS meta_lexer1.cpp meta_lexer1.h)
 
-add_executable(main main.cpp meta_lexer0.cpp meta_lexer1.cpp)
-target_link_libraries(main reflex fmt)
+add_executable(ypg main.cpp meta_lexer0.cpp meta_lexer1.cpp lr1_writer.cpp)
+target_link_libraries(ypg reflex fmt)
+
+install(DIRECTORY include/yuki TYPE INCLUDE)
+install(TARGETS ypg RUNTIME)

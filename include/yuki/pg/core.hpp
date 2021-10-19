@@ -1,5 +1,5 @@
 #pragma once
-#include<yuki/ParserGen/debug_.hpp>
+#include<yuki/pg/debug_.hpp>
 #include<concepts>
 #include<type_traits>
 #include<utility>
@@ -122,8 +122,13 @@ struct is_token<Token<Token_Kind_t,kind_p,Ts...>> : std::true_type {};
 template<typename T>
 inline constexpr bool is_token_v = is_token<T>::value;
 
+
+
+template<typename TS,bool = TS::is_simple_token>
+struct Any_Token;
+
 template<typename TS>
-struct Any_Token{
+struct Any_Token<TS,false>{
   public:
     typedef TS Token_Settings;
     typedef typename TS::Token_Kind_t Token_Kind_t;
@@ -203,6 +208,41 @@ struct Any_Token{
 }; // struct Any_Token
 
 template<typename TS>
-typename TS::Allocator Any_Token<TS>::alloc{};
+typename TS::Allocator Any_Token<TS,false>::alloc{};
 
+
+
+template<std::unsigned_integral Token_Kind_t,typename T>
+struct Simple_Token_{
+    Token_Kind_t kind = -1;
+    T value;
+    Location_Range location_range={};
+};
+
+template<std::unsigned_integral Token_Kind_t>
+struct Simple_Token_<Token_Kind_t,void>{
+    Token_Kind_t kind = -1;
+    Location_Range location_range={};
+};
+
+static_assert(std::is_aggregate_v<Simple_Token_<unsigned,Location_Range>>);
+
+template<typename TS>
+struct Any_Token<TS,true> : Simple_Token_<typename TS::Token_Kind_t,typename TS::value_type> {};
+
+
+
+template<typename TS>
+struct AbsParser{
+    typedef TS Token_Settings;
+
+    typedef yuki::pg::Any_Token<TS> Any_Token;
+    typedef typename TS::Token Token;
+    typedef typename TS::Token_Kind Token_Kind;
+    typedef typename TS::Token_Kind_t Token_Kind_t;
+
+    virtual ~AbsParser() noexcept = default;
+
+    virtual int parse() = 0;
+};
 } // namespace yuki::pg
