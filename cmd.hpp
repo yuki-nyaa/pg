@@ -39,7 +39,7 @@ struct Cmd_Data{
         if(fp_out_h!=nullptr && fp_out_h!=stdout && fp_out_h!=stderr) {fclose(fp_out_h);fp_out_h=nullptr;}
         if(fp_out_token!=nullptr && fp_out_token!=stdout && fp_out_token!=stderr) {fclose(fp_out_token);fp_out_token=nullptr;}
         if(fp_out_log!=nullptr && fp_out_log!=stdout && fp_out_log!=stderr) {fclose(fp_out_log);fp_out_log=nullptr;}
-        if(fp_goto!=nullptr) {fclose(fp_goto);remove(tmp_goto);}
+        if(fp_goto!=nullptr) {fclose(fp_goto);remove(tmp_goto);fp_goto=nullptr;}
     }
 
     bool post_process();

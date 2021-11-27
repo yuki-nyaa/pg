@@ -114,7 +114,7 @@ size_t LR1_Writer<Token_Kind_t>::write_table(
                     yuki::try_print(fp_log,"SR-conflict encountered. action({},{}) = shift {} / reduce {}({}). Prec(lookahead)={}. Assoc(lookahead)={}. ",
                         cc_current,terms[i-nterm_total].name, action_this.shift,
                         action_this.reduce.rule_num, action_this.reduce.prec_sr,
-                        terms[i-nterm_total].prec,terms[i-nterm_total].assoc
+                        terms[i-nterm_total].prec, terms[i-nterm_total].prec==0 ? assoc0 : terms[i-nterm_total].assoc
                     );
                     switch(resolve_sr_conflict(nterms,terms,assoc0,action_this,i)){
                         case Action_Kind::SHIFT : {
@@ -192,10 +192,10 @@ void LR1_Writer<Token_Kind_t>::write(
     fprintf(out,
         "#include<yuki/pg/lr1.hpp>\n"
         "#include\"%s\"\n"
-        "constinit %s::%s::Action_Table %s::%s::action_table = {\n",
+        "constinit %s%s%s::Action_Table %s%s%s::action_table = {\n",
         cmd_data.out_h.c_str(),
-        cmd_data.nspace.c_str(), cmd_data.parser.c_str(),
-        cmd_data.nspace.c_str(), cmd_data.parser.c_str()
+        cmd_data.nspace.c_str(), cmd_data.nspace.empty() ? "" : "::", cmd_data.parser.c_str(),
+        cmd_data.nspace.c_str(), cmd_data.nspace.empty() ? "" : "::", cmd_data.parser.c_str()
     );
     const size_t state_size = write_table(nterms,terms,rules,assoc0,cmd_data.fp_out_cpp,cmd_data.fp_goto,stderr,cmd_data.fp_out_log);
     fprintf(out,
@@ -204,9 +204,9 @@ void LR1_Writer<Token_Kind_t>::write(
         "\n"
     );
     fprintf(out,
-        "constinit %s::%s::Goto_Table %s::%s::goto_table = {\n",
-        cmd_data.nspace.c_str(), cmd_data.parser.c_str(),
-        cmd_data.nspace.c_str(), cmd_data.parser.c_str()
+        "constinit %s%s%s::Goto_Table %s%s%s::goto_table = {\n",
+        cmd_data.nspace.c_str(), cmd_data.nspace.empty() ? "" : "::", cmd_data.parser.c_str(),
+        cmd_data.nspace.c_str(), cmd_data.nspace.empty() ? "" : "::", cmd_data.parser.c_str()
     );
     freopen(cmd_data.tmp_goto,"r",cmd_data.fp_goto);
     yuki::concat_file(out,cmd_data.fp_goto);
@@ -255,7 +255,7 @@ void LR1_Writer<Token_Kind_t>::write(
                 fprintf(out,
                     IND6 "auto p_token_target_ = Any_Token::alloc.template allocate<Token::%s>();\n"
                     IND6 "YUKI_CONSTRUCT(p_token_target_,%s);\n"
-                    IND6 "Token::%s& token_target_ = *p_token_target;\n"
+                    IND6 "Token::%s& token_target_ = *p_token_target_;\n"
                     "\n",
                     get_token_data(rule.left).name.c_str(), rule.init.c_str(),  get_token_data(rule.left).name.c_str()
                 );
@@ -320,7 +320,7 @@ void LR1_Writer<Token_Kind_t>::write(
         IND4 "return 1;\n"
         IND3 "}\n"
         IND2 "}\n"
-        IND2 "loop_end:;\n"
+        IND2 "loop_end_:;\n"
         IND "}\n"
         "}\n"
     );

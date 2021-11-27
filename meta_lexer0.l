@@ -274,7 +274,7 @@ id [A-Za-z_]\p{Word}*
 
 
 <PREC>{
-(\".*\")|({id}+)    {
+(\"[^\"]*\")|({id}+)    {
     str_temp1 = str();
     try{
         yuki::Pair<bool,size_t> pair = token_htable.at(str_temp1);
@@ -297,7 +297,7 @@ id [A-Za-z_]\p{Word}*
 
 
 <ASSOC>{
-(\".*\")|({id}+)    {
+(\"[^\"]*\")|({id}+)    {
     str_temp1 = str();
     try{
         yuki::Pair<bool,size_t> pair = token_htable.at(str_temp1);
@@ -347,6 +347,7 @@ id [A-Za-z_]\p{Word}*
 
 
 <CODE1>{
+\{    {++brace_level;str_temp1.push_back('{');}
 \}    {
     if(brace_level!=0){
         --brace_level;
@@ -448,7 +449,7 @@ void write_token(const Cmd_Data& cmd_data,const std::vector<Token_Data>& nterms,
         IND "static constexpr bool is_simple_token = %s;\n"
         "\n"
         IND "static constexpr size_t token_total = %zu;\n"
-        IND "typedef yuki::uint_auto<token_total> Token_Kind_t;\n",
+        IND "typedef yuki::uint_auto_t<token_total> Token_Kind_t;\n",
         cmd_data.sp_token.empty() ? "false" : "true",
         nterms.size()+terms.size()
     );
