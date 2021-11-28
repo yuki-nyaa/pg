@@ -648,6 +648,9 @@ struct LR1_Writer{
         constexpr bool empty() const noexcept {return shift==0 && reduce.rule_num==0;}
     };
 
+    static_assert(std::is_trivial_v<Action_Candidates>);
+    static_assert(std::is_standard_layout_v<Action_Candidates>);
+
     static void resolve_rr_conflict(Action_Candidates& ac1,const size_t rule_num_2,const prec_t prec_sr_2,const prec_t prec_rr_2){
         // First select the rule with a higher rr-precedence; if same, then select the rule that has the smaller number, i.e. the rule that appears earlier in the grammar specs.
         // Note that `prec_sr` does not participate in the resolution process. It is recored for later SR-conflict resolution.
@@ -675,7 +678,7 @@ struct LR1_Writer{
             switch(ac.reduce.prec_sr==0 ? assoc0 : get_assoc(lookahead)){
                 case Assoc::RIGHT : return Action_Kind::SHIFT;
                 case Assoc::LEFT : return Action_Kind::REDUCE;
-                default : return Action_Kind::SHIFT;
+                default : return Action_Kind::SHIFT; // Unreachable
             }
         }
     }

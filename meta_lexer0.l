@@ -55,8 +55,9 @@
     std::string str_temp1;
 
     prec_t current_prec = 0;
-    Assoc current_assoc = Assoc::RIGHT;
+    Assoc current_assoc;
     Assoc assoc0 = Assoc::RIGHT;
+    Assoc assoc_default = Assoc::RIGHT;
 
     std::unordered_map<std::string,std::string> code_htable;
     std::string code_qualifier;
@@ -83,7 +84,7 @@ id [A-Za-z_]\p{Word}*
 %%
 <INITIAL>{
 \%\%\p{Space}*    {
-    terms.emplace_back("EOF_");
+    terms.emplace_back("EOF_",assoc_default);
     if(cmd_data->lexer.empty()){
         if(!cmd_data->nspace.empty())
             cmd_data->lexer.append(cmd_data->nspace).append("::");
@@ -111,6 +112,14 @@ id [A-Za-z_]\p{Word}*
     current_assoc = Assoc::RIGHT;
     assoc_has_args = false;
     start(ASSOC);
+}
+
+\%default_left\p{Space}*    {
+    assoc0 = assoc_default = Assoc::LEFT;
+}
+
+\%default_right\p{Space}*    {
+    assoc0 = assoc_default = Assoc::RIGHT;
 }
 
 \%code\p{Space}*    {
@@ -167,7 +176,7 @@ id [A-Za-z_]\p{Word}*
     token_declared = true;
     str_temp1 = str();
     token_htable.insert_or_assign(str_temp1,yuki::Pair<bool,size_t>{is_term,get_token_table(is_term).size()});
-    get_token_table(is_term).emplace_back(std::move(str_temp1));
+    get_token_table(is_term).emplace_back(std::move(str_temp1),assoc_default);
 }
 
 \{\p{Space}*    {brace_level=0;str_temp1.clear();start(TOKEN_DEF);}

@@ -80,7 +80,7 @@
         return get_token_data(p.zeroth,p.first);
     }
     Token_Data& get_token_data(Token_Kind_t k){
-        static Token_Data td_goal_("Goal_");
+        static Token_Data td_goal_("Goal_",Assoc::RIGHT);
         if(k==(Token_Kind_t)-1)
             return td_goal_;
         return k>=nterms.size() ? terms[k-nterms.size()] : nterms[k];

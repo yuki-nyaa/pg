@@ -8,22 +8,23 @@
 
 namespace yuki::pg{
 typedef unsigned short prec_t;
-enum struct Assoc : unsigned char {RIGHT=0,LEFT};
+enum struct Assoc : unsigned char {RIGHT,LEFT};
 
 struct Token_Data{
     std::string name;
     std::string alias;
 
     prec_t prec=0;
-    Assoc assoc = Assoc::RIGHT;
+    Assoc assoc;
 
     std::vector<std::string> types;
     std::vector<std::string> names;
 
     std::string alloc;
 
-    Token_Data(std::string&& n) noexcept :
-        name(std::move(n))
+    Token_Data(std::string&& n,Assoc assoc_p) noexcept :
+        name(std::move(n)),
+        assoc(assoc_p)
     {
         #ifndef YUKI_PG_TOKEN_DATA_RESERVE
         #define YUKI_PG_TOKEN_DATA_RESERVE 8
