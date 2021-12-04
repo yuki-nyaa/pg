@@ -6,6 +6,6 @@ typedef xxx::Token_Settings TS;
 int main(){
     FILE* file=fopen("test.txt","r");
     xxx::Lexer lexer(file);
-    xxx::SParser parser(&lexer);
+    xxx::Parser parser(&lexer);
     parser.parse();
 }
