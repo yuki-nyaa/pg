@@ -32,22 +32,10 @@ int main(int argc,char** argv){
             ypg::LR1_Writer<unsigned short>::write(cmd_data,meta_lexer1.code_htable,meta_lexer1.nterms,meta_lexer1.terms,meta_lexer1.rs,meta_lexer1.assoc0);
             break;
         }
-        case yuki::uint_enum::UINT : {
+        default : {
             ypg::Meta_Lexer1<unsigned> meta_lexer1(std::move(meta_lexer0));
             meta_lexer1.lex();
             ypg::LR1_Writer<unsigned>::write(cmd_data,meta_lexer1.code_htable,meta_lexer1.nterms,meta_lexer1.terms,meta_lexer1.rs,meta_lexer1.assoc0);
-            break;
-        }
-        case yuki::uint_enum::ULONG : {
-            ypg::Meta_Lexer1<unsigned long> meta_lexer1(std::move(meta_lexer0));
-            meta_lexer1.lex();
-            ypg::LR1_Writer<unsigned long>::write(cmd_data,meta_lexer1.code_htable,meta_lexer1.nterms,meta_lexer1.terms,meta_lexer1.rs,meta_lexer1.assoc0);
-            break;
-        }
-        case yuki::uint_enum::ULLONG : {
-            ypg::Meta_Lexer1<unsigned long long> meta_lexer1(std::move(meta_lexer0));
-            meta_lexer1.lex();
-            ypg::LR1_Writer<unsigned long long>::write(cmd_data,meta_lexer1.code_htable,meta_lexer1.nterms,meta_lexer1.terms,meta_lexer1.rs,meta_lexer1.assoc0);
             break;
         }
     }

@@ -13,8 +13,6 @@
         extern template struct Meta_Lexer1<unsigned char>;
         extern template struct Meta_Lexer1<unsigned short>;
         extern template struct Meta_Lexer1<unsigned>;
-        extern template struct Meta_Lexer1<unsigned long>;
-        extern template struct Meta_Lexer1<unsigned long long>;
     }
 }
 
@@ -48,8 +46,8 @@
     unsigned brace_level=0;
     unsigned rule_num = 0;
 
-    std::vector<Token_Data> nterms;
-    std::vector<Token_Data> terms;
+    yuki::Vector<Token_Data> nterms;
+    yuki::Vector<Token_Data> terms;
 
     std::unordered_map<std::string,yuki::Pair<bool,size_t>> token_htable;
 
@@ -69,7 +67,7 @@
     std::string str_temp1;
     std::string str_temp2;
 
-    std::vector<Token_Data>& get_token_table(bool is_term_p){
+    yuki::Vector<Token_Data>& get_token_table(bool is_term_p){
         return is_term_p ? terms : nterms;
     }
     Token_Data& get_token_data(bool is_term_p,size_t idx){
@@ -128,10 +126,10 @@ Goal_    {
 \/\/.*\R    {} // Comments.
 \%\%\p{Space}*    {
     // Make sure that the goal symbol is the first non-terminal, so that the accepting state has number 1.
-    typename Rule_Set<Token_Kind_t>::iterator it = rs.first_equiv_greater({(Token_Kind_t)-1,{},0});
+    typename Rule_Set<Token_Kind_t>::const_iterator it = rs.first_equiv_greater({(Token_Kind_t)-1,{},0});
     if(it==rs.end()){
         fprintf(stderr,"Warning: No goal symbol specified. Defaulted to the first non-terminal - %s - .\n",nterms[0].name.c_str());
-        rs.insert_equal({(Token_Kind_t)-1,std::initializer_list<Token_Kind_t>{0},0});
+        rs.emplace(-1,std::initializer_list<Token_Kind_t>{0},0);
     }else{
         Token_Kind_t goal = (it->rights)[0];
         if(goal!=0){
@@ -185,13 +183,13 @@ Goal_    {
 }
 \|    {
     rule.num = left_current!=(Token_Kind_t)-1 ? ++rule_num : 0;
-    rs.insert_equal(std::move(rule));
+    rs.emplace(std::move(rule));
     rule.clear();
     init_encountered = false;
 }
 ;    {
     rule.num = left_current!=(Token_Kind_t)-1 ? ++rule_num : 0;
-    rs.insert_equal(std::move(rule));
+    rs.emplace(std::move(rule));
     rule.clear();
     init_encountered = false;
     left_current = -1;
@@ -368,7 +366,7 @@ Goal_    {
 
 \]    {
     size_t i = 0;
-    const std::vector<std::string>& vec = get_token_data(token_current).names;
+    const yuki::Vector<std::string>& vec = get_token_data(token_current).names;
     for(;i!=vec.size();++i){
         if(str_temp2==vec[i])
             goto suc;
@@ -437,6 +435,4 @@ namespace yuki::pg{
 template struct Meta_Lexer1<unsigned char>;
 template struct Meta_Lexer1<unsigned short>;
 template struct Meta_Lexer1<unsigned>;
-template struct Meta_Lexer1<unsigned long>;
-template struct Meta_Lexer1<unsigned long long>;
 }

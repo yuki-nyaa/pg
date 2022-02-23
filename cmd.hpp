@@ -1,5 +1,4 @@
 #pragma once
-#include"cconfig"
 #include<string>
 #include<fmt/core.h>
 #include<yuki/string_split.hpp>
@@ -46,23 +45,23 @@ struct Cmd_Data{
 };
 
 namespace cmd_impl{
-    inline void i(Cmd_Data& cmd_data,std::vector<std::string>& args){
+    inline void i(Cmd_Data& cmd_data,yuki::Vector<std::string>& args){
         cmd_data.in=std::move(args[0]);
     }
-    inline void o(Cmd_Data& cmd_data,std::vector<std::string>& args){
+    inline void o(Cmd_Data& cmd_data,yuki::Vector<std::string>& args){
         cmd_data.out_cpp=std::move(args[0]);
     }
-    inline void h(Cmd_Data& cmd_data,std::vector<std::string>& args){
+    inline void h(Cmd_Data& cmd_data,yuki::Vector<std::string>& args){
         cmd_data.out_h=std::move(args[0]);
     }
-    inline void t(Cmd_Data& cmd_data,std::vector<std::string>& args){
+    inline void t(Cmd_Data& cmd_data,yuki::Vector<std::string>& args){
         cmd_data.out_token=std::move(args[0]);
     }
-    inline void l(Cmd_Data& cmd_data,std::vector<std::string>& args){
+    inline void l(Cmd_Data& cmd_data,yuki::Vector<std::string>& args){
         cmd_data.out_log=std::move(args[0]);
     }
-    inline void version(Cmd_Data&,std::vector<std::string>&){
-        fmt::print(stdout,"ParserGen by Yuki, version {}.{}\n",YUKI_PG_VERSION_MAJOR,YUKI_PG_VERSION_MINOR);
+    inline void version(Cmd_Data&,yuki::Vector<std::string>&){
+        fmt::print(stdout,"ParserGen by Yuki, version {}.{}\n",1,0);
         std::exit(EXIT_SUCCESS);
     }
 }

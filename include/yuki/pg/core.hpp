@@ -46,37 +46,37 @@ struct Semantics_Tuple_Impl_<std::index_sequence<ints...>,Ts...> : Semantics_Tup
     template<size_t i>
     constexpr member_type<i>&& get() && noexcept {
         static_assert(i<sizeof...(ints),"The requested index is greater than the max.");
-        return unit_type<i>::member;
+        return static_cast<member_type<i>&&>(unit_type<i>::member);
     }
     template<size_t i>
     constexpr const member_type<i>&& get() const&& noexcept {
         static_assert(i<sizeof...(ints),"The requested index is greater than the max.");
-        return unit_type<i>::member;
+        return static_cast<const member_type<i>&&>(unit_type<i>::member);
     }
 
     template<typename U>
     constexpr U& get() & noexcept {
-        static_assert(yuki::is_pairwise_different_v<Ts...>,"The member types in `yuki::pg::Token` are not pairwise different!");
         static_assert(yuki::is_any_of_v<U,Ts...>,"The requested type is not among the member types!");
+        static_assert(yuki::is_unique_v<U,Ts...>,"The requested type is not unique!");
         return Semantics_Tuple_Unit_<yuki::type_to_num_v<U,Ts...>,U>::member;
     }
     template<typename U>
     constexpr const U& get() const& noexcept {
-        static_assert(yuki::is_pairwise_different_v<Ts...>,"The member types in `yuki::pg::Token` are not pairwise different!");
         static_assert(yuki::is_any_of_v<U,Ts...>,"The requested type is not among the member types!");
+        static_assert(yuki::is_unique_v<U,Ts...>,"The requested type is not unique!");
         return Semantics_Tuple_Unit_<yuki::type_to_num_v<U,Ts...>,U>::member;
     }
     template<typename U>
     constexpr U&& get() && noexcept {
-        static_assert(yuki::is_pairwise_different_v<Ts...>,"The member types in `yuki::pg::Token` are not pairwise different!");
         static_assert(yuki::is_any_of_v<U,Ts...>,"The requested type is not among the member types!");
-        return Semantics_Tuple_Unit_<yuki::type_to_num_v<U,Ts...>,U>::member;
+        static_assert(yuki::is_unique_v<U,Ts...>,"The requested type is not unique!");
+        return static_cast<U&&>(Semantics_Tuple_Unit_<yuki::type_to_num_v<U,Ts...>,U>::member);
     }
     template<typename U>
     constexpr const U&& get() const&& noexcept {
-        static_assert(yuki::is_pairwise_different_v<Ts...>,"The member types in `yuki::pg::Token` are not pairwise different!");
         static_assert(yuki::is_any_of_v<U,Ts...>,"The requested type is not among the member types!");
-        return Semantics_Tuple_Unit_<yuki::type_to_num_v<U,Ts...>,U>::member;
+        static_assert(yuki::is_unique_v<U,Ts...>,"The requested type is not unique!");
+        return static_cast<const U&&>(Semantics_Tuple_Unit_<yuki::type_to_num_v<U,Ts...>,U>::member);
     }
 }; // struct Semantics_Tuple_Impl_<std::index_sequence<ints...>,Ts...>
 

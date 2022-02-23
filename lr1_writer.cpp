@@ -1,9 +1,24 @@
+#include"cconfig"
+#include<yuki/print.hpp>
+#include"cmd.hpp"
 #include"lr1_writer.h"
 #include"debug.hpp"
+
+template<>
+struct fmt::formatter<yuki::pg::Assoc,char> : yuki::simple_formatter<yuki::pg::Assoc,char> {
+    template<typename OutputIt>
+    auto format(yuki::pg::Assoc assoc,fmt::basic_format_context<OutputIt,char>& ctx) -> typename fmt::basic_format_context<OutputIt,char>::iterator {
+        switch(assoc){
+            case yuki::pg::Assoc::LEFT : {return fmt::format_to(ctx.out(),"{}","LEFT");}
+            default : {return fmt::format_to(ctx.out(),"{}","RIGHT");}
+        }
+    }
+};
+
 namespace yuki::pg{
 template<std::unsigned_integral Token_Kind_t>
 size_t LR1_Writer<Token_Kind_t>::write_table(
-    const std::vector<Token_Data>& nterms,const std::vector<Token_Data>& terms,
+    const yuki::Vector<Token_Data>& nterms,const yuki::Vector<Token_Data>& terms,
     const Rule_Set<Token_Kind_t>& rules,
     const Assoc assoc0,
     FILE* fp_file,FILE* fp_goto,FILE* fp_err,FILE* fp_log)
@@ -11,15 +26,17 @@ size_t LR1_Writer<Token_Kind_t>::write_table(
     assert(fp_file); assert(fp_err); // Log-out is optional.
 
     First_Table<Token_Kind_t> first_table(nterms,terms,rules);
-    std::vector<LR1_Item_Set> cc;
-    #ifndef YUKI_PG_LR1_ITEMS_RESERVE
-    #define YUKI_PG_LR1_ITEMS_RESERVE 65536
-    #endif
-    cc.reserve(YUKI_PG_LR1_ITEMS_RESERVE);
-    size_t cc_next=1;
-    cc.push_back(generate_initial_items(rules,first_table));
+    LR1_Item_Set_Set cc;
+    cc.insert(generate_initial_items(rules,first_table));
 
-    LR1_Item_Set cc_candidate{};
+    #ifndef YUKI_PG_CC_WORKLIST_RESERVE
+    #define YUKI_PG_CC_WORKLIST_RESERVE 65535
+    #endif
+    yuki::Vector<typename LR1_Item_Set_Set::const_iterator,yuki::Allocator<typename LR1_Item_Set_Set::const_iterator>,yuki::Vector_EC_Tp<>> worklist(yuki::reserve_tag,YUKI_PG_CC_WORKLIST_RESERVE);
+    worklist.emplace_back(cc.begin());
+    //< Possibly use a queue?
+
+    LR1_Item_Set items_pending;
 
     const size_t term_total = terms.size();
     const size_t nterm_total = nterms.size();
@@ -31,41 +48,35 @@ size_t LR1_Writer<Token_Kind_t>::write_table(
     size_t sr_conflict_total = 0;
     size_t rr_conflict_total = 0;
 
-    for(size_t cc_current=0; cc_current<cc_next && !(cc[cc_current].processed); ++cc_current){
-        cc[cc_current].processed=true;
-        typename LR1_Item_Set::const_iterator it = cc[cc_current].begin();
+    for(size_t current=0; current<worklist.size(); ++current){
+        const LR1_Item_Set& items = worklist[current]->zeroth;
+        typename LR1_Item_Set::const_iterator it = items.begin();
         Token_Kind_t cursored_current=it.cursored();
 
         while(cursored_current!=Token_Kind_t(-1)){ // Handles "shift" and "goto".
-            assert(cc_candidate.empty());
-            for(;!it.is_end() && it.cursored()==cursored_current; ++it){
-                cc_candidate.insert({it.left(),it.rights(),it.lookahead(),it.cursor()+1});
-            }
-            closure(cc_candidate,rules,first_table);
+            assert(items_pending.empty());
+            for(;!it.is_end() && it.cursored()==cursored_current; ++it)
+                items_pending.emplace(it.left(),it.rights(),it.lookahead(),it.cursor()+1);
+            closure(items_pending,rules,first_table);
 
-            size_t cc_candidate_number=0;
-            for(;cc_candidate_number!=cc_next;++cc_candidate_number){
-                if(cc[cc_candidate_number]==cc_candidate){
-                    cc_candidate.clear();
-                    goto cc_candidate_already_exists;
-                }
-            }
-            cc.emplace_back(std::move(cc_candidate));
-            ++cc_next;
-            cc_candidate_already_exists:
+            yuki::Pair<typename LR1_Item_Set_Set::const_iterator,bool> insert_result= cc.insert(std::move(items_pending));
+            if(insert_result.first)
+                worklist.emplace_back(insert_result.zeroth);
+            size_t items_pending_number = insert_result.zeroth->first;
+
             if(cursored_current>=nterm_total && cursored_current<token_total){ // `cursored_current` is terminal.
-                action_row[cursored_current-nterm_total].shift=cc_candidate_number;
-                // The write of "action(cursored_current(,cc_current)) = shift cc_candidate_number" is postponed until all items in the current item-set are considered.
+                action_row[cursored_current-nterm_total].shift=items_pending_number;
+                // The write of "action(cursored_current(,current)) = shift items_pending_number" is postponed until all items in the current item-set are considered.
             }else if(cursored_current<nterm_total){ // `cursored_current` is nterminal.
-                fmt::print(fp_goto,"{{{},{},{}}},",cc_current,cursored_current,cc_candidate_number);
-                // Since "goto" cannot have conflicts, we can immediately write "goto(cc_current,symbol)=cc_candidate_number".
+                fmt::print(fp_goto,"{{{},{},{}}},",current,cursored_current,items_pending_number);
+                // Since "goto" cannot have conflicts, we can immediately write "goto(current,symbol)=items_pending_number".
             }
-            yuki::try_print(fp_log,"GOTO({},{}) = {}\n",cc_current,cursored_current,cc_candidate_number);
+            yuki::try_print(fp_log,"GOTO({},{}) = {}\n",current,cursored_current,items_pending_number);
 
             if(it.is_end()){
                 for(Token_Kind_t i=nterm_total;i<token_total;++i){
                     if(action_row[i-nterm_total].shift!=0)
-                        fmt::print(fp_file,"{{{},{},{{1,{}}}}},",cc_current,i,action_row[i-nterm_total].shift);
+                        fmt::print(fp_file,"{{{},{},{{1,{}}}}},",current,i,action_row[i-nterm_total].shift);
                 }
                 std::memset(action_row,0, term_total * sizeof(Action_Candidates) );
                 goto loop_1_end;
@@ -75,11 +86,11 @@ size_t LR1_Writer<Token_Kind_t>::write_table(
         }
 
         for(;!it.is_end();++it){ // Handles "reduce".
-            auto rule_it = rules.first_equal({it.left(),it.rights(),0});
+            auto rule_it = rules.find({it.left(),it.rights(),0});
             assert(rule_it!=rules.end());
             if(Action_Candidates& action_this = action_row[it.lookahead()-nterm_total] ; action_this.reduce.rule_num!=0){
                 yuki::try_print(fp_log,"RR-conflict encountered. action({},{}) = reduce {}({}) / {}({}). ",
-                    cc_current,
+                    current,
                     terms[it.lookahead()-nterm_total].name,
                     action_this.reduce.rule_num,
                     action_this.reduce.prec_rr,
@@ -101,30 +112,30 @@ size_t LR1_Writer<Token_Kind_t>::write_table(
                     continue;
                 }
                 case Action_Candidates::State::S : {
-                    fmt::print(fp_file,"{{{},{},{{1,{}}}}},",cc_current,i,action_this.shift);
+                    fmt::print(fp_file,"{{{},{},{{1,{}}}}},",current,i,action_this.shift);
                     std::memset(action_row+(i-nterm_total),0,sizeof(Action_Candidates));
                     break;
                 }
                 case Action_Candidates::State::R : {
-                    fmt::print(fp_file,"{{{},{},{{2,{}}}}},",cc_current,i,action_this.reduce.rule_num);
+                    fmt::print(fp_file,"{{{},{},{{2,{}}}}},",current,i,action_this.reduce.rule_num);
                     std::memset(action_row+(i-nterm_total),0,sizeof(Action_Candidates));
                     break;
                 }
                 case Action_Candidates::State::SR : {
                     yuki::try_print(fp_log,"SR-conflict encountered. action({},{}) = shift {} / reduce {}({}). Prec(lookahead)={}. Assoc(lookahead)={}. ",
-                        cc_current,terms[i-nterm_total].name, action_this.shift,
+                        current,terms[i-nterm_total].name, action_this.shift,
                         action_this.reduce.rule_num, action_this.reduce.prec_sr,
                         terms[i-nterm_total].prec, terms[i-nterm_total].prec==0 ? assoc0 : terms[i-nterm_total].assoc
                     );
                     switch(resolve_sr_conflict(nterms,terms,assoc0,action_this,i)){
                         case Action_Kind::SHIFT : {
                             yuki::try_print(fp_log,"Resolved to shift {}.\n",action_this.shift);
-                            fmt::print(fp_file,"{{{},{},{{1,{}}}}},",cc_current,i,action_this.shift);
+                            fmt::print(fp_file,"{{{},{},{{1,{}}}}},",current,i,action_this.shift);
                             break;
                         }
                         case Action_Kind::REDUCE : {
                             yuki::try_print(fp_log,"Resolved to reduce {}.\n",action_this.reduce.rule_num);
-                            fmt::print(fp_file,"{{{},{},{{2,{}}}}},",cc_current,i,action_this.reduce.rule_num);
+                            fmt::print(fp_file,"{{{},{},{{2,{}}}}},",current,i,action_this.reduce.rule_num);
                             break;
                         }
                     }
@@ -138,11 +149,11 @@ size_t LR1_Writer<Token_Kind_t>::write_table(
         #ifdef YUKI_PG_DBG
         for(Token_Kind_t i=nterm_total;i<token_total;++i){
             if(!action_row[i-nterm_total].empty())
-                dbgout("non-empty action_candidates at ({},{}).\n",cc_current,i);
+                dbgout("non-empty action_candidates at ({},{}).\n",current,i);
         }
         std::memset(action_row,0, term_total * sizeof(Action_Candidates) );
         #endif
-    }
+    } // for(size_t current=0; current<worklist.size(); ++current)
 
     // Write the accept action.
     // The accept item-set might contain reduce-items with lookahead EOF_. Those will be overwritten, WITHOUT diagnostics. Such conflicts should be rare, however. The production-set that entails such conflicts should obviously wrong, like "A -> A".
@@ -154,13 +165,13 @@ size_t LR1_Writer<Token_Kind_t>::write_table(
     delete[] action_row;
 
     return cc.size();
-}
+} // size_t LR1_Writer<Token_Kind_t>::write_table
 
 template<std::unsigned_integral Token_Kind_t>
 void LR1_Writer<Token_Kind_t>::write(
     const Cmd_Data& cmd_data,
     const std::unordered_map<std::string,std::string> code_htable,
-    const std::vector<Token_Data>& nterms,const std::vector<Token_Data>& terms,
+    const yuki::Vector<Token_Data>& nterms,const yuki::Vector<Token_Data>& terms,
     const Rule_Set<Token_Kind_t>& rules,
     const Assoc assoc0)
 {
@@ -308,7 +319,7 @@ void LR1_Writer<Token_Kind_t>::write(
                 fprintf(out,IND6 "stack_.push_back({std::move(token_target_),state_});\n\n");
             fprintf(out,IND6 "goto loop_end_;\n" IND5 "}\n");
         }
-    }
+    } // for(const Rule<Token_Kind_t>& rule : rules)
     fprintf(out,
         IND5 "default : return 2;\n"
         IND4 "}\n"
@@ -367,10 +378,9 @@ void LR1_Writer<Token_Kind_t>::write(
     try{
         fprintf(out_h,"%s\n",code_htable.at("h_end").c_str());
     }catch(const std::out_of_range&){}
-}
+} // void LR1_Writer<Token_Kind_t>::write
+
 template struct LR1_Writer<unsigned char>;
 template struct LR1_Writer<unsigned short>;
 template struct LR1_Writer<unsigned>;
-template struct LR1_Writer<unsigned long>;
-template struct LR1_Writer<unsigned long long>;
 } // namespace yuki::pg

@@ -9,7 +9,7 @@
 
     class Meta_Lexer1;
     namespace yuki::pg{
-        void write_token(const Cmd_Data&,const std::vector<Token_Data>&,const std::vector<Token_Data>&,const std::unordered_map<std::string,std::string>&);
+        void write_token(const Cmd_Data&,const yuki::Vector<Token_Data>&,const yuki::Vector<Token_Data>&,const std::unordered_map<std::string,std::string>&);
     }
 }
 
@@ -31,8 +31,6 @@
         token_htable(YUKI_PG_TOKEN_HTABLE_BUCKET),
         code_htable(8)
     {
-        nterms.reserve(YUKI_PG_TOKEN_HTABLE_BUCKET);
-        terms.reserve(YUKI_PG_TOKEN_HTABLE_BUCKET);
         token_htable.max_load_factor(std::numeric_limits<float>::max()); // Inhibits rehashing anyway.
         code_htable.max_load_factor(std::numeric_limits<float>::max());
     }
@@ -47,8 +45,8 @@
 
     bool assoc_has_args = false;
 
-    std::vector<Token_Data> nterms;
-    std::vector<Token_Data> terms;
+    yuki::Vector<Token_Data> nterms{yuki::reserve_tag,YUKI_PG_TOKEN_HTABLE_BUCKET};
+    yuki::Vector<Token_Data> terms{yuki::reserve_tag,YUKI_PG_TOKEN_HTABLE_BUCKET};
 
     std::unordered_map<std::string,yuki::Pair<bool,size_t>> token_htable;
 
@@ -62,7 +60,7 @@
     std::unordered_map<std::string,std::string> code_htable;
     std::string code_qualifier;
 
-    std::vector<Token_Data>& get_token_table(bool is_term_p){
+    yuki::Vector<Token_Data>& get_token_table(bool is_term_p){
         return is_term_p ? terms : nterms;
     }
     Token_Data& get_token_data(bool is_term_p,size_t idx){
@@ -200,12 +198,12 @@ id [A-Za-z_]\p{Word}*
 
 :\p{Space}*    {
     yuki::trim_trailing_spaces(str_temp1);
-    get_token_table(is_term).back().types.push_back(std::move(str_temp1));
+    get_token_table(is_term).back().types.emplace_back(std::move(str_temp1));
 }
 
 ;\p{Space}*    {
     yuki::trim_trailing_spaces(str_temp1);
-    get_token_table(is_term).back().names.push_back(std::move(str_temp1));
+    get_token_table(is_term).back().names.emplace_back(std::move(str_temp1));
 }
 
 \R    {str_temp1.push_back(' ');}
@@ -430,9 +428,9 @@ id [A-Za-z_]\p{Word}*
 
 %%
 namespace yuki::pg{
-static void write_token_non_simple(const Cmd_Data&,const std::vector<Token_Data>&,const std::vector<Token_Data>&);
+static void write_token_non_simple(const Cmd_Data&,const yuki::Vector<Token_Data>&,const yuki::Vector<Token_Data>&);
 
-void write_token(const Cmd_Data& cmd_data,const std::vector<Token_Data>& nterms,const std::vector<Token_Data>& terms,const std::unordered_map<std::string,std::string>& code_htable){
+void write_token(const Cmd_Data& cmd_data,const yuki::Vector<Token_Data>& nterms,const yuki::Vector<Token_Data>& terms,const std::unordered_map<std::string,std::string>& code_htable){
     #define IND YUKI_PG_IND
     #define IND2 IND IND
     #define IND3 IND IND IND
@@ -536,7 +534,7 @@ void write_token(const Cmd_Data& cmd_data,const std::vector<Token_Data>& nterms,
 } // write_token
 
 
-static void write_token_non_simple(const Cmd_Data& cmd_data,const std::vector<Token_Data>& nterms,const std::vector<Token_Data>& terms){
+static void write_token_non_simple(const Cmd_Data& cmd_data,const yuki::Vector<Token_Data>& nterms,const yuki::Vector<Token_Data>& terms){
     FILE* const out = cmd_data.fp_out_token;
     const char* const ts_cstr = cmd_data.ts.c_str();
     fprintf(out,
