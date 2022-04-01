@@ -4,6 +4,17 @@
 #include"lr1_writer.h"
 #include"debug.hpp"
 
+#define IND YUKI_PG_IND
+#define IND2 IND IND
+#define IND3 IND IND IND
+#define IND4 IND IND IND IND
+#define IND5 IND IND IND IND IND
+#define IND6 IND IND IND IND IND IND
+
+#ifndef YUKI_PG_TABLE_MAX_LINE_ITEM
+#define YUKI_PG_TABLE_MAX_LINE_ITEM 8
+#endif
+
 template<>
 struct fmt::formatter<yuki::pg::Assoc,char> : yuki::simple_formatter<yuki::pg::Assoc,char> {
     template<typename OutputIt>
@@ -49,6 +60,25 @@ size_t LR1_Writer<Token_Kind_t>::write_table(
     size_t rr_conflict_total = 0;
 
     for(size_t current=0; current<worklist.size(); ++current){
+        size_t action_count = 0;
+        size_t goto_count = 0;
+        auto print_action_ind = [fp_file,&action_count](){
+            if(action_count % YUKI_PG_TABLE_MAX_LINE_ITEM == 0)
+                fprintf(fp_file,IND);
+        };
+        auto reset_action_ind = [fp_file,&action_count](){
+            if(action_count % YUKI_PG_TABLE_MAX_LINE_ITEM == 0)
+                fprintf(fp_file,"\n");
+        };
+        auto print_goto_ind = [fp_goto,&goto_count](){
+            if(goto_count % YUKI_PG_TABLE_MAX_LINE_ITEM == 0)
+                fprintf(fp_goto,IND);
+        };
+        auto reset_goto_ind = [fp_goto,&goto_count](){
+            if(goto_count % YUKI_PG_TABLE_MAX_LINE_ITEM == 0)
+                fprintf(fp_goto,"\n");
+        };
+
         const LR1_Item_Set& items = worklist[current]->zeroth;
         typename LR1_Item_Set::const_iterator it = items.begin();
         Token_Kind_t cursored_current=it.cursored();
@@ -68,15 +98,22 @@ size_t LR1_Writer<Token_Kind_t>::write_table(
                 action_row[cursored_current-nterm_total].shift=items_pending_number;
                 // The write of "action(cursored_current(,current)) = shift items_pending_number" is postponed until all items in the current item-set are considered.
             }else if(cursored_current<nterm_total){ // `cursored_current` is nterminal.
+                print_goto_ind();
                 fmt::print(fp_goto,"{{{},{},{}}},",current,cursored_current,items_pending_number);
+                ++goto_count;
+                reset_goto_ind();
                 // Since "goto" cannot have conflicts, we can immediately write "goto(current,symbol)=items_pending_number".
             }
             yuki::try_print(fp_log,"GOTO({},{}) = {}\n",current,cursored_current,items_pending_number);
 
             if(it.is_end()){
                 for(Token_Kind_t i=nterm_total;i<token_total;++i){
-                    if(action_row[i-nterm_total].shift!=0)
+                    if(action_row[i-nterm_total].shift!=0){
+                        print_action_ind();
                         fmt::print(fp_file,"{{{},{},{{1,{}}}}},",current,i,action_row[i-nterm_total].shift);
+                        ++action_count;
+                        reset_action_ind();
+                    }
                 }
                 std::memset(action_row,0, term_total * sizeof(Action_Candidates) );
                 goto loop_1_end;
@@ -112,12 +149,18 @@ size_t LR1_Writer<Token_Kind_t>::write_table(
                     continue;
                 }
                 case Action_Candidates::State::S : {
+                    print_action_ind();
                     fmt::print(fp_file,"{{{},{},{{1,{}}}}},",current,i,action_this.shift);
+                    ++action_count;
+                    reset_action_ind();
                     std::memset(action_row+(i-nterm_total),0,sizeof(Action_Candidates));
                     break;
                 }
                 case Action_Candidates::State::R : {
+                    print_action_ind();
                     fmt::print(fp_file,"{{{},{},{{2,{}}}}},",current,i,action_this.reduce.rule_num);
+                    ++action_count;
+                    reset_action_ind();
                     std::memset(action_row+(i-nterm_total),0,sizeof(Action_Candidates));
                     break;
                 }
@@ -130,12 +173,18 @@ size_t LR1_Writer<Token_Kind_t>::write_table(
                     switch(resolve_sr_conflict(nterms,terms,assoc0,action_this,i)){
                         case Action_Kind::SHIFT : {
                             yuki::try_print(fp_log,"Resolved to shift {}.\n",action_this.shift);
+                            print_action_ind();
                             fmt::print(fp_file,"{{{},{},{{1,{}}}}},",current,i,action_this.shift);
+                            ++action_count;
+                            reset_action_ind();
                             break;
                         }
                         case Action_Kind::REDUCE : {
                             yuki::try_print(fp_log,"Resolved to reduce {}.\n",action_this.reduce.rule_num);
+                            print_action_ind();
                             fmt::print(fp_file,"{{{},{},{{2,{}}}}},",current,i,action_this.reduce.rule_num);
+                            ++action_count;
+                            reset_action_ind();
                             break;
                         }
                     }
@@ -145,7 +194,11 @@ size_t LR1_Writer<Token_Kind_t>::write_table(
                 }
             }
         }
-        loop_1_end:;
+        loop_1_end:
+        if(action_count % YUKI_PG_TABLE_MAX_LINE_ITEM != 0)
+            fprintf(fp_file,"\n");
+        if(goto_count % YUKI_PG_TABLE_MAX_LINE_ITEM != 0)
+            fprintf(fp_goto,"\n");
         #ifdef YUKI_PG_DBG
         for(Token_Kind_t i=nterm_total;i<token_total;++i){
             if(!action_row[i-nterm_total].empty())
@@ -157,7 +210,7 @@ size_t LR1_Writer<Token_Kind_t>::write_table(
 
     // Write the accept action.
     // The accept item-set might contain reduce-items with lookahead EOF_. Those will be overwritten, WITHOUT diagnostics. Such conflicts should be rare, however. The production-set that entails such conflicts should obviously wrong, like "A -> A".
-    fmt::print(fp_file,"{{1,{},{{2,0}}}},",token_total-1);
+    fmt::print(fp_file,IND "{{1,{},{{2,0}}}},\n",token_total-1);
 
     if(sr_conflict_total || rr_conflict_total)
         fmt::print(fp_err,"{} SR-conflict(s), {} RR-conflict(s) in total. See log for details.\n",sr_conflict_total,rr_conflict_total);
@@ -175,13 +228,6 @@ void LR1_Writer<Token_Kind_t>::write(
     const Rule_Set<Token_Kind_t>& rules,
     const Assoc assoc0)
 {
-    #define IND YUKI_PG_IND
-    #define IND2 IND IND
-    #define IND3 IND IND IND
-    #define IND4 IND IND IND IND
-    #define IND5 IND IND IND IND IND
-    #define IND6 IND IND IND IND IND IND
-
     auto get_token_data = [&nterms,&terms](Token_Kind_t k) -> const Token_Data& {
         assert(k!=(Token_Kind_t)-1);
         return k>=nterms.size() ? terms[k-nterms.size()] : nterms[k];
@@ -210,7 +256,6 @@ void LR1_Writer<Token_Kind_t>::write(
     );
     const size_t state_size = write_table(nterms,terms,rules,assoc0,cmd_data.fp_out_cpp,cmd_data.fp_goto,stderr,cmd_data.fp_out_log);
     fprintf(out,
-        "\n"
         "};\n"
         "\n"
     );
