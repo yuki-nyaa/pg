@@ -140,7 +140,7 @@ struct Rule_Set : private yuki::MultiSet<Rule<Token_Kind_t>,typename Rule<Token_
     size_type count(const key_type& k) const {return contains(k) ? 1 : 0;}
 
     template<typename... Args>
-    yuki::Pair<const_iterator,bool> emplace(Args&&... args){
+    yuki::IB_Pair<const_iterator> emplace(Args&&... args){
         const const_iterator i = MultiSet_::emplace(std::forward<Args>(args)...);
         for(const_iterator feg = first_equiv_greater(*i);feg!=i;++feg){
             if(*feg==*i){
@@ -153,7 +153,7 @@ struct Rule_Set : private yuki::MultiSet<Rule<Token_Kind_t>,typename Rule<Token_
 
     // Used for debugging.
     template<typename... Args>
-    yuki::Pair<const_iterator,bool> emplace(Token_Kind_t left,std::basic_string<Token_Kind_t> rights,size_t num,Args&&... others){
+    yuki::IB_Pair<const_iterator> emplace(Token_Kind_t left,std::basic_string<Token_Kind_t> rights,size_t num,Args&&... others){
         const const_iterator i = MultiSet_::emplace(left,std::move(rights),num,std::forward<Args>(others)...);
         for(const_iterator feg = first_equiv_greater(*i);feg!=i;++feg){
             if(*feg==*i){

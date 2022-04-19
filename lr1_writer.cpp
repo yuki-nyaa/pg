@@ -43,7 +43,7 @@ size_t LR1_Writer<Token_Kind_t>::write_table(
     #ifndef YUKI_PG_CC_WORKLIST_RESERVE
     #define YUKI_PG_CC_WORKLIST_RESERVE 65535
     #endif
-    yuki::Vector<typename LR1_Item_Set_Set::const_iterator,yuki::Allocator<typename LR1_Item_Set_Set::const_iterator>,yuki::Vector_EC_Tp<>> worklist(yuki::reserve_tag,YUKI_PG_CC_WORKLIST_RESERVE);
+    yuki::Vector<typename LR1_Item_Set_Set::const_iterator,yuki::Allocator<typename LR1_Item_Set_Set::const_iterator>,yuki::Default_EC<>> worklist(yuki::reserve_tag,YUKI_PG_CC_WORKLIST_RESERVE);
     worklist.emplace_back(cc.begin());
     //< Possibly use a queue?
 
@@ -79,7 +79,7 @@ size_t LR1_Writer<Token_Kind_t>::write_table(
                 fprintf(fp_goto,"\n");
         };
 
-        const LR1_Item_Set& items = worklist[current]->zeroth;
+        const LR1_Item_Set& items = worklist[current]->key;
         typename LR1_Item_Set::const_iterator it = items.begin();
         Token_Kind_t cursored_current=it.cursored();
 
@@ -89,10 +89,10 @@ size_t LR1_Writer<Token_Kind_t>::write_table(
                 items_pending.emplace(it.left(),it.rights(),it.lookahead(),it.cursor()+1);
             closure(items_pending,rules,first_table);
 
-            yuki::Pair<typename LR1_Item_Set_Set::const_iterator,bool> insert_result= cc.insert(std::move(items_pending));
-            if(insert_result.first)
-                worklist.emplace_back(insert_result.zeroth);
-            size_t items_pending_number = insert_result.zeroth->first;
+            yuki::IB_Pair<typename LR1_Item_Set_Set::const_iterator> insert_result= cc.insert(std::move(items_pending));
+            if(insert_result.has_inserted)
+                worklist.emplace_back(insert_result.iterator);
+            size_t items_pending_number = insert_result.iterator->mapped;
 
             if(cursored_current>=nterm_total && cursored_current<token_total){ // `cursored_current` is terminal.
                 action_row[cursored_current-nterm_total].shift=items_pending_number;

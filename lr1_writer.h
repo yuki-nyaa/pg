@@ -85,24 +85,24 @@ struct LR1_Writer{
                 x(xp),x_end(xep)
             {
                 if(x!=x_end)
-                    y=x->first.begin();
+                    y=x->mapped.begin();
             }
           public:
-            Token_Kind_t left() const {return x->zeroth.left;}
+            Token_Kind_t left() const {return x->key.left;}
             const std::basic_string<Token_Kind_t>& rights() const {return y->rights;}
             Token_Kind_t lookahead() const {return y->lookahead;}
             size_t cursor() const {return y->cursor;}
             bool processed() const {return y->processed;}
             void mark_as_processed() const {y->processed=true;}
-            Token_Kind_t cursored() const {return x->zeroth.cursored;}
-            bool is_complete() const {return x->zeroth.is_complete();}
+            Token_Kind_t cursored() const {return x->key.cursored;}
+            bool is_complete() const {return x->key.is_complete();}
 
             const_iterator& operator++(){
                 ++y;
-                if(y==x->first.end()){
+                if(y==x->mapped.end()){
                     ++x;
                     if(x!=x_end)
-                        y=x->first.begin();
+                        y=x->mapped.begin();
                 }
                 return *this;
             }
@@ -125,28 +125,28 @@ struct LR1_Writer{
         void clear() {map_.clear(); size_=0;}
 
         void emplace(Token_Kind_t l,const std::basic_string<Token_Kind_t>& rs,Token_Kind_t lh,Token_Kind_t c){
-            const yuki::Pair<typename map_type::iterator,bool> result1 = map_.template emplace<true>({c==rs.size() ? Token_Kind_t(-1) : rs[c],l});
-            if(!result1.first){
-                typename block_type::const_iterator feg = result1.zeroth->first.first_equiv_greater({rs.size(),lh,c});
-                const typename block_type::const_iterator fg = result1.zeroth->first.first_greater({rs.size(),lh,c});
+            const yuki::IB_Pair<typename map_type::iterator> result1 = map_.template emplace<true>({c==rs.size() ? Token_Kind_t(-1) : rs[c],l});
+            if(!result1.has_inserted){
+                typename block_type::const_iterator feg = result1.iterator->mapped.first_equiv_greater({rs.size(),lh,c});
+                const typename block_type::const_iterator fg = result1.iterator->mapped.first_greater({rs.size(),lh,c});
                 for(;feg!=fg;++feg)
                     if(feg->rights==rs)
                         return;
             }
-            result1.zeroth->first.emplace(rs,lh,c);
+            result1.iterator->mapped.emplace(rs,lh,c);
             ++size_;
         }
 
         void emplace(Token_Kind_t l,std::basic_string<Token_Kind_t>&& rs,Token_Kind_t lh,Token_Kind_t c){
-            const yuki::Pair<typename map_type::iterator,bool> result1 = map_.template emplace<true>({c==rs.size() ? Token_Kind_t(-1) : rs[c],l});
-            if(!result1.first){
-                typename block_type::const_iterator feg = result1.zeroth->first.first_equiv_greater({rs.size(),lh,c});
-                const typename block_type::const_iterator fg = result1.zeroth->first.first_greater({rs.size(),lh,c});
+            const yuki::IB_Pair<typename map_type::iterator> result1 = map_.template emplace<true>({c==rs.size() ? Token_Kind_t(-1) : rs[c],l});
+            if(!result1.has_inserted){
+                typename block_type::const_iterator feg = result1.iterator->mapped.first_equiv_greater({rs.size(),lh,c});
+                const typename block_type::const_iterator fg = result1.iterator->mapped.first_greater({rs.size(),lh,c});
                 for(;feg!=fg;++feg)
                     if(feg->rights==rs)
                         return;
             }
-            result1.zeroth->first.emplace(std::move(rs),lh,c);
+            result1.iterator->mapped.emplace(std::move(rs),lh,c);
             ++size_;
         }
 
@@ -235,20 +235,20 @@ struct LR1_Writer{
 
         size_t size() const {return map_.size();}
 
-        yuki::Pair<const_iterator,bool> insert(LR1_Item_Set&& items){
+        yuki::IB_Pair<const_iterator> insert(LR1_Item_Set&& items){
             const_iterator feg = map_.first_equiv_greater(items);
             const const_iterator fg = map_.first_greater(items);
             for(;feg!=fg;++feg){
                 {
-                typename LR1_Item_Set::map_type::const_iterator lb = feg->zeroth.map_.begin();
+                typename LR1_Item_Set::map_type::const_iterator lb = feg->key.map_.begin();
                 typename LR1_Item_Set::map_type::const_iterator rb = items.map_.begin();
-                const typename LR1_Item_Set::map_type::const_iterator le = feg->zeroth.map_.end();
+                const typename LR1_Item_Set::map_type::const_iterator le = feg->key.map_.end();
                 for(;lb!=le;++lb,++rb)
-                    if(lb->zeroth!=rb->zeroth || lb->first.size()!=rb->first.size())
+                    if(lb->key!=rb->key || lb->mapped.size()!=rb->mapped.size())
                         goto loop_end;
                 }
                 {
-                typename LR1_Item_Set::const_iterator lb = feg->zeroth.begin();
+                typename LR1_Item_Set::const_iterator lb = feg->key.begin();
                 typename LR1_Item_Set::const_iterator rb = items.begin();
                 for(;!lb.is_end();++lb,++rb)
                     if(!body_equal(lb,rb))
