@@ -1,5 +1,6 @@
 #include"cconfig"
 #include<yuki/print.hpp>
+#include<yuki/ring_queue.hpp>
 #include"cmd.hpp"
 #include"lr1_writer.h"
 #include"debug.hpp"
@@ -43,9 +44,8 @@ size_t LR1_Writer<Token_Kind_t>::write_table(
     #ifndef YUKI_PG_CC_WORKLIST_RESERVE
     #define YUKI_PG_CC_WORKLIST_RESERVE 65535
     #endif
-    yuki::Vector<typename LR1_Item_Set_Set::const_iterator,yuki::Allocator<typename LR1_Item_Set_Set::const_iterator>,yuki::Default_EC<>> worklist(yuki::reserve_tag,YUKI_PG_CC_WORKLIST_RESERVE);
+    yuki::RingQueue<typename LR1_Item_Set_Set::const_iterator> worklist(yuki::reserve_tag,YUKI_PG_CC_WORKLIST_RESERVE);
     worklist.emplace_back(cc.begin());
-    //< Possibly use a queue?
 
     LR1_Item_Set items_pending;
 
@@ -59,7 +59,7 @@ size_t LR1_Writer<Token_Kind_t>::write_table(
     size_t sr_conflict_total = 0;
     size_t rr_conflict_total = 0;
 
-    for(size_t current=0; current<worklist.size(); ++current){
+    while(!worklist.empty()){
         size_t action_count = 0;
         size_t goto_count = 0;
         auto print_action_ind = [fp_file,&action_count](){
@@ -79,7 +79,9 @@ size_t LR1_Writer<Token_Kind_t>::write_table(
                 fprintf(fp_goto,"\n");
         };
 
-        const LR1_Item_Set& items = worklist[current]->key;
+        const LR1_Item_Set& items = worklist.front()->key;
+        const size_t items_num = worklist.front()->mapped;
+
         typename LR1_Item_Set::const_iterator it = items.begin();
         Token_Kind_t cursored_current=it.cursored();
 
@@ -96,21 +98,21 @@ size_t LR1_Writer<Token_Kind_t>::write_table(
 
             if(cursored_current>=nterm_total && cursored_current<token_total){ // `cursored_current` is terminal.
                 action_row[cursored_current-nterm_total].shift=items_pending_number;
-                // The write of "action(cursored_current(,current)) = shift items_pending_number" is postponed until all items in the current item-set are considered.
+                // The write of "action(cursored_current(,items_num)) = shift items_pending_number" is postponed until all items in the items_num item-set are considered.
             }else if(cursored_current<nterm_total){ // `cursored_current` is nterminal.
                 print_goto_ind();
-                fmt::print(fp_goto,"{{{},{},{}}},",current,cursored_current,items_pending_number);
+                fmt::print(fp_goto,"{{{},{},{}}},",items_num,cursored_current,items_pending_number);
                 ++goto_count;
                 reset_goto_ind();
-                // Since "goto" cannot have conflicts, we can immediately write "goto(current,symbol)=items_pending_number".
+                // Since "goto" cannot have conflicts, we can immediately write "goto(items_num,symbol)=items_pending_number".
             }
-            yuki::try_print(fp_log,"GOTO({},{}) = {}\n",current,cursored_current,items_pending_number);
+            yuki::try_print(fp_log,"GOTO({},{}) = {}\n",items_num,cursored_current,items_pending_number);
 
             if(it.is_end()){
                 for(Token_Kind_t i=nterm_total;i<token_total;++i){
                     if(action_row[i-nterm_total].shift!=0){
                         print_action_ind();
-                        fmt::print(fp_file,"{{{},{},{{1,{}}}}},",current,i,action_row[i-nterm_total].shift);
+                        fmt::print(fp_file,"{{{},{},{{1,{}}}}},",items_num,i,action_row[i-nterm_total].shift);
                         ++action_count;
                         reset_action_ind();
                     }
@@ -127,7 +129,7 @@ size_t LR1_Writer<Token_Kind_t>::write_table(
             assert(rule_it!=rules.end());
             if(Action_Candidates& action_this = action_row[it.lookahead()-nterm_total] ; action_this.reduce.rule_num!=0){
                 yuki::try_print(fp_log,"RR-conflict encountered. action({},{}) = reduce {}({}) / {}({}). ",
-                    current,
+                    items_num,
                     terms[it.lookahead()-nterm_total].name,
                     action_this.reduce.rule_num,
                     action_this.reduce.prec_rr,
@@ -150,7 +152,7 @@ size_t LR1_Writer<Token_Kind_t>::write_table(
                 }
                 case Action_Candidates::State::S : {
                     print_action_ind();
-                    fmt::print(fp_file,"{{{},{},{{1,{}}}}},",current,i,action_this.shift);
+                    fmt::print(fp_file,"{{{},{},{{1,{}}}}},",items_num,i,action_this.shift);
                     ++action_count;
                     reset_action_ind();
                     std::memset(action_row+(i-nterm_total),0,sizeof(Action_Candidates));
@@ -158,7 +160,7 @@ size_t LR1_Writer<Token_Kind_t>::write_table(
                 }
                 case Action_Candidates::State::R : {
                     print_action_ind();
-                    fmt::print(fp_file,"{{{},{},{{2,{}}}}},",current,i,action_this.reduce.rule_num);
+                    fmt::print(fp_file,"{{{},{},{{2,{}}}}},",items_num,i,action_this.reduce.rule_num);
                     ++action_count;
                     reset_action_ind();
                     std::memset(action_row+(i-nterm_total),0,sizeof(Action_Candidates));
@@ -166,7 +168,7 @@ size_t LR1_Writer<Token_Kind_t>::write_table(
                 }
                 case Action_Candidates::State::SR : {
                     yuki::try_print(fp_log,"SR-conflict encountered. action({},{}) = shift {} / reduce {}({}). Prec(lookahead)={}. Assoc(lookahead)={}. ",
-                        current,terms[i-nterm_total].name, action_this.shift,
+                        items_num,terms[i-nterm_total].name, action_this.shift,
                         action_this.reduce.rule_num, action_this.reduce.prec_sr,
                         terms[i-nterm_total].prec, terms[i-nterm_total].prec==0 ? assoc0 : terms[i-nterm_total].assoc
                     );
@@ -174,7 +176,7 @@ size_t LR1_Writer<Token_Kind_t>::write_table(
                         case Action_Kind::SHIFT : {
                             yuki::try_print(fp_log,"Resolved to shift {}.\n",action_this.shift);
                             print_action_ind();
-                            fmt::print(fp_file,"{{{},{},{{1,{}}}}},",current,i,action_this.shift);
+                            fmt::print(fp_file,"{{{},{},{{1,{}}}}},",items_num,i,action_this.shift);
                             ++action_count;
                             reset_action_ind();
                             break;
@@ -182,7 +184,7 @@ size_t LR1_Writer<Token_Kind_t>::write_table(
                         case Action_Kind::REDUCE : {
                             yuki::try_print(fp_log,"Resolved to reduce {}.\n",action_this.reduce.rule_num);
                             print_action_ind();
-                            fmt::print(fp_file,"{{{},{},{{2,{}}}}},",current,i,action_this.reduce.rule_num);
+                            fmt::print(fp_file,"{{{},{},{{2,{}}}}},",items_num,i,action_this.reduce.rule_num);
                             ++action_count;
                             reset_action_ind();
                             break;
@@ -195,6 +197,7 @@ size_t LR1_Writer<Token_Kind_t>::write_table(
             }
         }
         loop_1_end:
+        worklist.pop_front();
         if(action_count % YUKI_PG_TABLE_MAX_LINE_ITEM != 0)
             fprintf(fp_file,"\n");
         if(goto_count % YUKI_PG_TABLE_MAX_LINE_ITEM != 0)
@@ -202,11 +205,11 @@ size_t LR1_Writer<Token_Kind_t>::write_table(
         #ifdef YUKI_PG_DBG
         for(Token_Kind_t i=nterm_total;i<token_total;++i){
             if(!action_row[i-nterm_total].empty())
-                dbgout("non-empty action_candidates at ({},{}).\n",current,i);
+                dbgout("non-empty action_candidates at ({},{}).\n",items_num,i);
         }
         std::memset(action_row,0, term_total * sizeof(Action_Candidates) );
         #endif
-    } // for(size_t current=0; current<worklist.size(); ++current)
+    } // while(!worklist.empty())
 
     // Write the accept action.
     // The accept item-set might contain reduce-items with lookahead EOF_. Those will be overwritten, WITHOUT diagnostics. Such conflicts should be rare, however. The production-set that entails such conflicts should obviously wrong, like "A -> A".
