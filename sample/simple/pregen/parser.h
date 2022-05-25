@@ -4,14 +4,19 @@
 #include"parser.token.hpp"
 #include"lexer.h"
 namespace xxx{
-struct SParser : yuki::pg::AbsLR1Parser<Token_Settings,Lexer,12,5>{
-    typedef yuki::pg::AbsLR1Parser<Token_Settings,Lexer,12,5> Base_Parser;
+struct SParser : yuki::pg::AbsLR1Parser<Token_Settings>{
+    xxx::Lexer* lexer;
+
+    typedef yuki::pg::LR1_Action_Table<Token_Settings,12,5> Action_Table;
+    typedef yuki::pg::LR1_Goto_Table<Token_Settings,12> Goto_Table;
 
     static constinit Action_Table action_table;
     static constinit Goto_Table goto_table;
 
-    using Base_Parser::Base_Parser;
+    constexpr SParser(xxx::Lexer* l=nullptr) noexcept : lexer(l) {}
 
-    virtual int parse() override;
+    int parse(xxx::Lexer&);
+
+    virtual int parse() override {return parse(*lexer);}
 };
 } // namespace xxx

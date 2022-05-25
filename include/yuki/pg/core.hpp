@@ -8,17 +8,15 @@
 
 namespace yuki::pg{
 struct Location_Point{
-    size_t line=1;
-    size_t column=1;
+    size_t line=0;
+    size_t column=0;
 };
 struct Location_Range{
-    Location_Point start;
-    Location_Point end;
+    Location_Point start={};
+    Location_Point end={};
 };
-inline constexpr Location_Range empty_location_range={};
-}
 
-namespace yuki::pg{
+
 template<size_t index_p,typename T>
 struct Semantics_Tuple_Unit_ {T member;};
 
@@ -134,17 +132,19 @@ struct Any_Token<TS,false>{
     typedef typename TS::Token_Kind_t Token_Kind_t;
 
     constexpr Token_Kind_t kind() const noexcept {return kind_;}
+    constexpr Location_Range location_range() const noexcept {return location_range_;}
+    constexpr bool empty() const noexcept {return p_token_base;}
 
     constexpr Any_Token() noexcept = default;
 
     template<typename T> requires TS::template is_token_v<T>
-    explicit constexpr Any_Token(T*& p_token_other,const Location_Range& location_range_p=empty_location_range) noexcept : kind_(T::kind_static),location_range(location_range_p),p_token_base(p_token_other) {p_token_other=nullptr;}
+    explicit constexpr Any_Token(T*& p_token_other,Location_Range location_range_p={}) noexcept : kind_(T::kind_static),location_range_(location_range_p),p_token_base(p_token_other) {p_token_other=nullptr;}
 
     template<typename T> requires TS::template is_token_v<T>
-    explicit constexpr Any_Token(T*&& p_token_other,const Location_Range& location_range_p=empty_location_range) noexcept : kind_(T::kind_static),location_range(location_range_p),p_token_base(p_token_other) {p_token_other=nullptr;}
+    explicit constexpr Any_Token(T*&& p_token_other,Location_Range location_range_p={}) noexcept : kind_(T::kind_static),location_range_(location_range_p),p_token_base(p_token_other) {p_token_other=nullptr;}
 
     Any_Token(const Any_Token&) = delete;
-    constexpr Any_Token(Any_Token&& other) noexcept : kind_(other.kind_),location_range(other.location_range),p_token_base(other.p_token_base) {other.p_token_base=nullptr;}
+    constexpr Any_Token(Any_Token&& other) noexcept : kind_(other.kind_),location_range_(other.location_range_),p_token_base(other.p_token_base) {other.p_token_base=nullptr;}
 
     Any_Token& operator=(const Any_Token&) = delete;
     Any_Token& operator=(Any_Token&& other) noexcept {
@@ -154,12 +154,13 @@ struct Any_Token<TS,false>{
                 alloc.dynamic_destroy_deallocate(kind_,p_token_base);
             }
             kind_=other.kind_;
-            location_range=other.location_range;
+            location_range_=other.location_range_;
             p_token_base=other.p_token_base;
             other.p_token_base=nullptr;
         }
         return *this;
     }
+
     ~Any_Token() noexcept {
         if(p_token_base){
             YUKI_PG_TARGET_DBGO_ANY_TOKEN_DTOR("`any_token` fallback destructor called with kind {}.\n",kind_);
@@ -197,18 +198,17 @@ struct Any_Token<TS,false>{
         return static_cast<const T&&>(*p_token_base);
     }
 
-    constexpr bool empty() const noexcept {return p_token_base;}
   private:
     Token_Kind_t kind_=TS::Token_Kind::EOF_;
     Token_Base* p_token_base=nullptr;
+    Location_Range location_range_={};
   public:
-    Location_Range location_range={};
-
     static typename TS::Allocator alloc;
 }; // struct Any_Token
 
 template<typename TS>
 typename TS::Allocator Any_Token<TS,false>::alloc{};
+
 
 
 

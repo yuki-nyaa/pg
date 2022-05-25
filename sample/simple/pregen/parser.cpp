@@ -2,7 +2,8 @@
 #include"cconfig"
 #include<yuki/pg/lr1.hpp>
 #include"parser.h"
-constinit xxx::SParser::Action_Table xxx::SParser::action_table = {
+
+constinit yuki::pg::LR1_Action_Table<xxx::Token_Settings,12,5> xxx::SParser::action_table = {
     {0,2,{1,3}},
     {1,2,{1,3}}, {1,4,{2,0}},
     {2,2,{2,2}}, {2,4,{2,2}},
@@ -17,26 +18,27 @@ constinit xxx::SParser::Action_Table xxx::SParser::action_table = {
     {11,3,{2,3}},
 };
 
-constinit xxx::SParser::Goto_Table xxx::SParser::goto_table = {
+constinit yuki::pg::LR1_Goto_Table<xxx::Token_Settings,12> xxx::SParser::goto_table = {
     {0,0,1},{0,1,2},
     {1,1,4},
     {3,1,5},
     {6,1,9},
 };
 
-int xxx::SParser::parse(){
+int xxx::SParser::parse(xxx::Lexer& lexer_p_){
     namespace ypg = yuki::pg;
 
     reset();
+    stack_.reserve(128);
 
-    Any_Token token_ahead_ = lexer_->lex();
+    Any_Token token_ahead_=lexer_p_.lex();
 
     while(true){
         switch(action_table(state_,token_ahead_.kind).kind()){
             case ypg::LR1_Action_Kind::S : {
                 state_ = action_table(state_,token_ahead_.kind).state();
-                stack_.push_back({std::move(token_ahead_),state_});
-                token_ahead_ = lexer_->lex();
+                stack_.emplace_back(std::move(token_ahead_),state_);
+                token_ahead_=lexer_p_.lex();
                 goto loop_end_;
             }
             case ypg::LR1_Action_Kind::R : {
@@ -44,7 +46,6 @@ int xxx::SParser::parse(){
                     case 0: {
                         assert(stack_.size()>=1);
                         size_t start_ = stack_.size()-1-(1-1);
-                        size_t end_ = stack_.size()-1;
                         Any_Token& token0_ = stack_[start_].token;
 
                         { // User codes.
@@ -58,35 +59,23 @@ int xxx::SParser::parse(){
                     case 1 : {
                         assert(stack_.size()>=2);
                         size_t start_ = stack_.size()-1-(2-1);
-                        size_t end_ = stack_.size()-1;
                         Any_Token& token0_ = stack_[start_].token;
                         Any_Token& token1_ = stack_[start_+1].token;
-
                         Any_Token token_target_{Token_Kind::List,token0_.value+token1_.value};
 
                         { // User codes.
                             token_target_.value+=1;
                         }
 
-                        stack_.pop_back();
-                        stack_.pop_back();
-
-                        if(!stack_.empty()){
-                            state_ = goto_table(stack_.back().state,Token_Kind::List);
-                        }else{
-                            state_ = goto_table(0,Token_Kind::List);
-                        }
-
-                        stack_.push_back({std::move(token_target_),state_});
-
+                        stack_.pop_back(2);
+                        state_ = goto_table(stack_.empty() ? 0 : stack_.back().state,Token_Kind::List);
+                        stack_.emplace_back(std::move(token_target_),state_);
                         goto loop_end_;
                     }
                     case 2 : {
                         assert(stack_.size()>=1);
                         size_t start_ = stack_.size()-1-(1-1);
-                        size_t end_ = stack_.size()-1;
                         Any_Token& token0_ = stack_[start_].token;
-
                         Any_Token token_target_{Token_Kind::List,token0_.value};
 
                         { // User codes.
@@ -94,68 +83,40 @@ int xxx::SParser::parse(){
                         }
 
                         stack_.pop_back();
-
-                        if(!stack_.empty()){
-                            state_ = goto_table(stack_.back().state,Token_Kind::List);
-                        }else{
-                            state_ = goto_table(0,Token_Kind::List);
-                        }
-
-                        stack_.push_back({std::move(token_target_),state_});
-
+                        state_ = goto_table(stack_.empty() ? 0 : stack_.back().state,Token_Kind::List);
+                        stack_.emplace_back(std::move(token_target_),state_);
                         goto loop_end_;
                     }
                     case 3 : {
                         assert(stack_.size()>=3);
                         size_t start_ = stack_.size()-1-(3-1);
-                        size_t end_ = stack_.size()-1;
                         Any_Token& token0_ = stack_[start_].token;
                         Any_Token& token1_ = stack_[start_+1].token;
                         Any_Token& token2_ = stack_[start_+2].token;
-
                         Any_Token token_target_{Token_Kind::Pair,token1_.value};
 
                         { // User codes.
                             token_target_.value+=3;
                         }
 
-                        stack_.pop_back();
-                        stack_.pop_back();
-                        stack_.pop_back();
-
-                        if(!stack_.empty()){
-                            state_ = goto_table(stack_.back().state,Token_Kind::Pair);
-                        }else{
-                            state_ = goto_table(0,Token_Kind::Pair);
-                        }
-
-                        stack_.push_back({std::move(token_target_),state_});
-
+                        stack_.pop_back(3);
+                        state_ = goto_table(stack_.empty() ? 0 : stack_.back().state,Token_Kind::Pair);
+                        stack_.emplace_back(std::move(token_target_),state_);
                         goto loop_end_;
                     }
                     case 4 : {
                         assert(stack_.size()>=2);
                         size_t start_ = stack_.size()-1-(2-1);
-                        size_t end_ = stack_.size()-1;
                         Any_Token& token0_ = stack_[start_].token;
                         Any_Token& token1_ = stack_[start_+1].token;
-
                         Any_Token token_target_{Token_Kind::Pair,7};
 
                         { // User codes.
                         }
 
-                        stack_.pop_back();
-                        stack_.pop_back();
-
-                        if(!stack_.empty()){
-                            state_ = goto_table(stack_.back().state,Token_Kind::Pair);
-                        }else{
-                            state_ = goto_table(0,Token_Kind::Pair);
-                        }
-
-                        stack_.push_back({std::move(token_target_),state_});
-
+                        stack_.pop_back(2);
+                        state_ = goto_table(stack_.empty() ? 0 : stack_.back().state,Token_Kind::Pair);
+                        stack_.emplace_back(std::move(token_target_),state_);
                         goto loop_end_;
                     }
                     default : return 2;

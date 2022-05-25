@@ -83,11 +83,14 @@ id [A-Za-z_]\p{Word}*
 <INITIAL>{
 \%\%\p{Space}*    {
     terms.emplace_back("EOF_",assoc_default);
-    if(cmd_data->lexer.empty()){
-        if(!cmd_data->nspace.empty())
-            cmd_data->lexer.append(cmd_data->nspace).append("::");
-        cmd_data->lexer.append("Lexer");
+    if(!cmd_data->nspace.empty()){
+        cmd_data->parser_qualified.append(cmd_data->nspace).append("::");
+        cmd_data->ts_qualified.append(cmd_data->nspace).append("::");
+        cmd_data->lexer_qualified.append(cmd_data->nspace).append("::");
     }
+    cmd_data->parser_qualified.append(cmd_data->parser);
+    cmd_data->ts_qualified.append(cmd_data->ts);
+    cmd_data->lexer_qualified.append(cmd_data->lexer);
     write_token(*cmd_data,nterms,terms,code_htable);
     return 1;
 }
@@ -462,7 +465,7 @@ void write_token(const Cmd_Data& cmd_data,const yuki::Vector<Token_Data>& nterms
     );
     fprintf(out,
         IND "struct Token_Kind{\n"
-        IND2 "enum Enum : Token_Kind_t {"
+        IND2 "enum enum_t : Token_Kind_t {"
     );
     for(const Token_Data& td : nterms)
         fprintf(out,"%s,",td.name.c_str());
@@ -618,12 +621,13 @@ static void write_token_non_simple(const Cmd_Data& cmd_data,const yuki::Vector<T
         IND "}\n"
         "\n"
         IND "void dynamic_destroy_deallocate(Token_Kind_t k,const yuki::pg::Token_Base* p){\n"
+        IND2 "using enum Token_Kind::enum_t;\n"
         IND2 "switch(k){\n"
     );
     for(const Token_Data& td : nterms)
-        fprintf(out,IND3 "case Token_Kind::%s : {destroy_deallocate<Token::%s>(p);break;}\n",td.name.c_str(),td.name.c_str());
+        fprintf(out,IND3 "case %s : {destroy_deallocate<Token::%s>(p);break;}\n",td.name.c_str(),td.name.c_str());
     for(const Token_Data& td : terms)
-        fprintf(out,IND3 "case Token_Kind::%s : {destroy_deallocate<Token::%s>(p);break;}\n",td.name.c_str(),td.name.c_str());
+        fprintf(out,IND3 "case %s : {destroy_deallocate<Token::%s>(p);break;}\n",td.name.c_str(),td.name.c_str());
     fprintf(out,IND2 "}\n" IND "}\n}; // struct %s::Allocator\n",ts_cstr);
     if(!cmd_data.nspace.empty())
         fprintf(out,"} // namespace %s\n",cmd_data.nspace.c_str());

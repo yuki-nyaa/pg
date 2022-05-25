@@ -59,26 +59,28 @@ size_t LR1_Writer<Token_Kind_t>::write_table(
     size_t sr_conflict_total = 0;
     size_t rr_conflict_total = 0;
 
-    while(!worklist.empty()){
-        size_t action_count = 0;
-        size_t goto_count = 0;
-        auto print_action_ind = [fp_file,&action_count](){
-            if(action_count % YUKI_PG_TABLE_MAX_LINE_ITEM == 0)
-                fprintf(fp_file,IND);
-        };
-        auto reset_action_ind = [fp_file,&action_count](){
-            if(action_count % YUKI_PG_TABLE_MAX_LINE_ITEM == 0)
-                fprintf(fp_file,"\n");
-        };
-        auto print_goto_ind = [fp_goto,&goto_count](){
-            if(goto_count % YUKI_PG_TABLE_MAX_LINE_ITEM == 0)
-                fprintf(fp_goto,IND);
-        };
-        auto reset_goto_ind = [fp_goto,&goto_count](){
-            if(goto_count % YUKI_PG_TABLE_MAX_LINE_ITEM == 0)
-                fprintf(fp_goto,"\n");
-        };
+    size_t action_count = 0;
+    size_t goto_count = 0;
+    auto print_action_ind = [fp_file,&action_count](){
+        if(action_count % YUKI_PG_TABLE_MAX_LINE_ITEM == 0)
+            fprintf(fp_file,IND);
+    };
+    auto reset_action_ind = [fp_file,&action_count](){
+        if(action_count % YUKI_PG_TABLE_MAX_LINE_ITEM == 0)
+            fprintf(fp_file,"\n");
+    };
+    auto print_goto_ind = [fp_goto,&goto_count](){
+        if(goto_count % YUKI_PG_TABLE_MAX_LINE_ITEM == 0)
+            fprintf(fp_goto,IND);
+    };
+    auto reset_goto_ind = [fp_goto,&goto_count](){
+        if(goto_count % YUKI_PG_TABLE_MAX_LINE_ITEM == 0)
+            fprintf(fp_goto,"\n");
+    };
 
+    while(!worklist.empty()){
+        action_count = 0;
+        goto_count = 0;
         const LR1_Item_Set& items = worklist.front()->key;
         const size_t items_num = worklist.front()->mapped;
 
@@ -252,10 +254,10 @@ void LR1_Writer<Token_Kind_t>::write(
     fprintf(out,
         "#include<yuki/pg/lr1.hpp>\n"
         "#include\"%s\"\n"
-        "constinit %s%s%s::Action_Table %s%s%s::action_table = {\n",
+        "constinit %s::Action_Table %s::action_table = {\n",
         cmd_data.out_h.c_str(),
-        cmd_data.nspace.c_str(), cmd_data.nspace.empty() ? "" : "::", cmd_data.parser.c_str(),
-        cmd_data.nspace.c_str(), cmd_data.nspace.empty() ? "" : "::", cmd_data.parser.c_str()
+        cmd_data.parser_qualified.c_str(),
+        cmd_data.parser_qualified.c_str()
     );
     const size_t state_size = write_table(nterms,terms,rules,assoc0,cmd_data.fp_out_cpp,cmd_data.fp_goto,stderr,cmd_data.fp_out_log);
     fprintf(out,
@@ -263,9 +265,9 @@ void LR1_Writer<Token_Kind_t>::write(
         "\n"
     );
     fprintf(out,
-        "constinit %s%s%s::Goto_Table %s%s%s::goto_table = {\n",
-        cmd_data.nspace.c_str(), cmd_data.nspace.empty() ? "" : "::", cmd_data.parser.c_str(),
-        cmd_data.nspace.c_str(), cmd_data.nspace.empty() ? "" : "::", cmd_data.parser.c_str()
+        "constinit %s::Goto_Table %s::goto_table = {\n",
+        cmd_data.parser_qualified.c_str(),
+        cmd_data.parser_qualified.c_str()
     );
     freopen(cmd_data.tmp_goto,"r",cmd_data.fp_goto);
     yuki::concat_file(out,cmd_data.fp_goto);
@@ -275,22 +277,29 @@ void LR1_Writer<Token_Kind_t>::write(
         "\n"
     );
     fprintf(out,
-        "int %s::%s::parse(){\n"
-        IND "namespace ypg = yuki::pg;\n\n"
-        IND "reset();\n\n"
-        IND "Any_Token token_ahead_ = lexer_->lex();\n\n"
+        "int %s::parse(%s& lexer_p_){\n"
+        IND "namespace ypg = yuki::pg;\n"
+        "\n"
+        IND "reset();\n"
+        IND "stack_.reserve(%zu);\n"
+        "\n"
+        IND "Any_Token token_ahead_ = lexer_p_.lex();\n"
+        "\n"
         IND "while(true){\n"
         IND2 "switch(action_table(state_,token_ahead_.kind%s).kind()){\n"
         IND3 "case ypg::LR1_Action_Kind::S : {\n"
         IND4 "state_ = action_table(state_,token_ahead_.kind%s).state();\n"
-        IND4 "stack_.push_back({std::move(token_ahead_),state_});\n"
-        IND4 "token_ahead_ = lexer_->lex();\n"
+        IND4 "stack_.emplace_back(std::move(token_ahead_),state_);\n"
+        IND4 "token_ahead_ = lexer_p_.lex();\n"
         IND4 "goto loop_end_;\n"
         IND3 "}\n"
         IND3 "case ypg::LR1_Action_Kind::R : {\n"
         IND4 "switch(action_table(state_,token_ahead_.kind%s).rule()){\n",
-        cmd_data.nspace.c_str(), cmd_data.parser.c_str(),
-        sp_token ? "" : "()", sp_token ? "" : "()", sp_token ? "" : "()"
+        cmd_data.parser_qualified.c_str(), cmd_data.lexer_qualified.c_str(),
+        cmd_data.lr1_stack_reserve,
+        sp_token ? "" : "()",
+        sp_token ? "" : "()",
+        sp_token ? "" : "()"
     );
 
     for(const Rule<Token_Kind_t>& rule : rules){
@@ -299,8 +308,7 @@ void LR1_Writer<Token_Kind_t>::write(
         fprintf(out,
             "\n"
             IND6 "assert(stack_.size()>=%zu);\n"
-            IND6 "size_t start_ = stack_.size()-%zu;\n"
-            IND6 "size_t end_ = stack_.size()-1;\n",
+            IND6 "size_t start_ = stack_.size()-%zu;\n",
             rule.rights.size(), rule.rights.size()
         );
         if(!sp_token){
@@ -309,11 +317,10 @@ void LR1_Writer<Token_Kind_t>::write(
                     IND6 "Token::%s& token%zu_ = stack_[start_+%zu].token.get<Token::%s>();\n",
                     get_token_data(rule.rights[i]).name.c_str(), i, i, get_token_data(rule.rights[i]).name.c_str()
                 );
-            fprintf(out,"\n");
             if(rule.left!=(Token_Kind_t)-1)
                 fprintf(out,
                     IND6 "auto p_token_target_ = Any_Token::alloc.template allocate<Token::%s>();\n"
-                    IND6 "YUKI_CONSTRUCT(p_token_target_,%s);\n"
+                    IND6 "YUKI_CONSTRUCT_BRACE(p_token_target_,%s);\n"
                     IND6 "Token::%s& token_target_ = *p_token_target_;\n"
                     "\n",
                     get_token_data(rule.left).name.c_str(), rule.init.c_str(),  get_token_data(rule.left).name.c_str()
@@ -321,7 +328,6 @@ void LR1_Writer<Token_Kind_t>::write(
         }else{
             for(size_t i = 0;i<rule.rights.size();++i)
                 fprintf(out,IND6 "Any_Token& token%zu_ = stack_[start_+%zu].token;\n", i,i);
-            fprintf(out,"\n");
             if(rule.left!=(Token_Kind_t)-1)
                 fprintf(out,
                     IND6 "Any_Token token_target_{Token_Kind::%s,%s};\n"
@@ -343,28 +349,21 @@ void LR1_Writer<Token_Kind_t>::write(
                 fprintf(out,IND6 "stack_.pop_back();\n");
             }
         }else{
-            for(size_t i = rule.rights.size();i!=0;--i)
-                fprintf(out,IND6 "stack_.pop_back();\n");
+            fprintf(out,IND6 "stack_.pop_back(%zu);\n",rule.rights.size());
         }
-        fprintf(out,"\n");
         if(rule.left==(Token_Kind_t)-1){
             if(!sp_token)
-                fprintf(out,IND6 "token_ahead_.static_destroy_deallocate<Token::EOF_>();\n\n");
+                fprintf(out,IND6 "token_ahead_.static_destroy_deallocate<Token::EOF_>();\n");
             fprintf(out,IND6 "return 0;\n" IND5 "}\n");
         }else{
             fprintf(out,
-                IND6 "if(!stack_.empty()){\n"
-                IND6 IND "state_ = goto_table(stack_.back().state,Token_Kind::%s);\n"
-                IND6 "}else{\n"
-                IND6 IND "state_ = goto_table(0,Token_Kind::%s);\n"
-                IND6 "}\n"
-                "\n",
-                get_token_data(rule.left).name.c_str(), get_token_data(rule.left).name.c_str()
+                IND6 "state_ = goto_table(stack_.empty() ? 0 : stack_.back().state,Token_Kind::%s);\n",
+                get_token_data(rule.left).name.c_str()
             );
             if(!sp_token)
-                fprintf(out,IND6 "stack_.push_back({Any_Token(p_token_target_),state_});\n\n");
+                fprintf(out,IND6 "stack_.emplace_back(Any_Token(p_token_target_),state_);\n");
             else
-                fprintf(out,IND6 "stack_.push_back({std::move(token_target_),state_});\n\n");
+                fprintf(out,IND6 "stack_.emplace_back(std::move(token_target_),state_);\n");
             fprintf(out,IND6 "goto loop_end_;\n" IND5 "}\n");
         }
     } // for(const Rule<Token_Kind_t>& rule : rules)
@@ -382,6 +381,7 @@ void LR1_Writer<Token_Kind_t>::write(
         IND2 "loop_end_:;\n"
         IND "}\n"
         "}\n"
+        "\n"
     );
     try{
         fprintf(out,"%s\n",code_htable.at("SEC2_").c_str());
@@ -401,20 +401,28 @@ void LR1_Writer<Token_Kind_t>::write(
     if(!cmd_data.nspace.empty())
         fprintf(out_h,"namespace %s{\n",cmd_data.nspace.c_str());
     fprintf(out_h,
-        "struct %s %s : yuki::pg::AbsLR1Parser<%s,%s,%zu,%zu>{\n"
-        IND "typedef yuki::pg::AbsLR1Parser<%s,%s,%zu,%zu> Base_Parser;\n"
+        "struct %s %s : yuki::pg::AbsLR1Parser<%s>{\n"
+        IND "%s* lexer;\n"
         "\n"
+        IND "typedef yuki::pg::LR1_Action_Table<%s,%zu,%zu> Action_Table;\n"
+        IND "typedef yuki::pg::LR1_Goto_Table<%s,%zu> Goto_Table;\n"
         IND "static constinit Action_Table action_table;\n"
         IND "static constinit Goto_Table goto_table;\n"
-        "\n"
-        "%s"
-        "\n"
-        IND "virtual int parse() override %s;\n"
         "\n",
-        cmd_data.parser.c_str(), cmd_data.if_final_class ? "final" : "",
-        cmd_data.ts.c_str(), cmd_data.lexer.c_str(), state_size, rules.size(),
-        cmd_data.ts.c_str(), cmd_data.lexer.c_str(), state_size, rules.size(),
-        !cmd_data.no_default_ctor ? IND "using Base_Parser::Base_Parser;\n" : "",
+        cmd_data.parser.c_str(), cmd_data.if_final_class ? "final" : "", cmd_data.ts_qualified.c_str(),
+        cmd_data.lexer_qualified.c_str(),
+        cmd_data.ts_qualified.c_str(), state_size, rules.size(),
+        cmd_data.ts_qualified.c_str(), state_size
+    );
+    if(!cmd_data.no_default_ctor){
+        fprintf(out_h,IND "constexpr %s(%s* l=nullptr) noexcept : lexer(l) {}\n\n",cmd_data.parser.c_str(),cmd_data.lexer_qualified.c_str());
+    }
+    fprintf(out_h,
+        IND "int parse(%s&);\n"
+        "\n"
+        IND "virtual int parse() override %s {assert(lexer); return parse(*lexer);}\n"
+        "\n",
+        cmd_data.lexer_qualified.c_str(),
         cmd_data.if_final_function ? "final" : ""
     );
     try{

@@ -11,4 +11,6 @@
     // The individual flags may be turned on/off according to your demand.
     #undef DEBUG_REFLEX
 #endif
+
 #define YUKI_PG_IND "    "
+#define YUKI_PG_HIND "  "

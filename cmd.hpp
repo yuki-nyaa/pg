@@ -24,11 +24,17 @@ struct Cmd_Data{
     std::string nspace;
     std::string parser = "Parser";
     std::string ts = "Token_Settings";
-    std::string lexer;
+    std::string lexer = "Lexer";
+
+    std::string parser_qualified;
+    std::string ts_qualified;
+    std::string lexer_qualified;
 
     bool if_final_function = false;
     bool if_final_class = false;
     bool no_default_ctor = false;
+
+    size_t lr1_stack_reserve = 128;
 
     ~Cmd_Data() noexcept {close_all();}
 
