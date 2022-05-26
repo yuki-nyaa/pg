@@ -207,7 +207,7 @@ size_t LR1_Writer<Token_Kind_t>::write_table(
         #ifdef YUKI_PG_DBG
         for(Token_Kind_t i=nterm_total;i<token_total;++i){
             if(!action_row[i-nterm_total].empty())
-                dbgout("non-empty action_candidates at ({},{}).\n",items_num,i);
+                YUKI_PG_DBGO("non-empty action_candidates at ({},{}).\n",items_num,i);
         }
         std::memset(action_row,0, term_total * sizeof(Action_Candidates) );
         #endif
@@ -252,6 +252,7 @@ void LR1_Writer<Token_Kind_t>::write(
         fprintf(out,"%s\n",code_htable.at("cpp_top").c_str());
     }catch(const std::out_of_range&){}
     fprintf(out,
+        "#include<yuki/print.hpp>\n"
         "#include<yuki/pg/lr1.hpp>\n"
         "#include\"%s\"\n"
         "constinit %s::Action_Table %s::action_table = {\n",

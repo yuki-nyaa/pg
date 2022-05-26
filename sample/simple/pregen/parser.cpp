@@ -1,5 +1,6 @@
 // Definition for the parsing tables and the parsing function.
 #include"cconfig"
+#include<yuki/print.hpp>
 #include<yuki/pg/lr1.hpp>
 #include"parser.h"
 

@@ -1,3 +1,4 @@
+#include<yuki/print.hpp>
 #include<yuki/pg/lr1.hpp>
 #include"parser.h"
 constinit xxx::Parser::Action_Table xxx::Parser::action_table = {
