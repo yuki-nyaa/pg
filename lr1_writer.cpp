@@ -39,7 +39,7 @@ size_t LR1_Writer<Token_Kind_t>::write_table(
 
     First_Table<Token_Kind_t> first_table(nterms,terms,rules);
     LR1_Item_Set_Set cc;
-    cc.insert(generate_initial_items(rules,first_table));
+    cc.insert(LR1_Item_Set(rules,first_table));
 
     #ifndef YUKI_PG_CC_WORKLIST_RESERVE
     #define YUKI_PG_CC_WORKLIST_RESERVE 65535
@@ -91,7 +91,7 @@ size_t LR1_Writer<Token_Kind_t>::write_table(
             assert(items_pending.empty());
             for(;!it.is_end() && it.cursored()==cursored_current; ++it)
                 items_pending.emplace(it.left(),it.rights(),it.lookahead(),it.cursor()+1);
-            closure(items_pending,rules,first_table);
+            items_pending.closure(rules,first_table);
 
             yuki::IB_Pair<typename LR1_Item_Set_Set::const_iterator> insert_result= cc.insert(std::move(items_pending));
             if(insert_result.has_inserted)

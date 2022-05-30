@@ -6,6 +6,7 @@
 #include<fmt/core.h>
 #include<yuki/map.hpp>
 #include<yuki/vector.hpp>
+#include<yuki/ring_queue.hpp>
 #include"common.hpp"
 
 namespace yuki::pg{
@@ -33,7 +34,6 @@ struct LR1_Writer{
     struct LR1_Item_Body{
         std::basic_string<Token_Kind_t> rights;
         Token_Kind_t lookahead;
-        mutable bool processed=false;
         size_t cursor;
 
         template<typename R>
@@ -75,6 +75,15 @@ struct LR1_Writer{
             size_(other.size_)
         {other.size_=0;}
 
+        /// @note If there are multiple goal productions, only the first is considered.
+        LR1_Item_Set(const Rule_Set<Token_Kind_t>& rules,const First_Table<Token_Kind_t>& ftable) noexcept {
+            typename Rule_Set<Token_Kind_t>::const_iterator b = rules.begin(-1); // `-1` is the number of "Goal_".
+            const typename Rule_Set<Token_Kind_t>::const_iterator e = rules.end();
+            for(;b!=e;++b)
+                emplace(-1,std::initializer_list<Token_Kind_t>{b->rights.front()},ftable.eof(),0);
+            closure(rules,ftable);
+        }
+
         struct const_iterator{
             friend LR1_Item_Set;
           private:
@@ -87,13 +96,14 @@ struct LR1_Writer{
                 if(x!=x_end)
                     y=x->mapped.begin();
             }
+            constexpr const_iterator(typename map_type::const_iterator xp,typename map_type::const_iterator xep,typename block_type::const_iterator yp) noexcept:
+                x(xp),x_end(xep),y(yp)
+            {}
           public:
             Token_Kind_t left() const {return x->key.left;}
             const std::basic_string<Token_Kind_t>& rights() const {return y->rights;}
             Token_Kind_t lookahead() const {return y->lookahead;}
             size_t cursor() const {return y->cursor;}
-            bool processed() const {return y->processed;}
-            void mark_as_processed() const {y->processed=true;}
             Token_Kind_t cursored() const {return x->key.cursored;}
             bool is_complete() const {return x->key.is_complete();}
 
@@ -124,30 +134,30 @@ struct LR1_Writer{
 
         void clear() {map_.clear(); size_=0;}
 
-        void emplace(Token_Kind_t l,const std::basic_string<Token_Kind_t>& rs,Token_Kind_t lh,Token_Kind_t c){
-            const yuki::IB_Pair<typename map_type::iterator> result1 = map_.template emplace<true>({c==rs.size() ? Token_Kind_t(-1) : rs[c],l});
+        yuki::IB_Pair<const_iterator> emplace(Token_Kind_t l,const std::basic_string<Token_Kind_t>& rs,Token_Kind_t lh,Token_Kind_t c){
+            const yuki::IB_Pair<typename map_type::iterator> result1 = map_.template emplace<true>({(c==rs.size() ? Token_Kind_t(-1) : rs[c]), l});
             if(!result1.has_inserted){
                 typename block_type::const_iterator feg = result1.iterator->mapped.first_equiv_greater({rs.size(),lh,c});
                 const typename block_type::const_iterator fg = result1.iterator->mapped.first_greater({rs.size(),lh,c});
                 for(;feg!=fg;++feg)
                     if(feg->rights==rs)
-                        return;
+                        return {{result1.iterator,map_.end(),feg},false};
             }
-            result1.iterator->mapped.emplace(rs,lh,c);
             ++size_;
+            return {{result1.iterator,map_.end(),result1.iterator->mapped.emplace(rs,lh,c)},true};
         }
 
-        void emplace(Token_Kind_t l,std::basic_string<Token_Kind_t>&& rs,Token_Kind_t lh,Token_Kind_t c){
+        yuki::IB_Pair<const_iterator> emplace(Token_Kind_t l,std::basic_string<Token_Kind_t>&& rs,Token_Kind_t lh,Token_Kind_t c){
             const yuki::IB_Pair<typename map_type::iterator> result1 = map_.template emplace<true>({c==rs.size() ? Token_Kind_t(-1) : rs[c],l});
             if(!result1.has_inserted){
                 typename block_type::const_iterator feg = result1.iterator->mapped.first_equiv_greater({rs.size(),lh,c});
                 const typename block_type::const_iterator fg = result1.iterator->mapped.first_greater({rs.size(),lh,c});
                 for(;feg!=fg;++feg)
                     if(feg->rights==rs)
-                        return;
+                        return {{result1.iterator,map_.end(),feg},false};
             }
-            result1.iterator->mapped.emplace(std::move(rs),lh,c);
             ++size_;
+            return {{result1.iterator,map_.end(),result1.iterator->mapped.emplace(std::move(rs),lh,c)},true};
         }
 
         struct Less_By_Size{
@@ -160,65 +170,54 @@ struct LR1_Writer{
         };
 
         friend LR1_Item_Set_Set;
-    }; // struct LR1_Item_Set
 
-    static void closure(LR1_Item_Set& items,const Rule_Set<Token_Kind_t>& rules,const First_Table<Token_Kind_t>& ftable){
-        size_t items_size = items.size();
-        bool items_changed = true;
-        while(items_changed){
-            items_changed=false;
-            typename LR1_Item_Set::const_iterator item = items.begin();
-            while(!item.is_end()){
-                item_loop_head:
-                if(!item.processed()){
-                    item.mark_as_processed();
-                    if(!item.is_complete() && item.cursored()<ftable.term_first() ){ // `item.cursored()` is nterminal.
-                        typename Rule_Set<Token_Kind_t>::const_iterator b = rules.begin(item.cursored());
-                        typename Rule_Set<Token_Kind_t>::const_iterator e = rules.end(item.cursored());
-                        if(b!=rules.end()){
-                            const Token_Kind_t item_lookahead=item.lookahead();
-                            const std::basic_string_view<Token_Kind_t> item_rights(item.rights());
-                            const size_t item_cursor = item.cursor();
-                            for(;b!=e;++b){
-                                typename First_Table<Token_Kind_t>::extended_const_iterator_ne e_i=ftable.begin_ne(item_rights.substr(item_cursor+1),item_lookahead);
-                                for(;!e_i.is_end();++e_i)
-                                    items.emplace(item_rights[item_cursor],b->rights,*e_i,0);
-                            }
-                            if(items.size()>items_size){
-                                items_changed=true;
-                                items_size=items.size();
-                                goto item_loop_head;
+        void closure(const Rule_Set<Token_Kind_t>& rules,const First_Table<Token_Kind_t>& ftable){
+            #ifndef YUKI_PG_LR1_CLOSURE_WORKLIST_RESERVE
+            #define YUKI_PG_LR1_CLOSURE_WORKLIST_RESERVE 4096
+            #endif
+            static yuki::RingQueue<typename LR1_Item_Set::const_iterator> worklist(yuki::reserve_tag,YUKI_PG_LR1_CLOSURE_WORKLIST_RESERVE);
+
+            worklist.clear();
+            worklist.reserve(size_);
+            for(typename LR1_Item_Set::const_iterator b = begin();!b.is_end();++b)
+                worklist.emplace_back(b);
+
+            while(!worklist.empty()){
+                typename LR1_Item_Set::const_iterator item = worklist.front();
+                worklist.pop_front();
+                if(!item.is_complete() && item.cursored()<ftable.term_first() ){ // `item.cursored()` is nterminal.
+                    typename Rule_Set<Token_Kind_t>::const_iterator b = rules.begin(item.cursored());
+                    typename Rule_Set<Token_Kind_t>::const_iterator e = rules.end(item.cursored());
+                    if(b!=rules.end()){
+                        const Token_Kind_t item_lookahead=item.lookahead();
+                        const std::basic_string_view<Token_Kind_t> item_rights(item.rights());
+                        const size_t item_cursor = item.cursor();
+                        for(;b!=e;++b){
+                            typename First_Table<Token_Kind_t>::extended_const_iterator_ne e_i=ftable.begin_ne(item_rights.substr(item_cursor+1),item_lookahead);
+                            for(;!e_i.is_end();++e_i){
+                                yuki::IB_Pair<typename LR1_Item_Set::const_iterator> ibp = emplace(item_rights[item_cursor],b->rights,*e_i,0);
+                                if(ibp.has_inserted)
+                                    worklist.emplace_back(ibp.iterator);
                             }
                         }
                     }
                 }
-                ++item;
             }
+
         }
-    }
 
-    static LR1_Item_Set go_to(const LR1_Item_Set& items,const Token_Kind_t kind,const Rule_Set<Token_Kind_t>& rules,const First_Table<Token_Kind_t>& ftable){
-        LR1_Item_Set moved;
-        typename LR1_Item_Set::const_iterator item = items.begin();
-        for(;!item.is_end();++item){
-            if(!item.is_complete() && item.cursored()==kind)\
-                moved.emplace(item.left(),item.rights(),item.lookahead(),item.cursor()+1);
+        // Not used in this program.
+        LR1_Item_Set go_to(const Token_Kind_t kind,const Rule_Set<Token_Kind_t>& rules,const First_Table<Token_Kind_t>& ftable) const {
+            LR1_Item_Set moved;
+            typename LR1_Item_Set::const_iterator item = begin();
+            for(;!item.is_end();++item){
+                if(!item.is_complete() && item.cursored()==kind)\
+                    moved.emplace(item.left(),item.rights(),item.lookahead(),item.cursor()+1);
+            }
+            moved.closure(rules,ftable);
+            return moved;
         }
-        closure(moved,rules,ftable);
-        return moved;
-    }
-
-    /// @note If there are multiple goal productions, only the first is considered.
-    static LR1_Item_Set generate_initial_items(const Rule_Set<Token_Kind_t>& rules,const First_Table<Token_Kind_t>& ftable){
-        LR1_Item_Set items;
-        typename Rule_Set<Token_Kind_t>::const_iterator b = rules.begin(-1); // `-1` is the number of "Goal_".
-        const typename Rule_Set<Token_Kind_t>::const_iterator e = rules.end();
-        for(;b!=e;++b)
-            items.emplace(-1,std::initializer_list<Token_Kind_t>{b->rights.front()},ftable.eof(),0);
-        closure(items,rules,ftable);
-        return items;
-    }
-
+    }; // struct LR1_Item_Set
 
 
 
