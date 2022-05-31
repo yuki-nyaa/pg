@@ -83,14 +83,6 @@ id [A-Za-z_]\p{Word}*
 <INITIAL>{
 \%\%\p{Space}*    {
     terms.emplace_back("EOF_",assoc_default);
-    if(!cmd_data->nspace.empty()){
-        cmd_data->parser_qualified.append(cmd_data->nspace).append("::");
-        cmd_data->ts_qualified.append(cmd_data->nspace).append("::");
-        cmd_data->lexer_qualified.append(cmd_data->nspace).append("::");
-    }
-    cmd_data->parser_qualified.append(cmd_data->parser);
-    cmd_data->ts_qualified.append(cmd_data->ts);
-    cmd_data->lexer_qualified.append(cmd_data->lexer);
     write_token(*cmd_data,nterms,terms,code_htable);
     return 1;
 }

@@ -254,28 +254,25 @@ void LR1_Writer<Token_Kind_t>::write(
     fprintf(out,
         "#include<yuki/print.hpp>\n"
         "#include<yuki/pg/lr1.hpp>\n"
-        "#include\"%s\"\n"
-        "constinit %s::Action_Table %s::action_table = {\n",
-        cmd_data.out_h.c_str(),
-        cmd_data.parser_qualified.c_str(),
-        cmd_data.parser_qualified.c_str()
+        "#include\"%s\"\n",
+        cmd_data.out_h.c_str()
     );
+    if(!cmd_data.nspace.empty())
+        fprintf(out,"namespace %s{\n",cmd_data.nspace.c_str());
+    fprintf(out,"constinit %s::Action_Table %s::action_table = {\n",cmd_data.parser.c_str(),cmd_data.parser.c_str());
     const size_t state_size = write_table(nterms,terms,rules,assoc0,cmd_data.fp_out_cpp,cmd_data.fp_goto,stderr,cmd_data.fp_out_log);
     fprintf(out,
-        "};\n"
-        "\n"
+        "}; // constinit %s::Action_Table %s::action_table\n"
+        "\n",
+        cmd_data.parser.c_str(),cmd_data.parser.c_str()
     );
-    fprintf(out,
-        "constinit %s::Goto_Table %s::goto_table = {\n",
-        cmd_data.parser_qualified.c_str(),
-        cmd_data.parser_qualified.c_str()
-    );
+    fprintf(out,"constinit %s::Goto_Table %s::goto_table = {\n",cmd_data.parser.c_str(),cmd_data.parser.c_str());
     freopen(cmd_data.tmp_goto,"r",cmd_data.fp_goto);
     yuki::concat_file(out,cmd_data.fp_goto);
     fprintf(out,
-        "\n"
-        "};\n"
-        "\n"
+        "}; // constinit %s::Goto_Table %s::goto_table\n"
+        "\n",
+        cmd_data.parser.c_str(),cmd_data.parser.c_str()
     );
     fprintf(out,
         "int %s::parse(%s& lexer_p_){\n"
@@ -288,15 +285,15 @@ void LR1_Writer<Token_Kind_t>::write(
         "\n"
         IND "while(true){\n"
         IND2 "switch(action_table(state_,token_ahead_.kind%s).kind()){\n"
-        IND3 "case ypg::LR1_Action_Kind::S : {\n"
+        IND3 "case ypg::LR1_Action_Kind::S:{\n"
         IND4 "state_ = action_table(state_,token_ahead_.kind%s).state();\n"
         IND4 "stack_.emplace_back(std::move(token_ahead_),state_);\n"
         IND4 "token_ahead_ = lexer_p_.lex();\n"
         IND4 "goto loop_end_;\n"
         IND3 "}\n"
-        IND3 "case ypg::LR1_Action_Kind::R : {\n"
+        IND3 "case ypg::LR1_Action_Kind::R:{\n"
         IND4 "switch(action_table(state_,token_ahead_.kind%s).rule()){\n",
-        cmd_data.parser_qualified.c_str(), cmd_data.lexer_qualified.c_str(),
+        cmd_data.parser.c_str(), cmd_data.lexer.c_str(),
         cmd_data.lr1_stack_reserve,
         sp_token ? "" : "()",
         sp_token ? "" : "()",
@@ -304,7 +301,7 @@ void LR1_Writer<Token_Kind_t>::write(
     );
 
     for(const Rule<Token_Kind_t>& rule : rules){
-        fprintf(out, IND5 "case %zu : { // ",rule.num);
+        fprintf(out, IND5 "case %zu:{ // ",rule.num);
         print_rule(out,rule);
         fprintf(out,
             "\n"
@@ -365,25 +362,36 @@ void LR1_Writer<Token_Kind_t>::write(
                 fprintf(out,IND6 "stack_.emplace_back(Any_Token(p_token_target_),state_);\n");
             else
                 fprintf(out,IND6 "stack_.emplace_back(std::move(token_target_),state_);\n");
-            fprintf(out,IND6 "goto loop_end_;\n" IND5 "}\n");
+            fprintf(out,
+                IND6 "goto loop_end_;\n"
+                IND5 "} // case %zu // ",
+                rule.num
+            );
+            print_rule(out,rule);
+            fprintf(out,"\n");
         }
     } // for(const Rule<Token_Kind_t>& rule : rules)
     fprintf(out,
-        IND5 "default : return 2;\n"
-        IND4 "}\n"
-        IND3 "}\n"
-        IND3 "case ypg::LR1_Action_Kind::ERR : {\n"
+        IND5 "default:return 2;\n"
+        IND4 "} // switch(action_table(state_,token_ahead_.kind%s).rule())\n"
+        IND3 "} // case ypg::LR1_Action_Kind::R\n"
+        IND3 "case ypg::LR1_Action_Kind::ERR:{\n"
         IND4 "yuki::print_error(stderr,\"Syntax Error!\\n\");\n"
         IND4 "reset();\n"
         IND4 "yuki::print_error(stderr,\"Stack Clear!\\n\");\n"
         IND4 "return 1;\n"
         IND3 "}\n"
-        IND2 "}\n"
+        IND2 "} // switch(action_table(state_,token_ahead_.kind%s).kind)\n"
         IND2 "loop_end_:;\n"
-        IND "}\n"
-        "}\n"
-        "\n"
+        IND "} // while(true)\n"
+        "} // int %s::parse(%s&)\n",
+        sp_token ? "" : "()",
+        sp_token ? "" : "()",
+        cmd_data.parser.c_str(),cmd_data.lexer.c_str()
     );
+    if(!cmd_data.nspace.empty())
+        fprintf(out,"} // namespace %s\n",cmd_data.nspace.c_str());
+    fprintf(out,"\n");
     try{
         fprintf(out,"%s\n",code_htable.at("SEC2_").c_str());
     }catch(const std::out_of_range&){}
@@ -410,26 +418,26 @@ void LR1_Writer<Token_Kind_t>::write(
         IND "static constinit Action_Table action_table;\n"
         IND "static constinit Goto_Table goto_table;\n"
         "\n",
-        cmd_data.parser.c_str(), cmd_data.if_final_class ? "final" : "", cmd_data.ts_qualified.c_str(),
-        cmd_data.lexer_qualified.c_str(),
-        cmd_data.ts_qualified.c_str(), state_size, rules.size(),
-        cmd_data.ts_qualified.c_str(), state_size
+        cmd_data.parser.c_str(), cmd_data.if_final_class ? "final" : "", cmd_data.ts.c_str(),
+        cmd_data.lexer.c_str(),
+        cmd_data.ts.c_str(), state_size, rules.size(),
+        cmd_data.ts.c_str(), state_size
     );
     if(!cmd_data.no_default_ctor){
-        fprintf(out_h,IND "constexpr %s(%s* l=nullptr) noexcept : lexer(l) {}\n\n",cmd_data.parser.c_str(),cmd_data.lexer_qualified.c_str());
+        fprintf(out_h,IND "constexpr %s(%s* l=nullptr) noexcept : lexer(l) {}\n\n",cmd_data.parser.c_str(),cmd_data.lexer.c_str());
     }
     fprintf(out_h,
         IND "int parse(%s&);\n"
         "\n"
         IND "virtual int parse() override %s {assert(lexer); return parse(*lexer);}\n"
         "\n",
-        cmd_data.lexer_qualified.c_str(),
+        cmd_data.lexer.c_str(),
         cmd_data.if_final_function ? "final" : ""
     );
     try{
         fprintf(out_h,"%s\n",code_htable.at("class").c_str());
     }catch(const std::out_of_range&){}
-    fprintf(out_h,"\n};\n");
+    fprintf(out_h,"\n}; // struct %s\n",cmd_data.parser.c_str());
     if(!cmd_data.nspace.empty())
         fprintf(out_h,"} // namespace %s\n",cmd_data.nspace.c_str());
     try{

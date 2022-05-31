@@ -26,10 +26,6 @@ struct Cmd_Data{
     std::string ts = "Token_Settings";
     std::string lexer = "Lexer";
 
-    std::string parser_qualified;
-    std::string ts_qualified;
-    std::string lexer_qualified;
-
     bool if_final_function = false;
     bool if_final_class = false;
     bool no_default_ctor = false;
