@@ -26,8 +26,8 @@ struct Cmd_Data{
     std::string ts = "Token_Settings";
     std::string lexer = "Lexer";
 
-    bool if_final_function = false;
-    bool if_final_class = false;
+    bool no_final_function = false;
+    bool no_final_class = false;
     bool no_default_ctor = false;
 
     size_t lr1_stack_reserve = 128;

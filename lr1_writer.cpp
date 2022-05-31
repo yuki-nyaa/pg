@@ -410,7 +410,7 @@ void LR1_Writer<Token_Kind_t>::write(
     if(!cmd_data.nspace.empty())
         fprintf(out_h,"namespace %s{\n",cmd_data.nspace.c_str());
     fprintf(out_h,
-        "struct %s %s : yuki::pg::AbsLR1Parser<%s>{\n"
+        "struct %s %s: yuki::pg::AbsLR1Parser<%s> {\n"
         IND "%s* lexer;\n"
         "\n"
         IND "typedef yuki::pg::LR1_Action_Table<%s,%zu,%zu> Action_Table;\n"
@@ -418,7 +418,7 @@ void LR1_Writer<Token_Kind_t>::write(
         IND "static constinit Action_Table action_table;\n"
         IND "static constinit Goto_Table goto_table;\n"
         "\n",
-        cmd_data.parser.c_str(), cmd_data.if_final_class ? "final" : "", cmd_data.ts.c_str(),
+        cmd_data.parser.c_str(), cmd_data.no_final_class ? "" : "final ", cmd_data.ts.c_str(),
         cmd_data.lexer.c_str(),
         cmd_data.ts.c_str(), state_size, rules.size(),
         cmd_data.ts.c_str(), state_size
@@ -429,10 +429,10 @@ void LR1_Writer<Token_Kind_t>::write(
     fprintf(out_h,
         IND "int parse(%s&);\n"
         "\n"
-        IND "virtual int parse() override %s {assert(lexer); return parse(*lexer);}\n"
+        IND "virtual int parse() override %s{assert(lexer); return parse(*lexer);}\n"
         "\n",
         cmd_data.lexer.c_str(),
-        cmd_data.if_final_function ? "final" : ""
+        cmd_data.no_final_function ? "" : "final "
     );
     try{
         fprintf(out_h,"%s\n",code_htable.at("class").c_str());

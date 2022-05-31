@@ -141,8 +141,8 @@ id [A-Za-z_]\p{Word}*
     start(O_LEXER);
 }
 
-\%final_function    {cmd_data->if_final_function = true;}
-\%final_class    {cmd_data->if_final_class = true;}
+\%no_final_function    {cmd_data->no_final_function = true;}
+\%no_final_class    {cmd_data->no_final_class = true;}
 \%no_default_ctor    {cmd_data->no_default_ctor = true;}
 
 \p{Space}+    {} // Spaces as well as newlines are ignored.
