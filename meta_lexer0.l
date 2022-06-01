@@ -152,6 +152,8 @@ id [A-Za-z_]\p{Word}*
 \%no_final_class    {cmd_data->no_final_class = true;}
 \%no_default_ctor    {cmd_data->no_default_ctor = true;}
 
+\%action_array    {cmd_data->is_switch = false;}
+
 \p{Space}+    {} // Spaces as well as newlines are ignored.
 
 \/\/.*\R    {} // Comments.

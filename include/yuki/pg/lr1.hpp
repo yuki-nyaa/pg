@@ -98,6 +98,14 @@ struct LR1_Goto_Table{
 
 
 
+struct lr1_action_return_type{
+    size_t token_kind;
+    size_t rule;
+};
+
+
+
+
 template<typename TS>
 struct AbsLR1Parser : AbsParser<TS>{
     struct Token_State_Pair{
@@ -112,6 +120,9 @@ struct AbsLR1Parser : AbsParser<TS>{
         state_ = 0;
         stack_.clear();
     }
+
+    void SHIFT_(typename AbsParser<TS>::Any_Token&& t,size_t s) {stack_.emplace_back(std::move(t),s);}
+    void SET_STATE(size_t s) {state_=s;}
 
   protected:
     size_t state_;

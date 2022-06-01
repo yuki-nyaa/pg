@@ -1,0 +1,15 @@
+#cmakedefine YUKI_PARSER_SAMPLE_DBG
+#ifdef YUKI_PARSER_SAMPLE_DBG
+    #undef NDEBUG
+    #define YUKI_PG_TARGET_DBG
+    // The individual flags may be turned on/off according to your demand.
+    #define YUKI_PG_TARGET_DBG_ANY_TOKEN_DTOR
+    #define YUKI_PG_TARGET_DBG_ANY_TOKEN_MOVE_ASSIGN
+    //#define DEBUG_REFLEX
+#else
+    #define NDEBUG
+    #undef YUKI_PG_TARGET_DBG
+    #undef YUKI_PG_TARGET_DBG_ANY_TOKEN_DTOR
+    #undef YUKI_PG_TARGET_DBG_ANY_TOKEN_MOVE_ASSIGN
+    #undef DEBUG_REFLEX
+#endif

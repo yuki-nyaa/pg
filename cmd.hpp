@@ -31,6 +31,8 @@ struct Cmd_Data{
     bool no_final_class = false;
     bool no_default_ctor = false;
 
+    bool is_switch = true;
+
     size_t lr1_stack_reserve = 128;
 
     ~Cmd_Data() noexcept {close_all();}
