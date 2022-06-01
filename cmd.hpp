@@ -25,6 +25,7 @@ struct Cmd_Data{
     std::string parser = "Parser";
     std::string ts = "Token_Settings";
     std::string lexer = "Lexer";
+    std::string parser_tables;
 
     bool no_final_function = false;
     bool no_final_class = false;

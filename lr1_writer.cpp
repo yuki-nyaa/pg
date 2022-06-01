@@ -259,20 +259,20 @@ void LR1_Writer<Token_Kind_t>::write(
     );
     if(!cmd_data.nspace.empty())
         fprintf(out,"namespace %s{\n",cmd_data.nspace.c_str());
-    fprintf(out,"constinit %s::Action_Table %s::action_table = {\n",cmd_data.parser.c_str(),cmd_data.parser.c_str());
+    fprintf(out,"constinit %s::Action_Table %s::action_table = {\n",cmd_data.parser_tables.c_str(),cmd_data.parser_tables.c_str());
     const size_t state_size = write_table(nterms,terms,rules,assoc0,cmd_data.fp_out_cpp,cmd_data.fp_goto,stderr,cmd_data.fp_out_log);
     fprintf(out,
         "}; // constinit %s::Action_Table %s::action_table\n"
         "\n",
-        cmd_data.parser.c_str(),cmd_data.parser.c_str()
+        cmd_data.parser_tables.c_str(),cmd_data.parser_tables.c_str()
     );
-    fprintf(out,"constinit %s::Goto_Table %s::goto_table = {\n",cmd_data.parser.c_str(),cmd_data.parser.c_str());
+    fprintf(out,"constinit %s::Goto_Table %s::goto_table = {\n",cmd_data.parser_tables.c_str(),cmd_data.parser_tables.c_str());
     freopen(cmd_data.tmp_goto,"r",cmd_data.fp_goto);
     yuki::concat_file(out,cmd_data.fp_goto);
     fprintf(out,
         "}; // constinit %s::Goto_Table %s::goto_table\n"
         "\n",
-        cmd_data.parser.c_str(),cmd_data.parser.c_str()
+        cmd_data.parser_tables.c_str(),cmd_data.parser_tables.c_str()
     );
     fprintf(out,
         "int %s::parse(%s& lexer_p_){\n"
@@ -410,18 +410,32 @@ void LR1_Writer<Token_Kind_t>::write(
     if(!cmd_data.nspace.empty())
         fprintf(out_h,"namespace %s{\n",cmd_data.nspace.c_str());
     fprintf(out_h,
-        "struct %s %s: yuki::pg::AbsLR1Parser<%s> {\n"
-        IND "%s* lexer;\n"
-        "\n"
+        "struct %s{\n"
         IND "typedef yuki::pg::LR1_Action_Table<%s,%zu,%zu> Action_Table;\n"
         IND "typedef yuki::pg::LR1_Goto_Table<%s,%zu> Goto_Table;\n"
         IND "static constinit Action_Table action_table;\n"
         IND "static constinit Goto_Table goto_table;\n"
+        "};\n"
         "\n",
-        cmd_data.parser.c_str(), cmd_data.no_final_class ? "" : "final ", cmd_data.ts.c_str(),
-        cmd_data.lexer.c_str(),
+        cmd_data.parser_tables.c_str(),
         cmd_data.ts.c_str(), state_size, rules.size(),
         cmd_data.ts.c_str(), state_size
+    );
+    fprintf(out_h,
+        "struct %s %s: yuki::pg::AbsLR1Parser<%s>, private %s {\n"
+        IND "%s* lexer;\n"
+        "\n"
+        IND "using %s::Action_Table;\n"
+        IND "using %s::Goto_Table;\n"
+        IND "using %s::action_table;\n"
+        IND "using %s::goto_table;\n"
+        "\n",
+        cmd_data.parser.c_str(), cmd_data.no_final_class ? "" : "final ", cmd_data.ts.c_str(), cmd_data.parser_tables.c_str(),
+        cmd_data.lexer.c_str(),
+        cmd_data.parser_tables.c_str(),
+        cmd_data.parser_tables.c_str(),
+        cmd_data.parser_tables.c_str(),
+        cmd_data.parser_tables.c_str()
     );
     if(!cmd_data.no_default_ctor){
         fprintf(out_h,IND "constexpr %s(%s* l=nullptr) noexcept : lexer(l) {}\n\n",cmd_data.parser.c_str(),cmd_data.lexer.c_str());

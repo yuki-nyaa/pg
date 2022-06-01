@@ -72,7 +72,7 @@
     }
 }
 
-%x TERM TOKEN_DEF ALLOC0 ALLOC1 PREC ASSOC CODE0 CODE1 O_SPTOKEN O_NSPACE O_PARSER O_TS O_LEXER
+%x TERM TOKEN_DEF ALLOC0 ALLOC1 PREC ASSOC CODE0 CODE1 O_SPTOKEN O_NSPACE O_PARSER O_TS O_LEXER O_PT
 
 keychar    \p{Space}|\{|\}|\%|:|\||;|\$|\"
 non_keychar    [^{keychar}]
@@ -83,6 +83,8 @@ id [A-Za-z_]\p{Word}*
 <INITIAL>{
 \%\%\p{Space}*    {
     terms.emplace_back("EOF_",assoc_default);
+    if(cmd_data->parser_tables.empty())
+        cmd_data->parser_tables.append(cmd_data->parser).append("_Tables");
     write_token(*cmd_data,nterms,terms,code_htable);
     return 1;
 }
@@ -139,6 +141,11 @@ id [A-Za-z_]\p{Word}*
 \%lexer\p{Space}*    {
     str_temp1.clear();
     start(O_LEXER);
+}
+
+\%parser_tables\p{Space}*    {
+    str_temp1.clear();
+    start(O_PT);
 }
 
 \%no_final_function    {cmd_data->no_final_function = true;}
@@ -415,6 +422,20 @@ id [A-Za-z_]\p{Word}*
 (?=\%)    {
     yuki::trim_trailing_spaces(str_temp1);
     cmd_data->lexer = std::move(str_temp1);
+    start(INITIAL);
+}
+\R    {str_temp1.push_back(' ');}
+.    {str_temp1.push_back(chr());}
+}
+
+<O_PT>{
+\/\/.*\R    {} // Comments.
+
+\\\%    {str_temp1.push_back('%');}
+
+(?=\%)    {
+    yuki::trim_trailing_spaces(str_temp1);
+    cmd_data->parser_tables = std::move(str_temp1);
     start(INITIAL);
 }
 \R    {str_temp1.push_back(' ');}
