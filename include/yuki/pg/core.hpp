@@ -32,12 +32,12 @@ struct Semantics_Tuple_Impl_<std::index_sequence<ints...>,Ts...> : Semantics_Tup
     using unit_type=yuki::type_switch_t<i,Semantics_Tuple_Unit_<ints,Ts>...>;
 
     template<size_t i>
-    constexpr member_type<i>& get() & noexcept {
+    constexpr auto& get() & noexcept {
         static_assert(i<sizeof...(ints),"The requested index is greater than the max.");
         return unit_type<i>::member;
     }
     template<size_t i>
-    constexpr const member_type<i>& get() const& noexcept {
+    constexpr const auto& get() const& noexcept {
         static_assert(i<sizeof...(ints),"The requested index is greater than the max.");
         return unit_type<i>::member;
     }
