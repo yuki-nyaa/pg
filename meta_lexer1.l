@@ -129,7 +129,7 @@ Goal_    {
     typename Rule_Set<Token_Kind_t>::const_iterator it = rs.first_equiv_greater({(Token_Kind_t)-1,{},0});
     if(it==rs.end()){
         fprintf(stderr,"Warning: No goal symbol specified. Defaulted to the first non-terminal - %s - .\n",nterms[0].name.c_str());
-        rs.emplace(-1,std::initializer_list<Token_Kind_t>{0},0);
+        rs.emplace((Token_Kind_t)-1,std::initializer_list<Token_Kind_t>{0},(Token_Kind_t)0);
     }else{
         Token_Kind_t goal = (it->rights)[0];
         if(goal!=0){
