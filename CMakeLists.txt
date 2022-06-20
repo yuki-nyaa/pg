@@ -4,11 +4,11 @@ project(yuki.pg VERSION 1.0)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 set(CMAKE_CXX_EXTENSIONS OFF)
-set(CMAKE_CXX_FLAGS_DEBUG "-Wextra -Wno-narrowing -Wno-missing-field-initializers -g -O0")
-set(CMAKE_CXX_FLAGS_RELEASE "-Wno-narrowing -O2")
+set(CMAKE_CXX_FLAGS_DEBUG "-Wextra -Wno-missing-field-initializers -g -O0")
+set(CMAKE_CXX_FLAGS_RELEASE "-O2")
 if(NOT CMAKE_BUILD_TYPE)
-    message("No build type specified. Defaulted to 'Debug'.")
-    set(CMAKE_BUILD_TYPE Debug)
+    message("No build type specified. Defaulted to 'Release'.")
+    set(CMAKE_BUILD_TYPE Release)
 endif()
 
 if(CMAKE_BUILD_TYPE MATCHES Debug)
@@ -21,16 +21,8 @@ endif()
 
 configure_file(cconfig.in cconfig)
 
-if(MINGW)
-    set(USR "mingw64")
-else()
-    set(USR "usr")
-endif()
-set(LOCAL_INCLUDE /${USR}/local/include)
-set(LOCAL_LIB /${USR}/local/lib)
-
-include_directories(${PROJECT_SOURCE_DIR}/include ${LOCAL_INCLUDE} ${PROJECT_SOURCE_DIR} ${PROJECT_BINARY_DIR})
-link_directories(${LOCAL_LIB})
+include_directories(${PROJECT_SOURCE_DIR}/include /usr/local/include ${PROJECT_SOURCE_DIR} ${PROJECT_BINARY_DIR})
+link_directories(/usr/local/lib)
 
 add_custom_command(OUTPUT meta_lexer0.cpp meta_lexer0.h
     COMMAND reflex ${PROJECT_SOURCE_DIR}/meta_lexer0.l
