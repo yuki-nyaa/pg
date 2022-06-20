@@ -1,5 +1,5 @@
 #pragma once
-#include<yuki/pg/debug_.hpp>
+#include<yuki/pg/_debug.hpp>
 #include<concepts>
 #include<type_traits>
 #include<utility>
