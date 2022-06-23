@@ -21,6 +21,8 @@ endif()
 
 configure_file(cconfig.in cconfig)
 
+set(YUKI_PG_ROOT "../..")
+
 include_directories(${YUKI_PG_ROOT}/include /usr/local/include ${PROJECT_SOURCE_DIR} ${PROJECT_BINARY_DIR})
 link_directories(/usr/local/lib)
 
