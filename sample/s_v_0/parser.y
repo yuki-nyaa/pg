@@ -34,10 +34,10 @@ List :
 Pair :
     "(" Pair ")"
     {$1+1}
-    {}
+    {$!$.end.column;}
     |
     "(" ")"
-    {0}
+    {$!1.begin.line}
     {};
 
 Goal_ :

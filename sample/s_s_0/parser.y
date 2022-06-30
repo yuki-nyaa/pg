@@ -21,13 +21,13 @@ List :
     List Pair
     {$0+$1}
     {
-         $$+=1;
+         $$+=($!$.begin.line+1);
     }
     |
     Pair
     {$0}
     {
-         $$+=2;
+         $$+=($!0.end.line+2);
     };
 
 Pair :

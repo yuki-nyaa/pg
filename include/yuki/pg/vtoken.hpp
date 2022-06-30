@@ -1,7 +1,6 @@
 #pragma once
 #include<concepts>
 #include<cassert>
-#include<yuki/tmp.hpp>
 
 #include<memory>
 
@@ -391,9 +390,10 @@ struct VToken : private TIT {
     }
 
     template<auto K,typename... Args>
-    explicit constexpr VToken(yuki::pg::in_place_kind_t<K>,Args&&... args) noexcept :
+    explicit constexpr VToken(yuki::pg::in_place_kind_t<K>,yuki::pg::Location_Range loc,Args&&... args) noexcept :
         tu_(std::in_place_index<token_index_table[K]>,std::forward<Args>(args)...),
-        kind_(K)
+        kind_(K),
+        location_range_(loc)
     {}
 
     /// @tparam I Type index, not kind!!

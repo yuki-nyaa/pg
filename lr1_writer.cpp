@@ -330,10 +330,12 @@ void LR1_Writer<Token_Kind_t>::write_parse_array(
                 }
                 if(rule.left!=(Token_Kind_t)-1){
                     const Token_Data& td = get_token_data(rule.left);
-                    fprintf(out,
-                        IND6 "Token_t token_target_complete_(yuki::pg::in_place_kind<Token_Kind::%s>%s%s);\n",
-                        td.name.c_str(), rule.init.empty() ? "" : ",", rule.init.c_str()
-                    );
+                    fprintf(out,IND6 "Token_t token_target_complete_(yuki::pg::in_place_kind<Token_Kind::%s>,",td.name.c_str());
+                    if(rule.rights.size()!=0)
+                        fprintf(out,"{stack_[start_].token.location_range().begin,stack_[start_+%zu].token.location_range().end}",rule.rights.size()-1);
+                    else
+                        fprintf(out,"{}");
+                    fprintf(out,"%s%s);\n", rule.init.empty() ? "" : ",", rule.init.c_str());
                     if(!td.types.empty())
                         fprintf(out,IND6 "%s& token_target_ = token_target_complete_.get<%zu>();\n\n",td.types[0].c_str(),td.type_index);
                 }
@@ -342,12 +344,16 @@ void LR1_Writer<Token_Kind_t>::write_parse_array(
             case Options::Token_Impl_Type::SIMPLE:{
                 for(size_t i = 0;i<rule.rights.size();++i)
                     fprintf(out,IND6 "Token_t& token%zu_ = stack_[start_+%zu].token;\n", i,i);
-                if(rule.left!=(Token_Kind_t)-1)
+                if(rule.left!=(Token_Kind_t)-1){
                     fprintf(out,
-                        IND6 "Token_t token_target_{Token_Kind::%s,%s};\n"
-                        "\n",
-                        get_token_data(rule.left).name.c_str(), rule.init.c_str()
+                        IND6 "Token_t token_target_{Token_Kind::%s,%s",
+                        get_token_data(rule.left).name.c_str(),rule.init.c_str()
                     );
+                    if(rule.rights.size()!=0)
+                        fprintf(out,",{token0_.location_range.begin,token%zu_.location_range.end}};\n\n", rule.rights.size()-1);
+                    else
+                        fprintf(out,"};\n\n");
+                }
                 break;
             }
             case Options::Token_Impl_Type::TUPLE:{
@@ -356,14 +362,22 @@ void LR1_Writer<Token_Kind_t>::write_parse_array(
                         IND6 "Token::%s& token%zu_ = stack_[start_+%zu].token.get<Token::%s>();\n",
                         get_token_data(rule.rights[i]).name.c_str(), i, i, get_token_data(rule.rights[i]).name.c_str()
                     );
-                if(rule.left!=(Token_Kind_t)-1)
+                if(rule.left!=(Token_Kind_t)-1){
                     fprintf(out,
                         IND6 "auto p_token_target_ = Token_t::alloc.template allocate<Token::%s>();\n"
-                        IND6 "YUKI_CONSTRUCT_BRACE(p_token_target_,%s);\n"
-                        IND6 "Token::%s& token_target_ = *p_token_target_;\n"
-                        "\n",
-                        get_token_data(rule.left).name.c_str(), rule.init.c_str(),  get_token_data(rule.left).name.c_str()
+                        IND6 "yuki::pg::Location_Range loc_target_ = ",
+                        get_token_data(rule.left).name.c_str()
                     );
+                    if(rule.rights.size()!=0)
+                        fprintf(out,"{stack_[start_].token.location_range().begin,stack_[start_+%zu].token.location_range().end};\n", rule.rights.size()-1);
+                    else
+                        fprintf(out,"{};\n");
+                    fprintf(out,
+                        IND6 "YUKI_CONSTRUCT_BRACE(p_token_target_,%s);\n"
+                        IND6 "Token::%s& token_target_ = *p_token_target_;\n\n",
+                        rule.init.c_str(),  get_token_data(rule.left).name.c_str()
+                    );
+                }
                 break;
             }
         }
@@ -395,7 +409,7 @@ void LR1_Writer<Token_Kind_t>::write_parse_array(
             switch(options.token_impl_type){
                 case Options::Token_Impl_Type::VARIANT: fprintf(out,IND6 "stack_.emplace_back(std::move(token_target_complete_),state_);\n"); break;
                 case Options::Token_Impl_Type::SIMPLE: fprintf(out,IND6 "stack_.emplace_back(std::move(token_target_),state_);\n"); break;
-                case Options::Token_Impl_Type::TUPLE: fprintf(out,IND6 "stack_.emplace_back(Token_t(p_token_target_),state_);\n"); break;
+                case Options::Token_Impl_Type::TUPLE: fprintf(out,IND6 "stack_.emplace_back(Token_t(p_token_target_,loc_target_),state_);\n"); break;
             }
             fprintf(out,
                 IND6 "goto loop_end_;\n"
@@ -476,10 +490,12 @@ void LR1_Writer<Token_Kind_t>::write_parse_switch(
                 }
                 if(rule.left!=(Token_Kind_t)-1){
                     const Token_Data& td = get_token_data(rule.left);
-                    fprintf(out,
-                        IND4 "Token_t token_target_complete_(yuki::pg::in_place_kind<Token_Kind::%s>%s%s);\n",
-                        td.name.c_str(), rule.init.empty() ? "" : ",", rule.init.c_str()
-                    );
+                    fprintf(out,IND4 "Token_t token_target_complete_(yuki::pg::in_place_kind<Token_Kind::%s>,",td.name.c_str());
+                    if(rule.rights.size()!=0)
+                        fprintf(out,"{stack_[start_].token.location_range().begin,stack_[start_+%zu].token.location_range().end}",rule.rights.size()-1);
+                    else
+                        fprintf(out,"{}");
+                    fprintf(out,"%s%s);\n", rule.init.empty() ? "" : ",", rule.init.c_str());
                     if(!td.types.empty())
                         fprintf(out,IND4 "%s& token_target_ = token_target_complete_.get<%zu>();\n\n",td.types[0].c_str(),td.type_index);
                 }
@@ -488,12 +504,16 @@ void LR1_Writer<Token_Kind_t>::write_parse_switch(
             case Options::Token_Impl_Type::SIMPLE:{
                 for(size_t i = 0;i<rule.rights.size();++i)
                     fprintf(out,IND4 "Token_t& token%zu_ = stack_[start_+%zu].token;\n", i,i);
-                if(rule.left!=(Token_Kind_t)-1)
+                if(rule.left!=(Token_Kind_t)-1){
                     fprintf(out,
-                        IND4 "Token_t token_target_{Token_Kind::%s,%s};\n"
-                        "\n",
-                        get_token_data(rule.left).name.c_str(), rule.init.c_str()
+                        IND4 "Token_t token_target_{Token_Kind::%s,%s",
+                        get_token_data(rule.left).name.c_str(),rule.init.c_str()
                     );
+                    if(rule.rights.size()!=0)
+                        fprintf(out,",{token0_.location_range.begin,token%zu_.location_range.end}};\n\n", rule.rights.size()-1);
+                    else
+                        fprintf(out,"};\n\n");
+                }
                 break;
             }
             case Options::Token_Impl_Type::TUPLE:{
@@ -502,14 +522,22 @@ void LR1_Writer<Token_Kind_t>::write_parse_switch(
                         IND4 "Token::%s& token%zu_ = stack_[start_+%zu].token.get<Token::%s>();\n",
                         get_token_data(rule.rights[i]).name.c_str(), i, i, get_token_data(rule.rights[i]).name.c_str()
                     );
-                if(rule.left!=(Token_Kind_t)-1)
+                if(rule.left!=(Token_Kind_t)-1){
                     fprintf(out,
                         IND4 "auto p_token_target_ = Token_t::alloc.template allocate<Token::%s>();\n"
-                        IND4 "YUKI_CONSTRUCT_BRACE(p_token_target_,%s);\n"
-                        IND4 "Token::%s& token_target_ = *p_token_target_;\n"
-                        "\n",
-                        get_token_data(rule.left).name.c_str(), rule.init.c_str(),  get_token_data(rule.left).name.c_str()
+                        IND4 "yuki::pg::Location_Range loc_target_ = ",
+                        get_token_data(rule.left).name.c_str()
                     );
+                    if(rule.rights.size()!=0)
+                        fprintf(out,"{stack_[start_].token.location_range().begin,stack_[start_+%zu].token.location_range().end};\n", rule.rights.size()-1);
+                    else
+                        fprintf(out,"{};\n");
+                    fprintf(out,
+                        IND4 "YUKI_CONSTRUCT_BRACE(p_token_target_,%s);\n"
+                        IND4 "Token::%s& token_target_ = *p_token_target_;\n\n",
+                        rule.init.c_str(),  get_token_data(rule.left).name.c_str()
+                    );
+                }
                 break;
             }
         }
@@ -541,7 +569,7 @@ void LR1_Writer<Token_Kind_t>::write_parse_switch(
             switch(options.token_impl_type){
                 case Options::Token_Impl_Type::VARIANT: fprintf(out,IND4 "stack_.emplace_back(std::move(token_target_complete_),state_);\n"); break;
                 case Options::Token_Impl_Type::SIMPLE: fprintf(out,IND4 "stack_.emplace_back(std::move(token_target_),state_);\n"); break;
-                case Options::Token_Impl_Type::TUPLE: fprintf(out,IND4 "stack_.emplace_back(Token_t(p_token_target_),state_);\n"); break;
+                case Options::Token_Impl_Type::TUPLE: fprintf(out,IND4 "stack_.emplace_back(Token_t(p_token_target_,loc_target_),state_);\n"); break;
             }
             fprintf(out,
                 IND4 "break;\n"

@@ -245,11 +245,16 @@ Goal_    {
 \$[0-9]+    {
     switch(options.token_impl_type){
         case Options::Token_Impl_Type::VARIANT:{
-            const Token_Kind_t k = rule.rights.at(strtoull(text()+1,nullptr,10));
-            if(get_token_data(k).types.empty())
-                fprintf(stderr,"Error: Token with no semantic value is named: %s\n",get_token_data(k).name.c_str());
-            str_temp1.append("token").append(text()+1,size()-1).push_back('_');
-            break;
+            try{
+                const Token_Kind_t k = rule.rights.at(strtoull(text()+1,nullptr,10));
+                if(get_token_data(k).types.empty())
+                    fprintf(stderr,"Error: Token with no semantic value is named: %s\n",get_token_data(k).name.c_str());
+                str_temp1.append("token").append(text()+1,size()-1).push_back('_');
+                break;
+            }catch(const std::out_of_range&){
+                fprintf(stderr,"Fatal Error: Token index out of range: %s with %s.rights.size()=%zu\n",text()+1,get_token_data(left_current).name.c_str(),rule.rights.size());
+                std::exit(EXIT_FAILURE);
+            }
         }
         case Options::Token_Impl_Type::SIMPLE: str_temp1.append("token").append(text()+1,size()-1).append("_.value"); break;
         case Options::Token_Impl_Type::TUPLE:{
@@ -264,6 +269,22 @@ Goal_    {
                 std::exit(EXIT_FAILURE);
             }
         }
+    }
+}
+
+\$!\$    {
+    switch(options.token_impl_type){
+        case Options::Token_Impl_Type::VARIANT: str_temp1.append("(token_target_complete_.location_range())");break;
+        case Options::Token_Impl_Type::SIMPLE: str_temp1.append("token_target_.location_range"); break;
+        case Options::Token_Impl_Type::TUPLE: str_temp1.append("loc_target_"); break;
+    }
+}
+
+\$![0-9]+    {
+    switch(options.token_impl_type){
+        case Options::Token_Impl_Type::VARIANT: str_temp1.append("(stack_[start_+").append(text()+2,size()-2).append("].token.location_range())");break;
+        case Options::Token_Impl_Type::SIMPLE: str_temp1.append("token").append(text()+2,size()-2).append("_.location_range");break;
+        case Options::Token_Impl_Type::TUPLE: str_temp1.append("(stack_[start_+").append(text()+2,size()-2).append("].token.location_range())");break;
     }
 }
 
@@ -312,11 +333,16 @@ Goal_    {
 \$[0-9]+    {
     switch(options.token_impl_type){
         case Options::Token_Impl_Type::VARIANT:{
-            const Token_Kind_t k = rule.rights.at(strtoull(text()+1,nullptr,10));
-            if(get_token_data(k).types.empty())
-                fprintf(stderr,"Error: Token with no semantic value is named: %s\n",get_token_data(k).name.c_str());
-            str_temp1.append("token").append(text()+1,size()-1).push_back('_');
-            break;
+            try{
+                const Token_Kind_t k = rule.rights.at(strtoull(text()+1,nullptr,10));
+                if(get_token_data(k).types.empty())
+                    fprintf(stderr,"Error: Token with no semantic value is named: %s\n",get_token_data(k).name.c_str());
+                str_temp1.append("token").append(text()+1,size()-1).push_back('_');
+                break;
+            }catch(const std::out_of_range&){
+                fprintf(stderr,"Fatal Error: Token index out of range: %s with %s.rights.size()=%zu\n",text()+1,get_token_data(left_current).name.c_str(),rule.rights.size());
+                std::exit(EXIT_FAILURE);
+            }
         }
         case Options::Token_Impl_Type::SIMPLE: str_temp1.append("token").append(text()+1,size()-1).append("_.value"); break;
         case Options::Token_Impl_Type::TUPLE:{
@@ -331,6 +357,22 @@ Goal_    {
                 std::exit(EXIT_FAILURE);
             }
         }
+    }
+}
+
+\$!\$    {
+    switch(options.token_impl_type){
+        case Options::Token_Impl_Type::VARIANT: str_temp1.append("(token_target_complete_.location_range())");break;
+        case Options::Token_Impl_Type::SIMPLE: str_temp1.append("token_target_.location_range"); break;
+        case Options::Token_Impl_Type::TUPLE: str_temp1.append("loc_target_"); break;
+    }
+}
+
+\$![0-9]+    {
+    switch(options.token_impl_type){
+        case Options::Token_Impl_Type::VARIANT: str_temp1.append("(stack_[start_+").append(text()+2,size()-2).append("].token.location_range())");break;
+        case Options::Token_Impl_Type::SIMPLE: str_temp1.append("token").append(text()+2,size()-2).append("_.location_range");break;
+        case Options::Token_Impl_Type::TUPLE: str_temp1.append("(stack_[start_+").append(text()+2,size()-2).append("].token.location_range())");break;
     }
 }
 
@@ -378,11 +420,16 @@ Goal_    {
 \$[0-9]+    {
     switch(options.token_impl_type){
         case Options::Token_Impl_Type::VARIANT:{
-            const Token_Kind_t k = rule.rights.at(strtoull(text()+1,nullptr,10));
-            if(get_token_data(k).types.empty())
-                fprintf(stderr,"Error: Token with no semantic value is named: %s\n",get_token_data(k).name.c_str());
-            str_temp1.append("token").append(text()+1,size()-1).push_back('_');
-            break;
+            try{
+                const Token_Kind_t k = rule.rights.at(strtoull(text()+1,nullptr,10));
+                if(get_token_data(k).types.empty())
+                    fprintf(stderr,"Error: Token with no semantic value is named: %s\n",get_token_data(k).name.c_str());
+                str_temp1.append("token").append(text()+1,size()-1).push_back('_');
+                break;
+            }catch(const std::out_of_range&){
+                fprintf(stderr,"Fatal Error: Token index out of range: %s with %s.rights.size()=%zu\n",text()+1,get_token_data(left_current).name.c_str(),rule.rights.size());
+                std::exit(EXIT_FAILURE);
+            }
         }
         case Options::Token_Impl_Type::SIMPLE: str_temp1.append("token").append(text()+1,size()-1).append("_.value"); break;
         case Options::Token_Impl_Type::TUPLE:{
@@ -397,6 +444,22 @@ Goal_    {
                 std::exit(EXIT_FAILURE);
             }
         }
+    }
+}
+
+\$!\$    {
+    switch(options.token_impl_type){
+        case Options::Token_Impl_Type::VARIANT: str_temp1.append("(token_target_complete_.location_range())");break;
+        case Options::Token_Impl_Type::SIMPLE: str_temp1.append("token_target_.location_range"); break;
+        case Options::Token_Impl_Type::TUPLE: str_temp1.append("loc_target_"); break;
+    }
+}
+
+\$![0-9]+    {
+    switch(options.token_impl_type){
+        case Options::Token_Impl_Type::VARIANT: str_temp1.append("(stack_[start_+").append(text()+2,size()-2).append("].token.location_range())");break;
+        case Options::Token_Impl_Type::SIMPLE: str_temp1.append("token").append(text()+2,size()-2).append("_.location_range");break;
+        case Options::Token_Impl_Type::TUPLE: str_temp1.append("(stack_[start_+").append(text()+2,size()-2).append("].token.location_range())");break;
     }
 }
 

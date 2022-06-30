@@ -41,11 +41,11 @@ Pair :
     "(" Pair ")"
     {$1[count],std::move($1[lst])}
     {
-         $$[lst].push_back(3);
+         $$[lst].push_back($!$.end.column+3);
     }
     |
     "(" ")"
-    {1,{4}}
+    {$!1.begin.line+1,{4}}
     {};
 
 Goal_ :

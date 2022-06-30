@@ -19,8 +19,8 @@
 
 %%
 <INITIAL>{
-\(    {return Token_t(yuki::pg::in_place_kind<Token_Kind::LB>);}
-\)    {return Token_t(yuki::pg::in_place_kind<Token_Kind::RB>);}
-<<EOF>>    {return Token_t(yuki::pg::in_place_kind<Token_Kind::EOF_>);}
+\(    {return Token_t(yuki::pg::in_place_kind<Token_Kind::LB>,{});}
+\)    {return Token_t(yuki::pg::in_place_kind<Token_Kind::RB>,{});}
+<<EOF>>    {return Token_t(yuki::pg::in_place_kind<Token_Kind::EOF_>,{});}
 }
 %%
