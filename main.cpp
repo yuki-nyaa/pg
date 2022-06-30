@@ -13,34 +13,34 @@ int main(int argc,char** argv){
     if(!cmd_data.post_process())
         std::exit(EXIT_FAILURE);
 
-    ypg::Meta_Lexer0 meta_lexer0(cmd_data);
+    ypg::Meta_Lexer0 meta_lexer0(std::move(cmd_data));
     meta_lexer0.lex();
 
-    rewind(cmd_data.fp_in);
+    rewind(meta_lexer0.cmd_data.fp_in);
 
     try{
     switch(yuki::uint_auto_f(meta_lexer0.nterms.size()+meta_lexer0.terms.size())){
         case yuki::uint_enum::UCHAR : {
             ypg::Meta_Lexer1<unsigned char> meta_lexer1(std::move(meta_lexer0));
             meta_lexer1.lex();
-            ypg::LR1_Writer<unsigned char>::write(cmd_data,meta_lexer1.code_htable,meta_lexer1.nterms,meta_lexer1.terms,meta_lexer1.rs,meta_lexer1.assoc0);
+            ypg::LR1_Writer<unsigned char>::write(meta_lexer1.cmd_data,meta_lexer1.options,meta_lexer1.code_htable,meta_lexer1.nterms,meta_lexer1.terms,meta_lexer1.rs);
             break;
         }
         case yuki::uint_enum::USHORT : {
             ypg::Meta_Lexer1<unsigned short> meta_lexer1(std::move(meta_lexer0));
             meta_lexer1.lex();
-            ypg::LR1_Writer<unsigned short>::write(cmd_data,meta_lexer1.code_htable,meta_lexer1.nterms,meta_lexer1.terms,meta_lexer1.rs,meta_lexer1.assoc0);
+            ypg::LR1_Writer<unsigned short>::write(meta_lexer1.cmd_data,meta_lexer1.options,meta_lexer1.code_htable,meta_lexer1.nterms,meta_lexer1.terms,meta_lexer1.rs);
             break;
         }
         default : {
             ypg::Meta_Lexer1<unsigned> meta_lexer1(std::move(meta_lexer0));
             meta_lexer1.lex();
-            ypg::LR1_Writer<unsigned>::write(cmd_data,meta_lexer1.code_htable,meta_lexer1.nterms,meta_lexer1.terms,meta_lexer1.rs,meta_lexer1.assoc0);
+            ypg::LR1_Writer<unsigned>::write(meta_lexer1.cmd_data,meta_lexer1.options,meta_lexer1.code_htable,meta_lexer1.nterms,meta_lexer1.terms,meta_lexer1.rs);
             break;
         }
     }
     }catch(const std::runtime_error& e){
-        fprintf(stderr,"ICE : %s\n",e.what());
+        fprintf(stderr,"ICE: %s\n",e.what());
         std::exit(EXIT_FAILURE);
     }
 }

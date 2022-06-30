@@ -3,39 +3,58 @@
 %option namespace="yuki::pg" prefix="yuki_pg_meta0" lexer="Meta_Lexer0" lex="lex" token-type="int"
 
 %code_htop{
-    #include"cconfig"
+    #include<unordered_map>
     #include"common.hpp"
     #include"cmd.hpp"
 
-    class Meta_Lexer1;
     namespace yuki::pg{
-        void write_token(const Cmd_Data&,const yuki::Vector<Token_Data>&,const yuki::Vector<Token_Data>&,const std::unordered_map<std::string,std::string>&);
+        template<std::unsigned_integral Token_Kind_t>
+        class Meta_Lexer1;
     }
 }
 
 %code_cpptop{
-    #include<fmt/core.h>
-    #include<yuki/string_split.hpp>
+    #include"cconfig"
+    #include<unordered_map>
+    #include"common.hpp"
+    namespace yuki::pg{
+        static void write_token(FILE* const,const Options&,yuki::Vector<Token_Data>&,yuki::Vector<Token_Data>&,std::unordered_map<std::string,size_t>&,const std::unordered_map<std::string,std::string>&);
+    }
 }
 
 %code_class{
   public:
-    friend Meta_Lexer1;
+    template<std::unsigned_integral Token_Kind_t>
+    friend class Meta_Lexer1;
 
     #ifndef YUKI_PG_TOKEN_HTABLE_BUCKET
     #define YUKI_PG_TOKEN_HTABLE_BUCKET 1024
     #endif
-    Meta_Lexer0(yuki::pg::Cmd_Data& cmd_data_p,std::ostream& os=std::cout) noexcept :
+    Meta_Lexer0(yuki::pg::Cmd_Data&& cmd_data_p,std::ostream& os=std::cout) noexcept :
         AbstractBaseLexer(reflex::Input(cmd_data_p.fp_in),os),
-        cmd_data(&cmd_data_p),
+        cmd_data(std::move(cmd_data_p)),
+        vtoken_types(YUKI_PG_TOKEN_HTABLE_BUCKET),
         token_htable(YUKI_PG_TOKEN_HTABLE_BUCKET),
         code_htable(8)
-    {
-        token_htable.max_load_factor(std::numeric_limits<float>::max()); // Inhibits rehashing anyway.
-        code_htable.max_load_factor(std::numeric_limits<float>::max());
-    }
+    {}
   public:
-    yuki::pg::Cmd_Data* cmd_data;
+    struct Token_Coordinate{
+        bool is_term;
+        size_t idx;
+    };
+
+    yuki::pg::Cmd_Data cmd_data;
+
+    yuki::pg::Options options;
+
+    yuki::Vector<Token_Data> nterms{yuki::reserve_tag,YUKI_PG_TOKEN_HTABLE_BUCKET};
+    yuki::Vector<Token_Data> terms{yuki::reserve_tag,YUKI_PG_TOKEN_HTABLE_BUCKET};
+
+    std::unordered_map<std::string,size_t> vtoken_types;
+
+    std::unordered_map<std::string,Token_Coordinate> token_htable;
+
+    std::unordered_map<std::string,std::string> code_htable;
 
     unsigned brace_level=0;
 
@@ -45,30 +64,21 @@
 
     bool assoc_has_args = false;
 
-    yuki::Vector<Token_Data> nterms{yuki::reserve_tag,YUKI_PG_TOKEN_HTABLE_BUCKET};
-    yuki::Vector<Token_Data> terms{yuki::reserve_tag,YUKI_PG_TOKEN_HTABLE_BUCKET};
-
-    std::unordered_map<std::string,yuki::Pair<bool,size_t>> token_htable;
-
-    std::string str_temp1;
-
     prec_t current_prec = 0;
     Assoc current_assoc;
-    Assoc assoc0 = Assoc::RIGHT;
     Assoc assoc_default = Assoc::RIGHT;
 
-    std::unordered_map<std::string,std::string> code_htable;
+    std::string str_temp1;
     std::string code_qualifier;
 
     yuki::Vector<Token_Data>& get_token_table(bool is_term_p){
         return is_term_p ? terms : nterms;
     }
-    Token_Data& get_token_data(bool is_term_p,size_t idx){
-        return (is_term_p ? terms : nterms)[idx];
+    Token_Data& get_token_data(Token_Coordinate co){
+        return (co.is_term ? terms : nterms)[co.idx];
     }
     Token_Data& get_token_data(const std::string& s){
-        yuki::Pair<bool,size_t> p = token_htable[s];
-        return get_token_data(p.zeroth,p.first);
+        return get_token_data(token_htable[s]);
     }
 }
 
@@ -83,9 +93,9 @@ id [A-Za-z_]\p{Word}*
 <INITIAL>{
 \%\%\p{Space}*    {
     terms.emplace_back("EOF_",assoc_default);
-    if(cmd_data->parser_tables.empty())
-        cmd_data->parser_tables.append(cmd_data->parser).append("_Tables");
-    write_token(*cmd_data,nterms,terms,code_htable);
+    if(options.parser_tables.empty())
+        options.parser_tables.append(options.parser).append("_Tables");
+    write_token(cmd_data.fp_out_token,options,nterms,terms,vtoken_types,code_htable);
     return 1;
 }
 
@@ -109,50 +119,30 @@ id [A-Za-z_]\p{Word}*
     start(ASSOC);
 }
 
-\%default_left\p{Space}*    {
-    assoc0 = assoc_default = Assoc::LEFT;
-}
+\%default_left\p{Space}*    {options.assoc0 = assoc_default = Assoc::LEFT;}
+\%default_right\p{Space}*    {options.assoc0 = assoc_default = Assoc::RIGHT;}
 
-\%default_right\p{Space}*    {
-    assoc0 = assoc_default = Assoc::RIGHT;
-}
-
-\%code\p{Space}*    {
-    start(CODE0);
-}
+\%code\p{Space}*    {start(CODE0);}
 
 \%simple_token\p{Space}*    {
+    options.token_impl_type=Options::Token_Impl_Type::SIMPLE;
     str_temp1.clear();
     start(O_SPTOKEN);
 }
 
-\%namespace\p{Space}*    {
-    start(O_NSPACE);
-}
+\%tuple_token    {options.token_impl_type=Options::Token_Impl_Type::TUPLE;}
 
-\%parser\p{Space}*    {
-    start(O_PARSER);
-}
+\%namespace\p{Space}*    {start(O_NSPACE);}
+\%parser\p{Space}*    {start(O_PARSER);}
+\%token_settings\p{Space}*    {start(O_TS);}
+\%lexer\p{Space}*    {str_temp1.clear();start(O_LEXER);}
+\%parser_tables\p{Space}*    {str_temp1.clear();start(O_PT);}
 
-\%token_settings\p{Space}*    {
-    start(O_TS);
-}
+\%no_final_function    {options.no_final_function = true;}
+\%no_final_class    {options.no_final_class = true;}
+\%no_default_ctor    {options.no_default_ctor = true;}
 
-\%lexer\p{Space}*    {
-    str_temp1.clear();
-    start(O_LEXER);
-}
-
-\%parser_tables\p{Space}*    {
-    str_temp1.clear();
-    start(O_PT);
-}
-
-\%no_final_function    {cmd_data->no_final_function = true;}
-\%no_final_class    {cmd_data->no_final_class = true;}
-\%no_default_ctor    {cmd_data->no_default_ctor = true;}
-
-\%action_array    {cmd_data->is_switch = false;}
+\%action_array    {options.is_switch = false;}
 
 \p{Space}+    {} // Spaces as well as newlines are ignored.
 
@@ -168,7 +158,7 @@ id [A-Za-z_]\p{Word}*
     else{
         str_temp1 = str();
         get_token_table(is_term).back().alias = str_temp1;
-        token_htable.insert_or_assign(std::move(str_temp1),yuki::Pair<bool,size_t>{is_term,get_token_table(is_term).size()-1});
+        token_htable.insert_or_assign(std::move(str_temp1),Token_Coordinate{is_term,get_token_table(is_term).size()-1});
     }
 }
 
@@ -177,7 +167,7 @@ id [A-Za-z_]\p{Word}*
 {id}+    {
     token_declared = true;
     str_temp1 = str();
-    token_htable.insert_or_assign(str_temp1,yuki::Pair<bool,size_t>{is_term,get_token_table(is_term).size()});
+    token_htable.insert_or_assign(str_temp1,Token_Coordinate{is_term,get_token_table(is_term).size()});
     get_token_table(is_term).emplace_back(std::move(str_temp1),assoc_default);
 }
 
@@ -206,8 +196,11 @@ id [A-Za-z_]\p{Word}*
 }
 
 ;\p{Space}*    {
-    yuki::trim_trailing_spaces(str_temp1);
-    get_token_table(is_term).back().names.emplace_back(std::move(str_temp1));
+    if(options.token_impl_type==Options::Token_Impl_Type::TUPLE){
+        yuki::trim_trailing_spaces(str_temp1);
+        get_token_table(is_term).back().names.emplace_back(std::move(str_temp1));
+    }else if(!str_temp1.empty())
+        fprintf(stderr,"Warning: Token member name (\"%s\" in token \"%s\") is effective only with tuple-token!\n",str_temp1.c_str(),get_token_table(is_term).back().name.c_str());
 }
 
 \R    {str_temp1.push_back(' ');}
@@ -239,15 +232,27 @@ id [A-Za-z_]\p{Word}*
 \/\/.*\R    {} // Comments.
 
 \%    {
-    fprintf(stderr,"Fatal Error: %% encountered while scanning token allocator number of %s. Did you forget the ; ?\n",get_token_table(is_term).back().name.c_str());
+    fprintf(stderr,"Fatal Error: %% encountered while scanning token allocator number of \"%s\". Did you forget the ; ?\n",get_token_table(is_term).back().name.c_str());
     std::exit(EXIT_FAILURE);
 }
 
 ;    {
-    std::string& a = get_token_table(is_term).back().alloc;
-    if(a.empty()){
-        a.assign("yuki::Array_Allocator<Token::");
-        a.append(get_token_table(is_term).back().name).push_back('>');
+    switch(options.token_impl_type){
+        case Options::Token_Impl_Type::VARIANT:{
+            const auto& types = get_token_table(is_term).back().types;
+            if(!types.empty())
+                vtoken_types.try_emplace(types[0],0);
+            break;
+        }
+        case Options::Token_Impl_Type::SIMPLE: break;
+        case Options::Token_Impl_Type::TUPLE:{
+            std::string& a = get_token_table(is_term).back().alloc;
+            if(a.empty()){
+                a.assign("yuki::Array_Allocator<Token::");
+                a.append(get_token_table(is_term).back().name).push_back('>');
+            }
+            break;
+        }
     }
     start(INITIAL);
 }
@@ -277,7 +282,7 @@ id [A-Za-z_]\p{Word}*
     get_token_table(is_term).back().alloc.push_back(chr());
 }
 \%\%    {
-    fprintf(stderr,"Fatal Error: %%%% encountered while scanning token allocator name of %s. Did you forget the ; ?\n",get_token_table(is_term).back().name.c_str());
+    fprintf(stderr,"Fatal Error: %%%% encountered while scanning token allocator name of \"%s\". Did you forget the ; ?\n",get_token_table(is_term).back().name.c_str());
     std::exit(EXIT_FAILURE);
 }
 }
@@ -288,11 +293,11 @@ id [A-Za-z_]\p{Word}*
 (\"[^\"]*\")|({id}+)    {
     str_temp1 = str();
     try{
-        yuki::Pair<bool,size_t> pair = token_htable.at(str_temp1);
-        if(!pair.zeroth)
+        Token_Coordinate co = token_htable.at(str_temp1);
+        if(!co.is_term)
             fprintf(stderr,"Warning: %%prec for non-terminals makes no sense: %s\n",str_temp1.c_str());
         else
-            get_token_data(pair.zeroth,pair.first).prec = current_prec;
+            get_token_data(co).prec = current_prec;
     }catch(const std::out_of_range&){
         fprintf(stderr,"Error: Unknown token name encountered while parsing %%prec declaration: %s\n",str_temp1.c_str());
     }
@@ -311,11 +316,11 @@ id [A-Za-z_]\p{Word}*
 (\"[^\"]*\")|({id}+)    {
     str_temp1 = str();
     try{
-        yuki::Pair<bool,size_t> pair = token_htable.at(str_temp1);
-        if(!pair.zeroth)
+        Token_Coordinate co = token_htable.at(str_temp1);
+        if(!co.is_term)
             fprintf(stderr,"Warning: %%left/%%right for non-terminals makes no sense: %s\n",str_temp1.c_str());
         else{
-            Token_Data& td = get_token_data(pair.zeroth,pair.first);
+            Token_Data& td = get_token_data(co);
             td.prec = current_prec;
             assoc_has_args = true;
             td.assoc = current_assoc;
@@ -331,7 +336,7 @@ id [A-Za-z_]\p{Word}*
 
 (?=\%)    {
     if(assoc_has_args==false){
-        assoc0 = current_assoc;
+        options.assoc0 = current_assoc;
         --current_prec;
     }
     start(INITIAL);
@@ -365,7 +370,7 @@ id [A-Za-z_]\p{Word}*
         str_temp1.push_back('}');
     }else{
         yuki::trim_trailing_spaces(str_temp1);
-        code_htable[code_qualifier] = std::move(str_temp1);
+        code_htable.at(code_qualifier) = std::move(str_temp1);
         start(INITIAL);
     }
 }
@@ -383,10 +388,10 @@ id [A-Za-z_]\p{Word}*
 
 (?=\%)    {
     if(str_temp1.empty())
-        cmd_data->sp_token = "void";
+        options.sp_token = "void";
     else{
         yuki::trim_trailing_spaces(str_temp1);
-        cmd_data->sp_token = std::move(str_temp1);
+        options.sp_token = std::move(str_temp1);
     }
     start(INITIAL);
 }
@@ -397,19 +402,19 @@ id [A-Za-z_]\p{Word}*
 
 
 <O_NSPACE>{
-{id}+    {cmd_data->nspace.assign(text(),size());start(INITIAL);}
+{id}+    {options.nspace.assign(text(),size());start(INITIAL);}
 \p{Space}+    {} // Spaces as well as newlines are ignored.
 \/\/.*\R    {} // Comments.
 }
 
 <O_PARSER>{
-{id}+    {cmd_data->parser.assign(text(),size());start(INITIAL);}
+{id}+    {options.parser.assign(text(),size());start(INITIAL);}
 \p{Space}+    {} // Spaces as well as newlines are ignored.
 \/\/.*\R    {} // Comments.
 }
 
 <O_TS>{
-{id}+    {cmd_data->ts.assign(text(),size());start(INITIAL);}
+{id}+    {options.ts.assign(text(),size());start(INITIAL);}
 \p{Space}+    {} // Spaces as well as newlines are ignored.
 \/\/.*\R    {} // Comments.
 }
@@ -423,7 +428,7 @@ id [A-Za-z_]\p{Word}*
 
 (?=\%)    {
     yuki::trim_trailing_spaces(str_temp1);
-    cmd_data->lexer = std::move(str_temp1);
+    options.lexer = std::move(str_temp1);
     start(INITIAL);
 }
 \R    {str_temp1.push_back(' ');}
@@ -437,7 +442,7 @@ id [A-Za-z_]\p{Word}*
 
 (?=\%)    {
     yuki::trim_trailing_spaces(str_temp1);
-    cmd_data->parser_tables = std::move(str_temp1);
+    options.parser_tables = std::move(str_temp1);
     start(INITIAL);
 }
 \R    {str_temp1.push_back(' ');}
@@ -446,65 +451,74 @@ id [A-Za-z_]\p{Word}*
 
 %%
 namespace yuki::pg{
-static void write_token_non_simple(const Cmd_Data&,const yuki::Vector<Token_Data>&,const yuki::Vector<Token_Data>&);
+static void write_traits_alloc(FILE* const,const char* const,const yuki::Vector<Token_Data>&,const yuki::Vector<Token_Data>&);
+static void write_token_index_table(FILE* const,const char* const,yuki::Vector<Token_Data>&,yuki::Vector<Token_Data>&,const std::unordered_map<std::string,size_t>&);
 
-void write_token(const Cmd_Data& cmd_data,const yuki::Vector<Token_Data>& nterms,const yuki::Vector<Token_Data>& terms,const std::unordered_map<std::string,std::string>& code_htable){
+static void write_token(FILE* const out_token,const Options& options,yuki::Vector<Token_Data>& nterms_nc,yuki::Vector<Token_Data>& terms_nc,std::unordered_map<std::string,size_t>& vtoken_types,const std::unordered_map<std::string,std::string>& code_htable){
     #define IND YUKI_PG_IND
     #define IND2 IND IND
     #define IND3 IND IND IND
     #define IND4 IND IND IND IND
-    FILE* const out = cmd_data.fp_out_token;
-    fprintf(out,"#pragma once\n");
+
+    const Options::Token_Impl_Type token_impl_type = options.token_impl_type;
+    const yuki::Vector<Token_Data>& nterms = nterms_nc;
+    const yuki::Vector<Token_Data>& terms = terms_nc;
+
+    fprintf(out_token,"#pragma once\n");
     try{
-        fprintf(out,"%s\n",code_htable.at("token_top").c_str());
+        fprintf(out_token,"%s\n",code_htable.at("token_top").c_str());
     }catch(const std::out_of_range&){}
-    fprintf(out,
-        "#include<type_traits>\n"
+    fprintf(out_token,
         "#include<cassert>\n"
         "#include<yuki/tmp.hpp>\n"
         "#include<yuki/pg/core.hpp>\n"
-        "%s"
-        "\n",
-        cmd_data.sp_token.empty() ? "#include<yuki/allocator.hpp>\n" : ""
     );
-    if(!cmd_data.nspace.empty())
-        fprintf(out,"namespace %s{\n",cmd_data.nspace.c_str());
-    fprintf(out,"struct %s{\n",cmd_data.ts.c_str());
-    fprintf(out,
-        IND "static constexpr bool is_simple_token = %s;\n"
-        "\n"
+    switch(token_impl_type){
+        case Options::Token_Impl_Type::VARIANT: fprintf(out_token,"#include<yuki/pg/vtoken.hpp>\n\n");break;
+        case Options::Token_Impl_Type::SIMPLE: fprintf(out_token,"#include<yuki/pg/stoken.hpp>\n\n");break;
+        case Options::Token_Impl_Type::TUPLE: fprintf(out_token,"#include<yuki/pg/ttoken.hpp>\n#include<yuki/allocator.hpp>\n\n");break;
+    }
+    if(!options.nspace.empty())
+        fprintf(out_token,"namespace %s{\n",options.nspace.c_str());
+    fprintf(out_token,"struct %s{\n",options.ts.c_str());
+    fprintf(out_token,IND "static constexpr yuki::pg::Token_Impl_Type token_impl_type = yuki::pg::Token_Impl_Type::");
+    switch(token_impl_type){
+        case Options::Token_Impl_Type::VARIANT: fprintf(out_token,"VARIANT;\n\n");break;
+        case Options::Token_Impl_Type::SIMPLE: fprintf(out_token,"SIMPLE;\n\n");break;
+        case Options::Token_Impl_Type::TUPLE: fprintf(out_token,"TUPLE;\n\n");break;
+    }
+    fprintf(out_token,
         IND "static constexpr size_t token_total = %zu;\n"
         IND "typedef yuki::uint_auto_t<token_total> Token_Kind_t;\n",
-        cmd_data.sp_token.empty() ? "false" : "true",
         nterms.size()+terms.size()
     );
-    fprintf(out,
+    fprintf(out_token,
         IND "struct Token_Kind{\n"
         IND2 "enum enum_t : Token_Kind_t {"
     );
     for(const Token_Data& td : nterms)
-        fprintf(out,"%s,",td.name.c_str());
+        fprintf(out_token,"%s,",td.name.c_str());
     for(const Token_Data& td : terms)
-        fprintf(out,"%s,",td.name.c_str());
-    fprintf(out,
+        fprintf(out_token,"%s,",td.name.c_str());
+    fprintf(out_token,
         "};\n"
         IND "};\n"
     );
-    fprintf(out,IND "const char* token_name[token_total] = {");
+    fprintf(out_token,IND "const char* token_name[token_total] = {");
     for(const Token_Data& td : nterms){
         if(td.alias.empty())
-            fprintf(out,"\"%s\",",td.name.c_str());
+            fprintf(out_token,"\"%s\",",td.name.c_str());
         else
-            fprintf(out,"%s,",td.alias.c_str());
+            fprintf(out_token,"%s,",td.alias.c_str());
     }
     for(const Token_Data& td : terms){
         if(td.alias.empty())
-            fprintf(out,"\"%s\",",td.name.c_str());
+            fprintf(out_token,"\"%s\",",td.name.c_str());
         else
-            fprintf(out,"%s,",td.alias.c_str());
+            fprintf(out_token,"%s,",td.alias.c_str());
     }
-    fprintf(out,"};\n\n");
-    fprintf(out,
+    fprintf(out_token,"};\n\n");
+    fprintf(out_token,
         IND "static constexpr Token_Kind_t nterminal_first = Token_Kind::%s;\n"
         IND "static constexpr Token_Kind_t nterminal_last = Token_Kind::%s;\n"
         IND "static constexpr Token_Kind_t terminal_first = Token_Kind::%s;\n"
@@ -513,13 +527,13 @@ void write_token(const Cmd_Data& cmd_data,const yuki::Vector<Token_Data>& nterms
         "\n",
         nterms[0].name.c_str(), nterms.back().name.c_str(), terms[0].name.c_str()
     );
-    fprintf(out,
+    fprintf(out_token,
         IND "static constexpr size_t nterminal_total = %zu;\n"
         IND "static constexpr size_t terminal_total = %zu;\n"
         "\n",
         nterms.size(), terms.size()
     );
-    fprintf(out,
+    fprintf(out_token,
         IND "static constexpr bool is_nterminal_f(Token_Kind_t kind) {return kind>=nterminal_first && kind<=nterminal_last;}\n"
         IND "static constexpr bool is_terminal_f(Token_Kind_t kind) {return kind>=terminal_first && kind<=terminal_last;}\n"
         "\n"
@@ -534,47 +548,118 @@ void write_token(const Cmd_Data& cmd_data,const yuki::Vector<Token_Data>& nterms
         IND "}\n"
         "\n"
     );
-    if(!cmd_data.sp_token.empty()){
-        fprintf(out,
-            IND "using value_type = %s;\n"
-            IND "typedef void Token;\n"
-            "}; // struct %s\n",
-            cmd_data.sp_token.c_str(),
-            cmd_data.ts.c_str()
-        );
-        if(!cmd_data.nspace.empty())
-            fprintf(out,"} // namespace %s\n",cmd_data.nspace.c_str());
-    }else
-        write_token_non_simple(cmd_data,nterms,terms);
+    switch(token_impl_type){
+        case Options::Token_Impl_Type::VARIANT:{
+            fprintf(out_token,
+                IND "struct Token_Index_Table;\n\n"
+                IND "typedef yuki::pg::VToken<Token_Kind_t,Token_Index_Table"
+            );
+            size_t i = 1;
+            for(std::pair<const std::string,size_t>& pair : vtoken_types){
+                fprintf(out_token,",%s",pair.first.c_str());
+                pair.second = i++;
+            }
+            fprintf(out_token,
+                "> Token_t;\n"
+                IND "typedef void Token;\n"
+                "}; // struct %s\n",
+                options.ts.c_str()
+            );
+            write_token_index_table(out_token,options.ts.c_str(),nterms_nc,terms_nc,vtoken_types);
+            if(!options.nspace.empty())
+                fprintf(out_token,"} // namespace %s\n",options.nspace.c_str());
+            break;
+        }
+        case Options::Token_Impl_Type::SIMPLE:{
+            fprintf(out_token,
+                IND "typedef yuki::pg::SToken<Token_Kind_t,%s> Token_t;\n"
+                IND "typedef void Token;\n"
+                "}; // struct %s\n",
+                options.sp_token.c_str(),
+                options.ts.c_str()
+            );
+            if(!options.nspace.empty())
+                fprintf(out_token,"} // namespace %s\n",options.nspace.c_str());
+            break;
+        }
+        case Options::Token_Impl_Type::TUPLE:{
+            fprintf(out_token,IND "typedef yuki::pg::Any_TToken<%s> Token_t;\n\n",options.ts.c_str());
+            fprintf(out_token,
+                IND "template<Token_Kind_t kind_p,typename... Ts>\n"
+                IND "using TToken_Tp = yuki::pg::TToken<Token_Kind_t,kind_p,Ts...>;\n"
+                "\n"
+                IND "struct Token{\n"
+            );
+            for(const Token_Data& td : nterms){
+                fprintf(out_token,IND2 "using %s = TToken_Tp<Token_Kind::%s",td.name.c_str(),td.name.c_str());
+                for(const std::string& type : td.types)
+                    fprintf(out_token,",%s",type.c_str());
+                fprintf(out_token,">;\n");
+            }
+            for(const Token_Data& td : terms){
+                fprintf(out_token,IND2 "using %s = TToken_Tp<Token_Kind::%s",td.name.c_str(),td.name.c_str());
+                for(const std::string& type : td.types)
+                    fprintf(out_token,",%s",type.c_str());
+                fprintf(out_token,">;\n");
+            }
+            fprintf(out_token,IND "}; // struct Token\n\n");
+            write_traits_alloc(out_token,options.ts.c_str(),nterms,terms);
+            if(!options.nspace.empty())
+                fprintf(out_token,"} // namespace %s\n",options.nspace.c_str());
+            break;
+        }
+    }
     try{
-        fprintf(out,"%s\n",code_htable.at("token_end").c_str());
+        fprintf(out_token,"%s\n",code_htable.at("token_end").c_str());
     }catch(const std::out_of_range&){}
 } // write_token
 
 
-static void write_token_non_simple(const Cmd_Data& cmd_data,const yuki::Vector<Token_Data>& nterms,const yuki::Vector<Token_Data>& terms){
-    FILE* const out = cmd_data.fp_out_token;
-    const char* const ts_cstr = cmd_data.ts.c_str();
-    fprintf(out,
-        IND "template<Token_Kind_t kind_p,typename... Ts>\n"
-        IND "using Token_Tp = yuki::pg::Token<Token_Kind_t,kind_p,Ts...>;\n"
+static void write_token_index_table(FILE* const out_token,const char* const ts_cstr,yuki::Vector<Token_Data>& nterms,yuki::Vector<Token_Data>& terms,const std::unordered_map<std::string,size_t>& vtoken_types){
+    fprintf(out_token,
         "\n"
-        IND "struct Token{\n"
+        "struct %s::Token_Index_Table{\n"
+        "static constexpr %s::Token_Kind_t token_index_table[%zu] = {\n",
+        ts_cstr,
+        ts_cstr,nterms.size()+terms.size()
     );
-    for(const Token_Data& td : nterms){
-        fprintf(out,IND2 "using %s = Token_Tp<Token_Kind::%s",td.name.c_str(),td.name.c_str());
-        for(const std::string& type : td.types)
-            fprintf(out,",%s",type.c_str());
-        fprintf(out,">;\n");
+
+    size_t token_count = 0;
+    #ifndef YUKI_PG_TOKEN_INDEX_TABLE_MAX_LINE_ITEM
+    #define YUKI_PG_TOKEN_INDEX_TABLE_MAX_LINE_ITEM 16
+    #endif
+    auto print_ind = [out_token,&token_count](){
+        if(token_count % YUKI_PG_TOKEN_INDEX_TABLE_MAX_LINE_ITEM == 0)
+            fprintf(out_token,IND);
+    };
+    auto print_break = [out_token,&token_count](){
+        if(token_count % YUKI_PG_TOKEN_INDEX_TABLE_MAX_LINE_ITEM == 0)
+            fprintf(out_token,"\n");
+    };
+
+    for(Token_Data& td : nterms){
+        print_ind();
+        fprintf(out_token,"%zu,", td.types.empty() ? 0 : td.type_index = vtoken_types.at(td.types[0]));
+        ++token_count;
+        print_break();
     }
-    for(const Token_Data& td : terms){
-        fprintf(out,IND2 "using %s = Token_Tp<Token_Kind::%s",td.name.c_str(),td.name.c_str());
-        for(const std::string& type : td.types)
-            fprintf(out,",%s",type.c_str());
-        fprintf(out,">;\n");
+    for(Token_Data& td : terms){
+        print_ind();
+        fprintf(out_token,"%zu,", td.types.empty() ? 0 : td.type_index = vtoken_types.at(td.types[0]));
+        ++token_count;
+        print_break();
     }
-    fprintf(out,IND "};\n\n");
-    fprintf(out,
+    fprintf(out_token,
+        "%s}; // token_index_table\n"
+        "}; // struct %s::Token_Index_Table\n",
+        token_count%YUKI_PG_TOKEN_INDEX_TABLE_MAX_LINE_ITEM==0 ? "" : "\n",
+        ts_cstr
+    );
+}
+
+
+static void write_traits_alloc(FILE* const out_token,const char* const ts_cstr,const yuki::Vector<Token_Data>& nterms,const yuki::Vector<Token_Data>& terms){
+    fprintf(out_token,
         IND "template<typename T> struct is_nterminal : std::false_type {};\n"
         IND "template<typename T> static constexpr bool is_nterminal_v = is_nterminal<T>::value;\n"
         IND "template<typename T> struct is_terminal : std::false_type {};\n"
@@ -595,56 +680,56 @@ static void write_token_non_simple(const Cmd_Data& cmd_data,const yuki::Vector<T
         ts_cstr
     );
     for(const Token_Data& td : nterms)
-        fprintf(out,"template<> struct %s::is_nterminal<%s::Token::%s> : std::true_type {};\n",ts_cstr,ts_cstr,td.name.c_str());
-    fprintf(out,"\n");
+        fprintf(out_token,"template<> struct %s::is_nterminal<%s::Token::%s> : std::true_type {};\n",ts_cstr,ts_cstr,td.name.c_str());
+    fprintf(out_token,"\n");
     for(const Token_Data& td : terms)
-        fprintf(out,"template<> struct %s::is_terminal<%s::Token::%s> : std::true_type {};\n",ts_cstr,ts_cstr,td.name.c_str());
-    fprintf(out,"\n");
+        fprintf(out_token,"template<> struct %s::is_terminal<%s::Token::%s> : std::true_type {};\n",ts_cstr,ts_cstr,td.name.c_str());
+    fprintf(out_token,"\n");
     for(const Token_Data& td : nterms)
-        fprintf(out,"template<> struct %s::kind_to_type<%s::Token_Kind::%s> {typedef %s::Token::%s type;};\n",
+        fprintf(out_token,"template<> struct %s::kind_to_type<%s::Token_Kind::%s> {typedef %s::Token::%s type;};\n",
             ts_cstr, ts_cstr, td.name.c_str(),
             ts_cstr, td.name.c_str()
         );
     for(const Token_Data& td : terms)
-        fprintf(out,"template<> struct %s::kind_to_type<%s::Token_Kind::%s> {typedef %s::Token::%s type;};\n",
+        fprintf(out_token,"template<> struct %s::kind_to_type<%s::Token_Kind::%s> {typedef %s::Token::%s type;};\n",
             ts_cstr, ts_cstr, td.name.c_str(),
             ts_cstr, td.name.c_str()
         );
-    fprintf(out,"\n");
-    fprintf(out,"struct %s::Allocator :\n",ts_cstr);
+
+    fprintf(out_token,"\n");
+
+    fprintf(out_token,"struct %s::Allocator :\n",ts_cstr);
     for(const Token_Data& td : nterms)
-        fprintf(out,IND "private type_to_alloc_t<Token::%s>,\n",td.name.c_str());
+        fprintf(out_token,IND "private type_to_alloc_t<Token::%s>,\n",td.name.c_str());
     for(size_t i = 0;i!=terms.size();++i){
-        fprintf(out,IND "private type_to_alloc_t<Token::%s>",terms[i].name.c_str());
+        fprintf(out_token,IND "private type_to_alloc_t<Token::%s>",terms[i].name.c_str());
         if(i+1!=terms.size())
-            fprintf(out,",");
-        fprintf(out,"\n");
+            fprintf(out_token,",");
+        fprintf(out_token,"\n");
     }
-    fprintf(out,
+    fprintf(out_token,
         "{\n"
         IND "template<typename T>\n"
         IND "auto allocate(size_t n=1) -> typename type_to_alloc_t<T>::pointer {return type_to_alloc_t<T>::allocate(n);}\n"
         "\n"
         IND "template<typename T>\n"
-        IND "void deallocate(const yuki::pg::Token_Base* p,size_t n=1) {type_to_alloc_t<T>::deallocate(static_cast<const T*>(p),n);}\n"
+        IND "void deallocate(const yuki::pg::TToken_Base* p,size_t n=1) {type_to_alloc_t<T>::deallocate(static_cast<const T*>(p),n);}\n"
         "\n"
         IND "template<typename T>\n"
-        IND "void destroy_deallocate(const yuki::pg::Token_Base* p){\n"
+        IND "void destroy_deallocate(const yuki::pg::TToken_Base* p){\n"
         IND2 "if constexpr(!std::is_trivially_destructible_v<T>)\n"
         IND3 "static_cast<const T*>(p) -> ~T();\n"
         IND2 "type_to_alloc_t<T>::deallocate(static_cast<const T*>(p));\n"
         IND "}\n"
         "\n"
-        IND "void dynamic_destroy_deallocate(Token_Kind_t k,const yuki::pg::Token_Base* p){\n"
+        IND "void dynamic_destroy_deallocate(Token_Kind_t k,const yuki::pg::TToken_Base* p){\n"
         IND2 "using enum Token_Kind::enum_t;\n"
         IND2 "switch(k){\n"
     );
     for(const Token_Data& td : nterms)
-        fprintf(out,IND3 "case %s : {destroy_deallocate<Token::%s>(p);break;}\n",td.name.c_str(),td.name.c_str());
+        fprintf(out_token,IND3 "case %s : {destroy_deallocate<Token::%s>(p);break;}\n",td.name.c_str(),td.name.c_str());
     for(const Token_Data& td : terms)
-        fprintf(out,IND3 "case %s : {destroy_deallocate<Token::%s>(p);break;}\n",td.name.c_str(),td.name.c_str());
-    fprintf(out,IND2 "}\n" IND "}\n}; // struct %s::Allocator\n",ts_cstr);
-    if(!cmd_data.nspace.empty())
-        fprintf(out,"} // namespace %s\n",cmd_data.nspace.c_str());
-} // write_token_non_simple
+        fprintf(out_token,IND3 "case %s : {destroy_deallocate<Token::%s>(p);break;}\n",td.name.c_str(),td.name.c_str());
+    fprintf(out_token,IND2 "}\n" IND "}\n}; // struct %s::Allocator\n",ts_cstr);
+} // write_traits_alloc
 } // namespace yuki::pg

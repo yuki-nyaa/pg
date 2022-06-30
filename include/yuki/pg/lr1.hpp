@@ -107,9 +107,9 @@ struct lr1_action_return_type{
 
 
 template<typename TS>
-struct AbsLR1Parser : AbsParser<TS>{
+struct AbsLR1Parser : AbsParser<TS> {
     struct Token_State_Pair{
-        typename AbsParser<TS>::Any_Token token;
+        typename AbsParser<TS>::Token_t token;
         size_t state;
     };
 
@@ -121,7 +121,7 @@ struct AbsLR1Parser : AbsParser<TS>{
         stack_.clear();
     }
 
-    void SHIFT_(typename AbsParser<TS>::Any_Token&& t,size_t s) {stack_.emplace_back(std::move(t),s);}
+    void SHIFT_(typename AbsParser<TS>::Token_t&& t,size_t s) {stack_.emplace_back(std::move(t),s);}
     void SET_STATE(size_t s) {state_=s;}
 
   protected:

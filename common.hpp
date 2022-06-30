@@ -9,6 +9,32 @@ namespace yuki::pg{
 typedef unsigned short prec_t;
 enum struct Assoc : unsigned char {RIGHT,LEFT};
 
+struct Options{
+    std::string nspace;
+    std::string parser = "Parser";
+    std::string ts = "Token_Settings";
+    std::string lexer = "Lexer";
+    std::string parser_tables;
+
+    std::string sp_token;
+
+    size_t lr1_stack_reserve = 128;
+
+    bool no_final_function = false;
+    bool no_final_class = false;
+    bool no_default_ctor = false;
+
+    bool is_switch = true;
+
+    enum struct Token_Impl_Type : unsigned char {VARIANT,SIMPLE,TUPLE} token_impl_type = Token_Impl_Type::VARIANT;
+
+    Assoc assoc0 = Assoc::RIGHT;
+
+    bool is_variant() const {return token_impl_type==Token_Impl_Type::VARIANT;}
+    bool is_simple() const {return token_impl_type==Token_Impl_Type::SIMPLE;}
+    bool is_tuple() const {return token_impl_type==Token_Impl_Type::TUPLE;}
+};
+
 struct Token_Data{
     std::string name;
     std::string alias;
@@ -16,19 +42,15 @@ struct Token_Data{
     prec_t prec=0;
     Assoc assoc;
 
-    yuki::Vector<std::string> types;
-    yuki::Vector<std::string> names;
+    yuki::Vector<std::string,yuki::Allocator<std::string>,yuki::Default_EC<2,1,1,1024>> types;
+    size_t type_index = 0;
+    yuki::Vector<std::string,yuki::Allocator<std::string>,yuki::Default_EC<2,1,1,1024>> names;
 
     std::string alloc;
 
-    #ifndef YUKI_PG_TOKEN_DATA_RESERVE
-    #define YUKI_PG_TOKEN_DATA_RESERVE 8
-    #endif
     Token_Data(std::string&& n,Assoc assoc_p) noexcept :
         name(std::move(n)),
-        assoc(assoc_p),
-        types(yuki::reserve_tag,YUKI_PG_TOKEN_DATA_RESERVE),
-        names(yuki::reserve_tag,YUKI_PG_TOKEN_DATA_RESERVE)
+        assoc(assoc_p)
     {}
 
     std::string& name_or_alias() noexcept {return alias.empty() ? name : alias;}
@@ -50,7 +72,7 @@ struct Rule{
     std::string code;
 
     friend bool operator==(const Rule& lhs,const Rule& rhs) noexcept {
-        return lhs.left==rhs.left && lhs.rights.size()==rhs.rights.size() && lhs.rights==rhs.rights;
+        return lhs.left==rhs.left && lhs.rights==rhs.rights;
     }
 
     void clear(){

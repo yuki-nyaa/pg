@@ -327,27 +327,26 @@ struct LR1_Writer{
     }
 
     static size_t write_table(
-        const bool is_switch,const bool sp_token,
+        const bool is_switch,
         const yuki::Vector<Token_Data>& nterms,const yuki::Vector<Token_Data>& terms,
         const Rule_Set<Token_Kind_t>& rules,
         const Assoc assoc0,
         FILE* const fp_file,FILE* const fp_goto,FILE* const fp_err,FILE* const fp_log);
 
     static void write_parse_array(
-        const Cmd_Data& cmd_data,
+        FILE* const out,const Options& options,
         const yuki::Vector<Token_Data>& nterms,const yuki::Vector<Token_Data>& terms,
         const Rule_Set<Token_Kind_t>& rules);
 
     static void write_parse_switch(
-        const Cmd_Data& cmd_data,
+        FILE* const out,const Options& options,
         const yuki::Vector<Token_Data>& nterms,const yuki::Vector<Token_Data>& terms,
         const Rule_Set<Token_Kind_t>& rules);
 
     static void write(
-        const Cmd_Data& cmd_data,
+        const Cmd_Data& cmd_data,const Options& options,
         const std::unordered_map<std::string,std::string> code_htable,
         const yuki::Vector<Token_Data>& nterms,const yuki::Vector<Token_Data>& terms,
-        const Rule_Set<Token_Kind_t>& rules,
-        const Assoc assoc0);
+        const Rule_Set<Token_Kind_t>& rules);
 }; // struct LR1_Writer<Token_Kind_t>
 } // namespace yuki::pg

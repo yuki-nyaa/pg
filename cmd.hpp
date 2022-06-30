@@ -17,25 +17,7 @@ struct Cmd_Data{
     FILE* fp_out_token = nullptr;
     FILE* fp_out_log = nullptr;
 
-    const char* tmp_goto = "yuki_pg_tmp_goto";
-    FILE* fp_goto = nullptr;
-
-    std::string sp_token;
-    std::string nspace;
-    std::string parser = "Parser";
-    std::string ts = "Token_Settings";
-    std::string lexer = "Lexer";
-    std::string parser_tables;
-
-    bool no_final_function = false;
-    bool no_final_class = false;
-    bool no_default_ctor = false;
-
-    bool is_switch = true;
-
-    size_t lr1_stack_reserve = 128;
-
-    ~Cmd_Data() noexcept {close_all();}
+    FILE* fp_goto = tmpfile();
 
     void close_all(){
         if(fp_in!=nullptr && fp_in!=stdin) {fclose(fp_in);fp_in=nullptr;}
@@ -43,7 +25,7 @@ struct Cmd_Data{
         if(fp_out_h!=nullptr && fp_out_h!=stdout && fp_out_h!=stderr) {fclose(fp_out_h);fp_out_h=nullptr;}
         if(fp_out_token!=nullptr && fp_out_token!=stdout && fp_out_token!=stderr) {fclose(fp_out_token);fp_out_token=nullptr;}
         if(fp_out_log!=nullptr && fp_out_log!=stdout && fp_out_log!=stderr) {fclose(fp_out_log);fp_out_log=nullptr;}
-        if(fp_goto!=nullptr) {fclose(fp_goto);remove(tmp_goto);fp_goto=nullptr;}
+        if(fp_goto!=nullptr) {fclose(fp_goto);fp_goto=nullptr;}
     }
 
     bool post_process();
@@ -130,13 +112,6 @@ inline bool Cmd_Data::post_process(){
     if(!out_log.empty()){
         fp_out_log=fopen(out_log.c_str(),"w");
     }
-
-    if((fp_goto=fopen(tmp_goto,"r"))){
-        yuki::print_error(stderr,"Temp file \"{}\" already exists!\n",tmp_goto);
-        fclose(fp_goto); fp_goto = nullptr;
-        return false;
-    }
-    fp_goto = fopen(tmp_goto,"w+");
 
     return true;
 } // bool Cmd_Data::post_process()
