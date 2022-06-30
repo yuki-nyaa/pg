@@ -11,7 +11,7 @@ struct Location_Range{
     Location_Point end={};
 };
 
-enum struct Token_Impl_Type : unsigned char {VARIANT,SIMPLE,ANY};
+enum struct Token_Impl_Type : unsigned char {VARIANT,SIMPLE,TUPLE};
 
 template<typename TS>
 struct AbsParser{

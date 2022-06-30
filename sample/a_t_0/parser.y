@@ -1,3 +1,5 @@
+%tuple_token
+
 %nterm List{
      size_t : count;
      std::list<size_t> : lst;
@@ -18,6 +20,8 @@
 %code h_top{
 #include"lexer.h"
 }
+
+%action_array
 
 %%
 List :

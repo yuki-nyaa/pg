@@ -386,7 +386,7 @@ void LR1_Writer<Token_Kind_t>::write_parse_array(
         }
         if(rule.left==(Token_Kind_t)-1){
             if(options.is_tuple())
-                fprintf(out,IND6 "action_table.static_destroy_deallocate<Token::EOF_>();\n");
+                fprintf(out,IND6 "t_.static_destroy_deallocate<Token::EOF_>();\n");
             fprintf(out,IND6 "return 0;\n" IND5 "}\n");
         }else{
             fprintf(out,

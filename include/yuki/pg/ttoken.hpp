@@ -102,7 +102,7 @@ struct TToken_Base {};
 template<std::unsigned_integral Token_Kind_t,Token_Kind_t kind_p,typename... Ts>
 struct TToken: Semantics_Tuple_Impl_<std::make_index_sequence<sizeof...(Ts)>,Ts...>, TToken_Base {static constexpr Token_Kind_t kind_static = kind_p;};
 
-static_assert(std::is_aggregate_v<AToken<unsigned,100,int,double,const char*,const int&>>,"You need C++17 or later to make `yuki::pg::Semantics_Tuple` an aggregate!");
+static_assert(std::is_aggregate_v<TToken<unsigned,100,int,double,const char*,const int&>>,"You need C++17 or later to make `yuki::pg::Semantics_Tuple` an aggregate!");
 
 
 template<typename TS>
