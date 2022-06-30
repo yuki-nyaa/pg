@@ -322,21 +322,20 @@ void LR1_Writer<Token_Kind_t>::write_parse_array(
             case Options::Token_Impl_Type::VARIANT:{
                 for(size_t i = 0;i<rule.rights.size();++i){
                     const Token_Data& td = get_token_data(rule.rights[i]);
-                    fprintf(out,
-                        IND6 "%s& token%zu_ = stack_[start_+%zu].token.get<%zu>();\n",
-                        td.types.empty() ? "yuki::pg::VToken_Dummy" : td.types[0].c_str(),
-                        i,i,td.type_index
-                    );
+                    if(!td.types.empty())
+                        fprintf(out,
+                            IND6 "%s& token%zu_ = stack_[start_+%zu].token.get<%zu>();\n",
+                            td.types[0].c_str(),i,i,td.type_index
+                        );
                 }
                 if(rule.left!=(Token_Kind_t)-1){
                     const Token_Data& td = get_token_data(rule.left);
                     fprintf(out,
-                        IND6 "Token_t token_target_complete_(yuki::pg::in_place_kind<Token_Kind::%s>%s%s);\n"
-                        IND6 "%s& token_target_ = token_target_complete_.get<%zu>();\n"
-                        "\n",
-                        td.name.c_str(), rule.init.empty() ? "" : ",", rule.init.c_str(),
-                        td.types.empty() ? "yuki::pg::VToken_Dummy" : td.types[0].c_str(), td.type_index
+                        IND6 "Token_t token_target_complete_(yuki::pg::in_place_kind<Token_Kind::%s>%s%s);\n",
+                        td.name.c_str(), rule.init.empty() ? "" : ",", rule.init.c_str()
                     );
+                    if(!td.types.empty())
+                        fprintf(out,IND6 "%s& token_target_ = token_target_complete_.get<%zu>();\n\n",td.types[0].c_str(),td.type_index);
                 }
                 break;
             }
@@ -469,21 +468,20 @@ void LR1_Writer<Token_Kind_t>::write_parse_switch(
             case Options::Token_Impl_Type::VARIANT:{
                 for(size_t i = 0;i<rule.rights.size();++i){
                     const Token_Data& td = get_token_data(rule.rights[i]);
-                    fprintf(out,
-                        IND4 "%s& token%zu_ = stack_[start_+%zu].token.get<%zu>();\n",
-                        td.types.empty() ? "yuki::pg::VToken_Dummy" : td.types[0].c_str(),
-                        i,i,td.type_index
-                    );
+                    if(!td.types.empty())
+                        fprintf(out,
+                            IND4 "%s& token%zu_ = stack_[start_+%zu].token.get<%zu>();\n",
+                            td.types[0].c_str(),i,i,td.type_index
+                        );
                 }
                 if(rule.left!=(Token_Kind_t)-1){
                     const Token_Data& td = get_token_data(rule.left);
                     fprintf(out,
-                        IND4 "Token_t token_target_complete_(yuki::pg::in_place_kind<Token_Kind::%s>%s%s);\n"
-                        IND4 "%s& token_target_ = token_target_complete_.get<%zu>();\n"
-                        "\n",
-                        td.name.c_str(), rule.init.empty() ? "" : ",", rule.init.c_str(),
-                        td.types.empty() ? "yuki::pg::VToken_Dummy" : td.types[0].c_str(), td.type_index
+                        IND4 "Token_t token_target_complete_(yuki::pg::in_place_kind<Token_Kind::%s>%s%s);\n",
+                        td.name.c_str(), rule.init.empty() ? "" : ",", rule.init.c_str()
                     );
+                    if(!td.types.empty())
+                        fprintf(out,IND4 "%s& token_target_ = token_target_complete_.get<%zu>();\n\n",td.types[0].c_str(),td.type_index);
                 }
                 break;
             }

@@ -303,16 +303,13 @@ template<auto K>
 inline constexpr in_place_kind_t<K> in_place_kind;
 
 
-struct VToken_Dummy {};
-
-
 template<std::unsigned_integral Token_Kind_t,typename TIT,typename... Ts>
 struct VToken : private TIT {
   public:
     using TIT::token_index_table;
     static constexpr size_t size = sizeof...(Ts) + 1;
   private:
-    vtoken_impl_::tree_union<VToken_Dummy,Ts...> tu_;
+    vtoken_impl_::tree_union<vtoken_impl_::dm,Ts...> tu_;
     Token_Kind_t kind_;
     Location_Range location_range_;
   public:

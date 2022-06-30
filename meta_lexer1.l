@@ -225,7 +225,12 @@ Goal_    {
 
 \$\$    {
     switch(options.token_impl_type){
-        case Options::Token_Impl_Type::VARIANT: str_temp1.append("token_target_"); break;
+        case Options::Token_Impl_Type::VARIANT:{
+            if(get_token_data(left_current).types.empty())
+                fprintf(stderr,"Error: Token with no semantic value is named: %s\n",get_token_data(left_current).name.c_str());
+            str_temp1.append("token_target_");
+            break;
+        }
         case Options::Token_Impl_Type::SIMPLE: str_temp1.append("token_target_.value"); break;
         case Options::Token_Impl_Type::TUPLE:{
             token_current = left_current;
@@ -239,7 +244,13 @@ Goal_    {
 
 \$[0-9]+    {
     switch(options.token_impl_type){
-        case Options::Token_Impl_Type::VARIANT: str_temp1.append("token").append(text()+1,size()-1).push_back('_'); break;
+        case Options::Token_Impl_Type::VARIANT:{
+            const Token_Kind_t k = rule.rights.at(strtoull(text()+1,nullptr,10));
+            if(get_token_data(k).types.empty())
+                fprintf(stderr,"Error: Token with no semantic value is named: %s\n",get_token_data(k).name.c_str());
+            str_temp1.append("token").append(text()+1,size()-1).push_back('_');
+            break;
+        }
         case Options::Token_Impl_Type::SIMPLE: str_temp1.append("token").append(text()+1,size()-1).append("_.value"); break;
         case Options::Token_Impl_Type::TUPLE:{
             try{
@@ -281,7 +292,12 @@ Goal_    {
 
 \$\$    {
     switch(options.token_impl_type){
-        case Options::Token_Impl_Type::VARIANT: str_temp1.append("token_target_"); break;
+        case Options::Token_Impl_Type::VARIANT:{
+            if(get_token_data(left_current).types.empty())
+                fprintf(stderr,"Error: Token with no semantic value is named: %s\n",get_token_data(left_current).name.c_str());
+            str_temp1.append("token_target_");
+            break;
+        }
         case Options::Token_Impl_Type::SIMPLE: str_temp1.append("token_target_.value"); break;
         case Options::Token_Impl_Type::TUPLE:{
             token_current = left_current;
@@ -295,7 +311,13 @@ Goal_    {
 
 \$[0-9]+    {
     switch(options.token_impl_type){
-        case Options::Token_Impl_Type::VARIANT: str_temp1.append("token").append(text()+1,size()-1).push_back('_'); break;
+        case Options::Token_Impl_Type::VARIANT:{
+            const Token_Kind_t k = rule.rights.at(strtoull(text()+1,nullptr,10));
+            if(get_token_data(k).types.empty())
+                fprintf(stderr,"Error: Token with no semantic value is named: %s\n",get_token_data(k).name.c_str());
+            str_temp1.append("token").append(text()+1,size()-1).push_back('_');
+            break;
+        }
         case Options::Token_Impl_Type::SIMPLE: str_temp1.append("token").append(text()+1,size()-1).append("_.value"); break;
         case Options::Token_Impl_Type::TUPLE:{
             try{
@@ -336,7 +358,12 @@ Goal_    {
 
 \$\$    {
     switch(options.token_impl_type){
-        case Options::Token_Impl_Type::VARIANT: str_temp1.append("token_target_"); break;
+        case Options::Token_Impl_Type::VARIANT:{
+            if(get_token_data(left_current).types.empty())
+                fprintf(stderr,"Error: Token with no semantic value is named: %s\n",get_token_data(left_current).name.c_str());
+            str_temp1.append("token_target_");
+            break;
+        }
         case Options::Token_Impl_Type::SIMPLE: str_temp1.append("token_target_.value"); break;
         case Options::Token_Impl_Type::TUPLE:{
             token_current = left_current;
@@ -350,7 +377,13 @@ Goal_    {
 
 \$[0-9]+    {
     switch(options.token_impl_type){
-        case Options::Token_Impl_Type::VARIANT: str_temp1.append("token").append(text()+1,size()-1).push_back('_'); break;
+        case Options::Token_Impl_Type::VARIANT:{
+            const Token_Kind_t k = rule.rights.at(strtoull(text()+1,nullptr,10));
+            if(get_token_data(k).types.empty())
+                fprintf(stderr,"Error: Token with no semantic value is named: %s\n",get_token_data(k).name.c_str());
+            str_temp1.append("token").append(text()+1,size()-1).push_back('_');
+            break;
+        }
         case Options::Token_Impl_Type::SIMPLE: str_temp1.append("token").append(text()+1,size()-1).append("_.value"); break;
         case Options::Token_Impl_Type::TUPLE:{
             try{
