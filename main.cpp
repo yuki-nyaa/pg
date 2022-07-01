@@ -24,19 +24,19 @@ int main(int argc,char** argv){
             ypg::Meta_Lexer1<unsigned char> meta_lexer1(std::move(meta_lexer0));
             meta_lexer1.lex();
             ypg::LR1_Writer<unsigned char>::write(meta_lexer1.cmd_data,meta_lexer1.options,meta_lexer1.code_htable,meta_lexer1.nterms,meta_lexer1.terms,meta_lexer1.rs);
-            break;
+            return meta_lexer1.errors ? EXIT_FAILURE : EXIT_SUCCESS;
         }
         case yuki::uint_enum::USHORT : {
             ypg::Meta_Lexer1<unsigned short> meta_lexer1(std::move(meta_lexer0));
             meta_lexer1.lex();
             ypg::LR1_Writer<unsigned short>::write(meta_lexer1.cmd_data,meta_lexer1.options,meta_lexer1.code_htable,meta_lexer1.nterms,meta_lexer1.terms,meta_lexer1.rs);
-            break;
+            return meta_lexer1.errors ? EXIT_FAILURE : EXIT_SUCCESS;
         }
         default : {
             ypg::Meta_Lexer1<unsigned> meta_lexer1(std::move(meta_lexer0));
             meta_lexer1.lex();
             ypg::LR1_Writer<unsigned>::write(meta_lexer1.cmd_data,meta_lexer1.options,meta_lexer1.code_htable,meta_lexer1.nterms,meta_lexer1.terms,meta_lexer1.rs);
-            break;
+            return meta_lexer1.errors ? EXIT_FAILURE : EXIT_SUCCESS;
         }
     }
     }catch(const std::runtime_error& e){

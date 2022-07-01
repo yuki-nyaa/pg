@@ -56,6 +56,8 @@
 
     std::unordered_map<std::string,std::string> code_htable;
 
+    unsigned errors=0;
+
     unsigned brace_level=0;
 
     bool token_declared = false;
@@ -153,9 +155,10 @@ id [A-Za-z_]\p{Word}*
 
 <TERM>{
 \".*\"    {
-    if(!token_declared)
+    if(!token_declared){
         fprintf(stderr,"Error: Alias declaration precedes token name declaration: %s\n",text());
-    else{
+        ++errors;
+    }else{
         str_temp1 = str();
         get_token_table(is_term).back().alias = str_temp1;
         token_htable.insert_or_assign(std::move(str_temp1),Token_Coordinate{is_term,get_token_table(is_term).size()-1});
@@ -233,6 +236,7 @@ id [A-Za-z_]\p{Word}*
 
 \%    {
     fprintf(stderr,"Fatal Error: %% encountered while scanning token allocator number of \"%s\". Did you forget the ; ?\n",get_token_table(is_term).back().name.c_str());
+    ++errors;
     std::exit(EXIT_FAILURE);
 }
 
@@ -283,6 +287,7 @@ id [A-Za-z_]\p{Word}*
 }
 \%\%    {
     fprintf(stderr,"Fatal Error: %%%% encountered while scanning token allocator name of \"%s\". Did you forget the ; ?\n",get_token_table(is_term).back().name.c_str());
+    ++errors;
     std::exit(EXIT_FAILURE);
 }
 }
@@ -300,6 +305,7 @@ id [A-Za-z_]\p{Word}*
             get_token_data(co).prec = current_prec;
     }catch(const std::out_of_range&){
         fprintf(stderr,"Error: Unknown token name encountered while parsing %%prec declaration: %s\n",str_temp1.c_str());
+        ++errors;
     }
 }
 
@@ -327,6 +333,7 @@ id [A-Za-z_]\p{Word}*
         }
     }catch(const std::out_of_range&){
         fprintf(stderr,"Error: Unknown token name encountered while parsing %%left/%%right declaration: %s\n",str_temp1.c_str());
+        ++errors;
     }
 }
 
