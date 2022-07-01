@@ -36,7 +36,12 @@
         vtoken_types(YUKI_PG_TOKEN_HTABLE_BUCKET),
         token_htable(YUKI_PG_TOKEN_HTABLE_BUCKET),
         code_htable(8)
-    {}
+    {
+        #ifndef YUKI_PG_CODE_RESERVE
+        #define YUKI_PG_CODE_RESERVE 2048
+        #endif
+        str_temp1.reserve(YUKI_PG_CODE_RESERVE);
+    }
   public:
     struct Token_Coordinate{
         bool is_term;
@@ -73,6 +78,14 @@
     std::string str_temp1;
     std::string code_qualifier;
 
+    void clear_temps(){
+        std::unordered_map<std::string,size_t> umap;
+        using std::swap;
+        swap(vtoken_types,umap);
+        str_temp1.clear();
+        code_qualifier.clear();
+    }
+
     yuki::Vector<Token_Data>& get_token_table(bool is_term_p){
         return is_term_p ? terms : nterms;
     }
@@ -98,6 +111,7 @@ id [A-Za-z_]\p{Word}*
     if(options.parser_tables.empty())
         options.parser_tables.append(options.parser).append("_Tables");
     write_token(cmd_data.fp_out_token,options,nterms,terms,vtoken_types,code_htable);
+    clear_temps();
     return 1;
 }
 
@@ -358,10 +372,6 @@ id [A-Za-z_]\p{Word}*
 \{    {
     brace_level=0;
     str_temp1.clear();
-    #ifndef YUKI_PG_CODE_RESERVE
-    #define YUKI_PG_CODE_RESERVE 2048
-    #endif
-    str_temp1.reserve(YUKI_PG_CODE_RESERVE);
     start(CODE1);
 }
 }

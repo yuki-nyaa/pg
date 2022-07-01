@@ -30,13 +30,10 @@
         terms(std::move(ml0.terms)),
         token_htable(std::move(ml0.token_htable)),
         code_htable(std::move(ml0.code_htable)),
-        errors(ml0.errors)
-    {
-        #ifndef YUKI_PG_RULE_CODE_RESERVE
-        #define YUKI_PG_RULE_CODE_RESERVE 2048
-        #endif
-        str_temp1.reserve(YUKI_PG_RULE_CODE_RESERVE);
-    }
+        errors(ml0.errors),
+        str_temp1(std::move(ml0.str_temp1)),
+        str_temp2(std::move(ml0.code_qualifier))
+    {}
   public:
     static constexpr const char* ordinal[11] = {"zeroth","first","second","third","fourth","fifth","sixth","seventh","eighth","ninth","tenth"};
     static constexpr size_t ordinal_max = 2;
