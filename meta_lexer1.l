@@ -224,6 +224,7 @@ Goal_    {
 }
 
 \$\$    {
+    fprintf(stderr,"Error: Target token being referred to in the target token initializer!\n");
     switch(options.token_impl_type){
         case Options::Token_Impl_Type::VARIANT:{
             if(get_token_data(left_current).types.empty())
@@ -273,6 +274,7 @@ Goal_    {
 }
 
 \$!\$    {
+    fprintf(stderr,"Error: Target token being referred to in the target token initializer!\n");
     switch(options.token_impl_type){
         case Options::Token_Impl_Type::VARIANT: str_temp1.append("(token_target_complete_.location_range())");break;
         case Options::Token_Impl_Type::SIMPLE: str_temp1.append("token_target_.location_range"); break;
@@ -312,6 +314,7 @@ Goal_    {
 }
 
 \$\$    {
+    fprintf(stderr,"Error: Target token being referred to in the target token initializer!\n");
     switch(options.token_impl_type){
         case Options::Token_Impl_Type::VARIANT:{
             if(get_token_data(left_current).types.empty())
@@ -361,6 +364,7 @@ Goal_    {
 }
 
 \$!\$    {
+    fprintf(stderr,"Error: Target token being referred to in the target token initializer!\n");
     switch(options.token_impl_type){
         case Options::Token_Impl_Type::VARIANT: str_temp1.append("(token_target_complete_.location_range())");break;
         case Options::Token_Impl_Type::SIMPLE: str_temp1.append("token_target_.location_range"); break;
