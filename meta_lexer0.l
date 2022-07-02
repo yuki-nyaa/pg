@@ -181,7 +181,7 @@ id [A-Za-z_]\p{Word}*
 
 \p{Space}+    {} // Spaces as well as newlines are ignored.
 
-{id}+    {
+{id}    {
     token_declared = true;
     str_temp1 = str();
     token_htable.insert_or_assign(str_temp1,Token_Coordinate{is_term,get_token_table(is_term).size()});
@@ -309,7 +309,7 @@ id [A-Za-z_]\p{Word}*
 
 
 <PREC>{
-(\"[^\"]*\")|({id}+)    {
+(\"[^\"]*\")|({id})    {
     str_temp1 = str();
     try{
         Token_Coordinate co = token_htable.at(str_temp1);
@@ -333,7 +333,7 @@ id [A-Za-z_]\p{Word}*
 
 
 <ASSOC>{
-(\"[^\"]*\")|({id}+)    {
+(\"[^\"]*\")|({id})    {
     str_temp1 = str();
     try{
         Token_Coordinate co = token_htable.at(str_temp1);
@@ -367,7 +367,7 @@ id [A-Za-z_]\p{Word}*
 
 
 <CODE0>{
-{id}+    {code_qualifier=str();code_htable.insert_or_assign(code_qualifier,std::string{});}
+{id}    {code_qualifier=str();code_htable.insert_or_assign(code_qualifier,std::string{});}
 \p{Space}+    {} // Spaces as well as newlines are ignored.
 \{    {
     brace_level=0;
@@ -419,19 +419,19 @@ id [A-Za-z_]\p{Word}*
 
 
 <O_NSPACE>{
-{id}+    {options.nspace.assign(text(),size());start(INITIAL);}
+[a-zA-Z_:][0-9a-zA-Z_:]*   {options.nspace.assign(text(),size());start(INITIAL);}
 \p{Space}+    {} // Spaces as well as newlines are ignored.
 \/\/.*\R    {} // Comments.
 }
 
 <O_PARSER>{
-{id}+    {options.parser.assign(text(),size());start(INITIAL);}
+{id}    {options.parser.assign(text(),size());start(INITIAL);}
 \p{Space}+    {} // Spaces as well as newlines are ignored.
 \/\/.*\R    {} // Comments.
 }
 
 <O_TS>{
-{id}+    {options.ts.assign(text(),size());start(INITIAL);}
+{id}    {options.ts.assign(text(),size());start(INITIAL);}
 \p{Space}+    {} // Spaces as well as newlines are ignored.
 \/\/.*\R    {} // Comments.
 }
