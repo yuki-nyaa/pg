@@ -2,22 +2,25 @@
 %option outfile="meta_lexer1.cpp" header_file="meta_lexer1.h"
 %option namespace="yuki::pg" prefix="yuki_pg_meta1" lexer="Meta_Lexer1" lex="lex" token-type="int" templated_lexer="Meta_Lexer1<Token_Kind_t>"
 
+%code_cpptop{
+#include"cconfig"
+}
+
 %code_htop{
-    #include"cconfig"
-    #include"cmd.hpp"
-    #include"meta_lexer0.h"
+#include"cmd.hpp"
+#include"meta_lexer0.h"
 }
 
 %code_hafter{
-    namespace yuki::pg{
-        extern template struct Meta_Lexer1<unsigned char>;
-        extern template struct Meta_Lexer1<unsigned short>;
-        extern template struct Meta_Lexer1<unsigned>;
-    }
+namespace yuki::pg{
+extern template struct Meta_Lexer1<unsigned char>;
+extern template struct Meta_Lexer1<unsigned short>;
+extern template struct Meta_Lexer1<unsigned>;
+}
 }
 
 %code_templateclass{
-    template<std::unsigned_integral Token_Kind_t>
+template<std::unsigned_integral Token_Kind_t>
 }
 
 %code_class{

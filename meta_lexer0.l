@@ -2,24 +2,23 @@
 %option outfile="meta_lexer0.cpp" header-file="meta_lexer0.h"
 %option namespace="yuki::pg" prefix="yuki_pg_meta0" lexer="Meta_Lexer0" lex="lex" token-type="int"
 
-%code_htop{
-    #include<unordered_map>
-    #include"common.hpp"
-    #include"cmd.hpp"
-
-    namespace yuki::pg{
-        template<std::unsigned_integral Token_Kind_t>
-        class Meta_Lexer1;
-    }
+%code_cpptop{
+#include"cconfig"
+#include<unordered_map>
+#include"common.hpp"
+namespace yuki::pg{
+static void write_token(FILE* const,const Options&,yuki::Vector<Token_Data>&,yuki::Vector<Token_Data>&,std::unordered_map<std::string,size_t>&,const std::unordered_map<std::string,std::string>&);
+}
 }
 
-%code_cpptop{
-    #include"cconfig"
-    #include<unordered_map>
-    #include"common.hpp"
-    namespace yuki::pg{
-        static void write_token(FILE* const,const Options&,yuki::Vector<Token_Data>&,yuki::Vector<Token_Data>&,std::unordered_map<std::string,size_t>&,const std::unordered_map<std::string,std::string>&);
-    }
+%code_htop{
+#include<unordered_map>
+#include"common.hpp"
+#include"cmd.hpp"
+namespace yuki::pg{
+template<std::unsigned_integral Token_Kind_t>
+class Meta_Lexer1;
+}
 }
 
 %code_class{
