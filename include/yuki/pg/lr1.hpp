@@ -5,6 +5,7 @@
 #include<cassert>
 #include<initializer_list>
 #include<yuki/vector.hpp>
+#include<yuki/pg/_debug.hpp>
 #include<yuki/pg/core.hpp>
 
 namespace yuki::pg{
@@ -121,7 +122,10 @@ struct AbsLR1Parser : AbsParser<TS> {
         stack_.clear();
     }
 
-    void SHIFT_(typename AbsParser<TS>::Token_t&& t,size_t s) {stack_.emplace_back(std::move(t),s);}
+    void SHIFT_(typename AbsParser<TS>::Token_t&& t,size_t s){
+        YUKI_PG_TARGET_DBGO("SHIFT {} {}\n",TS::token_name[t.kind()],s);
+        stack_.emplace_back(std::move(t),s);
+    }
     void SET_STATE(size_t s) {state_=s;}
 
   protected:

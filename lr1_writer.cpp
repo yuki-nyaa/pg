@@ -278,12 +278,46 @@ void LR1_Writer<Token_Kind_t>::write_parse_array(
         assert(k!=(Token_Kind_t)-1);
         return k>=nterms.size() ? terms[k-nterms.size()] : nterms[k];
     };
+
     auto print_rule = [get_token_data](FILE* fp,const Rule<Token_Kind_t>& r) -> void {
         fprintf(fp,"%s ->",
             r.left!=(Token_Kind_t)-1 ? get_token_data(r.left).name_or_alias().c_str() : "Goal_"
         );
         for(const Token_Kind_t k : r.rights)
             fprintf(fp," %s",get_token_data(k).name_or_alias().c_str());
+    };
+
+    auto print_rule_escaped = [get_token_data](FILE* fp,const Rule<Token_Kind_t>& r) -> void {
+        static std::string buf;
+
+        if(r.left!=(Token_Kind_t)-1){
+            const std::string_view noa = get_token_data(r.left).name_or_alias();
+            for(const char c : noa){
+                switch(c){
+                    case '\'': buf.append("\\\'");break;
+                    case '\"': buf.append("\\\"");break;
+                    case '\\': buf.append("\\\\");break;
+                    default: buf.push_back(c);break;
+                }
+            }
+            fprintf(fp,"%s ->",buf.c_str());
+            buf.clear();
+        }else
+            fprintf(fp,"Goal_ ->");
+
+        for(const Token_Kind_t k : r.rights){
+            const std::string_view noa = get_token_data(k).name_or_alias();
+            for(const char c : noa){
+                switch(c){
+                    case '\'': buf.append("\\\'");break;
+                    case '\"': buf.append("\\\"");break;
+                    case '\\': buf.append("\\\\");break;
+                    default: buf.push_back(c);break;
+                }
+            }
+            fprintf(fp," %s",buf.c_str());
+            buf.clear();
+        }
     };
 
     fprintf(out,
@@ -411,9 +445,12 @@ void LR1_Writer<Token_Kind_t>::write_parse_array(
                 case Options::Token_Impl_Type::SIMPLE: fprintf(out,IND6 "stack_.emplace_back(std::move(token_target_),state_);\n"); break;
                 case Options::Token_Impl_Type::TUPLE: fprintf(out,IND6 "stack_.emplace_back(Token_t(p_token_target_,loc_target_),state_);\n"); break;
             }
+            fprintf(out,IND6 "YUKI_PG_TARGET_DBGO(\"REDUCE ");
+            print_rule_escaped(out,rule);
             fprintf(out,
-                IND6 "goto loop_end_;\n"
-                IND5 "} // case %zu // ",
+                "\\n\");\n"
+                IND6 "break;\n"
+                IND5 "} // case %zu //",
                 rule.num
             );
             print_rule(out,rule);
@@ -448,12 +485,46 @@ void LR1_Writer<Token_Kind_t>::write_parse_switch(
         assert(k!=(Token_Kind_t)-1);
         return k>=nterms.size() ? terms[k-nterms.size()] : nterms[k];
     };
+
     auto print_rule = [get_token_data](FILE* fp,const Rule<Token_Kind_t>& r) -> void {
         fprintf(fp,"%s ->",
             r.left!=(Token_Kind_t)-1 ? get_token_data(r.left).name_or_alias().c_str() : "Goal_"
         );
         for(const Token_Kind_t k : r.rights)
             fprintf(fp," %s",get_token_data(k).name_or_alias().c_str());
+    };
+
+    auto print_rule_escaped = [get_token_data](FILE* fp,const Rule<Token_Kind_t>& r) -> void {
+        static std::string buf;
+
+        if(r.left!=(Token_Kind_t)-1){
+            const std::string_view noa = get_token_data(r.left).name_or_alias();
+            for(const char c : noa){
+                switch(c){
+                    case '\'': buf.append("\\\'");break;
+                    case '\"': buf.append("\\\"");break;
+                    case '\\': buf.append("\\\\");break;
+                    default: buf.push_back(c);break;
+                }
+            }
+            fprintf(fp,"%s ->",buf.c_str());
+            buf.clear();
+        }else
+            fprintf(fp,"Goal_ ->");
+
+        for(const Token_Kind_t k : r.rights){
+            const std::string_view noa = get_token_data(k).name_or_alias();
+            for(const char c : noa){
+                switch(c){
+                    case '\'': buf.append("\\\'");break;
+                    case '\"': buf.append("\\\"");break;
+                    case '\\': buf.append("\\\\");break;
+                    default: buf.push_back(c);break;
+                }
+            }
+            fprintf(fp," %s",buf.c_str());
+            buf.clear();
+        }
     };
 
     fprintf(out,
@@ -571,9 +642,12 @@ void LR1_Writer<Token_Kind_t>::write_parse_switch(
                 case Options::Token_Impl_Type::SIMPLE: fprintf(out,IND4 "stack_.emplace_back(std::move(token_target_),state_);\n"); break;
                 case Options::Token_Impl_Type::TUPLE: fprintf(out,IND4 "stack_.emplace_back(Token_t(p_token_target_,loc_target_),state_);\n"); break;
             }
+            fprintf(out,IND4 "YUKI_PG_TARGET_DBGO(\"REDUCE ");
+            print_rule_escaped(out,rule);
             fprintf(out,
+                "\\n\");\n"
                 IND4 "break;\n"
-                IND3 "} // case %zu // ",
+                IND3 "} // case %zu //",
                 rule.num
             );
             print_rule(out,rule);
