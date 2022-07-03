@@ -520,7 +520,7 @@ static void write_token(FILE* const out_token,const Options& options,yuki::Vecto
         "};\n"
         IND "};\n"
     );
-    fprintf(out_token,IND "const char* token_name[token_total] = {");
+    fprintf(out_token,IND "static constexpr const char* token_name[token_total] = {");
     for(const Token_Data& td : nterms){
         if(td.alias.empty())
             fprintf(out_token,"\"%s\",",td.name.c_str());
