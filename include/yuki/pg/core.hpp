@@ -1,11 +1,16 @@
 #pragma once
 #include<cstddef>
+#include<cstdint>
 
 namespace yuki::pg{
+
+typedef uint_least32_t location_base_type;
+
 struct Location_Point{
-    size_t line=0;
-    size_t column=0;
+    location_base_type line=0;
+    location_base_type column=0;
 };
+
 struct Location_Range{
     Location_Point begin={};
     Location_Point end={};

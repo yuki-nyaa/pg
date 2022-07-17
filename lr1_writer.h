@@ -37,7 +37,7 @@ struct LR1_Writer{
         size_t cursor;
 
         template<typename R>
-        LR1_Item_Body(R&& rs,Token_Kind_t lh,size_t c) noexcept :
+        LR1_Item_Body(R&& rs,const Token_Kind_t lh,const size_t c) noexcept :
             rights(std::forward<R>(rs)),
             lookahead(lh),
             cursor(c)
@@ -90,13 +90,13 @@ struct LR1_Writer{
             typename map_type::const_iterator x;
             typename map_type::const_iterator x_end;
             typename block_type::const_iterator y;
-            constexpr const_iterator(typename map_type::const_iterator xp,typename map_type::const_iterator xep) noexcept:
+            constexpr const_iterator(const typename map_type::const_iterator xp,const typename map_type::const_iterator xep) noexcept:
                 x(xp),x_end(xep)
             {
                 if(x!=x_end)
                     y=x->mapped.begin();
             }
-            constexpr const_iterator(typename map_type::const_iterator xp,typename map_type::const_iterator xep,typename block_type::const_iterator yp) noexcept:
+            constexpr const_iterator(const typename map_type::const_iterator xp,const typename map_type::const_iterator xep,const typename block_type::const_iterator yp) noexcept:
                 x(xp),x_end(xep),y(yp)
             {}
           public:
@@ -119,11 +119,11 @@ struct LR1_Writer{
 
             constexpr bool is_end() const {return x==x_end;}
 
-            friend constexpr bool operator==(const_iterator lhs,const_iterator rhs){
+            friend constexpr bool operator==(const const_iterator lhs,const const_iterator rhs){
                 return lhs.x==rhs.x && (lhs.x==lhs.x_end || lhs.y==rhs.y);
             }
 
-            friend bool body_equal(const_iterator lhs,const_iterator rhs) {return *(lhs.y)==*(rhs.y);}
+            friend bool body_equal(const const_iterator lhs,const const_iterator rhs) {return *(lhs.y)==*(rhs.y);}
         };
 
         const_iterator begin() const {return {map_.begin(),map_.end()};}
@@ -134,7 +134,7 @@ struct LR1_Writer{
 
         void clear() {map_.clear(); size_=0;}
 
-        yuki::IB_Pair<const_iterator> emplace(Token_Kind_t l,const std::basic_string<Token_Kind_t>& rs,Token_Kind_t lh,Token_Kind_t c){
+        yuki::IB_Pair<const_iterator> emplace(const Token_Kind_t l,const std::basic_string<Token_Kind_t>& rs,const Token_Kind_t lh,const Token_Kind_t c){
             const yuki::IB_Pair<typename map_type::iterator> result1 = map_.template emplace<true>({(c==rs.size() ? Token_Kind_t(-1) : rs[c]), l});
             if(!result1.has_inserted){
                 typename block_type::const_iterator feg = result1.iterator->mapped.first_equiv_greater({rs.size(),lh,c});
@@ -147,7 +147,7 @@ struct LR1_Writer{
             return {{result1.iterator,map_.end(),result1.iterator->mapped.emplace(rs,lh,c)},true};
         }
 
-        yuki::IB_Pair<const_iterator> emplace(Token_Kind_t l,std::basic_string<Token_Kind_t>&& rs,Token_Kind_t lh,Token_Kind_t c){
+        yuki::IB_Pair<const_iterator> emplace(const Token_Kind_t l,std::basic_string<Token_Kind_t>&& rs,const Token_Kind_t lh,const Token_Kind_t c){
             const yuki::IB_Pair<typename map_type::iterator> result1 = map_.template emplace<true>({c==rs.size() ? Token_Kind_t(-1) : rs[c],l});
             if(!result1.has_inserted){
                 typename block_type::const_iterator feg = result1.iterator->mapped.first_equiv_greater({rs.size(),lh,c});
@@ -162,8 +162,8 @@ struct LR1_Writer{
 
         struct Less_By_Size{
             static std::strong_ordering compare3(const LR1_Item_Set& lhs,const LR1_Item_Set& rhs){
-                if(std::strong_ordering cmp=lhs.size_<=>rhs.size_; cmp!=0) return cmp;
-                if(std::strong_ordering cmp=lhs.map_.size()<=>rhs.map_.size(); cmp!=0) return cmp;
+                if(const std::strong_ordering cmp=lhs.size_<=>rhs.size_; cmp!=0) return cmp;
+                if(const std::strong_ordering cmp=lhs.map_.size()<=>rhs.map_.size(); cmp!=0) return cmp;
                 return std::strong_ordering::equal;
             }
             static bool compare(const LR1_Item_Set& lhs,const LR1_Item_Set& rhs) {return compare3(lhs,rhs)==std::strong_ordering::less;}
@@ -183,11 +183,10 @@ struct LR1_Writer{
                 worklist.emplace_back(b);
 
             while(!worklist.empty()){
-                typename LR1_Item_Set::const_iterator item = worklist.front();
-                worklist.pop_front();
+                const typename LR1_Item_Set::const_iterator item = worklist.pop_front_v();
                 if(!item.is_complete() && item.cursored()<ftable.term_first() ){ // `item.cursored()` is nterminal.
                     typename Rule_Set<Token_Kind_t>::const_iterator b = rules.begin(item.cursored());
-                    typename Rule_Set<Token_Kind_t>::const_iterator e = rules.end(item.cursored());
+                    const typename Rule_Set<Token_Kind_t>::const_iterator e = rules.end(item.cursored());
                     if(b!=rules.end()){
                         const Token_Kind_t item_lookahead=item.lookahead();
                         const std::basic_string_view<Token_Kind_t> item_rights(item.rights());
@@ -195,7 +194,7 @@ struct LR1_Writer{
                         for(;b!=e;++b){
                             typename First_Table<Token_Kind_t>::extended_const_iterator_ne e_i=ftable.begin_ne(item_rights.substr(item_cursor+1),item_lookahead);
                             for(;!e_i.is_end();++e_i){
-                                yuki::IB_Pair<typename LR1_Item_Set::const_iterator> ibp = emplace(item_rights[item_cursor],b->rights,*e_i,0);
+                                const yuki::IB_Pair<typename LR1_Item_Set::const_iterator> ibp = emplace(item_rights[item_cursor],b->rights,*e_i,0);
                                 if(ibp.has_inserted)
                                     worklist.emplace_back(ibp.iterator);
                             }
@@ -276,17 +275,10 @@ struct LR1_Writer{
 
         enum struct State {EMPTY,S,R,SR};
         constexpr State state() const noexcept {
-            if(shift!=0){
-                if(reduce.rule_num!=0)
-                    return State::SR;
-                else
-                    return State::S;
-            }else{
-                if(reduce.rule_num!=0)
-                    return State::R;
-                else
-                    return State::EMPTY;
-            }
+            if(shift!=0)
+                return reduce.rule_num!=0 ? State::SR : State::S;
+            else
+                return reduce.rule_num!=0 ? State::R : State::EMPTY;
         }
         constexpr bool empty() const noexcept {return shift==0 && reduce.rule_num==0;}
     };

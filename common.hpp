@@ -48,7 +48,7 @@ struct Token_Data{
 
     std::string alloc;
 
-    Token_Data(std::string&& n,Assoc assoc_p) noexcept :
+    Token_Data(std::string&& n,const Assoc assoc_p) noexcept :
         name(std::move(n)),
         assoc(assoc_p)
     {}
@@ -128,7 +128,7 @@ struct Rule_Set : private yuki::MultiSet<Rule<Token_Kind_t>,typename Rule<Token_
     using typename MultiSet_::const_iterator;
 
     using MultiSet_::begin;
-    const_iterator begin(Token_Kind_t token) const {
+    const_iterator begin(const Token_Kind_t token) const {
         const_iterator i = first_equiv_greater({token,{},0});
         return (i!=end() && i->left==token) ? i : end();
     }
@@ -175,7 +175,7 @@ struct Rule_Set : private yuki::MultiSet<Rule<Token_Kind_t>,typename Rule<Token_
 
     // Used for debugging.
     template<typename... Args>
-    yuki::IB_Pair<const_iterator> emplace(Token_Kind_t left,std::basic_string<Token_Kind_t> rights,size_t num,Args&&... others){
+    yuki::IB_Pair<const_iterator> emplace(const Token_Kind_t left,std::basic_string<Token_Kind_t> rights,const size_t num,Args&&... others){
         const const_iterator i = MultiSet_::emplace(left,std::move(rights),num,std::forward<Args>(others)...);
         for(const_iterator feg = first_equiv_greater(*i);feg!=i;++feg){
             if(*feg==*i){
@@ -193,13 +193,13 @@ template<std::unsigned_integral Token_Kind_t>
 using First_Set = yuki::Set_OV<Token_Kind_t>;
 
 template<std::unsigned_integral Token_Kind_t>
-bool contains_epsilon(First_Set<Token_Kind_t>& fs,std::type_identity_t<Token_Kind_t> e) {return !fs.empty() && fs.tree_base().back()==e;}
+bool contains_epsilon(First_Set<Token_Kind_t>& fs,const std::type_identity_t<Token_Kind_t> e) {return !fs.empty() && fs.tree_base().back()==e;}
 
 template<std::unsigned_integral Token_Kind_t>
-void remove_epsilon(First_Set<Token_Kind_t>& fs,std::type_identity_t<Token_Kind_t> e) {if(contains_epsilon(fs,e)) fs.tree_base().pop_back();}
+void remove_epsilon(First_Set<Token_Kind_t>& fs,const std::type_identity_t<Token_Kind_t> e) {if(contains_epsilon(fs,e)) fs.tree_base().pop_back();}
 
 template<std::unsigned_integral Token_Kind_t>
-void insert_epsilon(First_Set<Token_Kind_t>& fs,std::type_identity_t<Token_Kind_t> e) {if(!contains_epsilon(fs,e)) fs.tree_base().vec_base().emplace_back(e);}
+void insert_epsilon(First_Set<Token_Kind_t>& fs,const std::type_identity_t<Token_Kind_t> e) {if(!contains_epsilon(fs,e)) fs.tree_base().vec_base().emplace_back(e);}
 
 template<std::unsigned_integral Token_Kind_t>
 struct First_Table{
@@ -258,7 +258,7 @@ struct First_Table{
     size_t eof() const {return vec_.size()-2;}
     size_t epsilon() const {return vec_.size()-1;}
 
-    const First_Set<Token_Kind_t>& operator[](size_t i) const {return vec_[i];}
+    const First_Set<Token_Kind_t>& operator[](const size_t i) const {return vec_[i];}
 
     struct extended_const_iterator_ne{ // `extended_const_iterator` without epsilon.
       private:
@@ -292,7 +292,7 @@ struct First_Table{
         extended_const_iterator_ne() = delete;
 
         // This constructor finds the first non-epsilon symbol. If there is none, then the iterator points to epsilon, of course.
-        extended_const_iterator_ne(const First_Table* ftable_p, std::basic_string_view<Token_Kind_t> tokens_p, const Token_Kind_t token2_p) noexcept :
+        extended_const_iterator_ne(const First_Table* const ftable_p, const std::basic_string_view<Token_Kind_t> tokens_p, const Token_Kind_t token2_p) noexcept :
             ftable(ftable_p)
         {
             tokens.reserve(tokens_p.size()+1);
@@ -311,12 +311,12 @@ struct First_Table{
         }
 
         // Used for debugging.
-        extended_const_iterator_ne(const First_Table* ftable_p, std::initializer_list<Token_Kind_t> tokens_p, const Token_Kind_t token2_p) noexcept :
+        extended_const_iterator_ne(const First_Table* const ftable_p, std::initializer_list<Token_Kind_t> tokens_p, const Token_Kind_t token2_p) noexcept :
             extended_const_iterator_ne(ftable_p,std::basic_string_view<Token_Kind_t>(tokens_p.begin(),tokens_p.size()),token2_p)
         {}
     }; // struct extended_const_iterator_ne
 
-    extended_const_iterator_ne begin_ne(std::basic_string_view<Token_Kind_t> tokens,const Token_Kind_t token2) const {return extended_const_iterator_ne(this,tokens,token2);}
+    extended_const_iterator_ne begin_ne(const std::basic_string_view<Token_Kind_t> tokens,const Token_Kind_t token2) const {return extended_const_iterator_ne(this,tokens,token2);}
     extended_const_iterator_ne begin_ne(std::initializer_list<Token_Kind_t> tokens,const Token_Kind_t token2) const {return extended_const_iterator_ne(this,tokens,token2);}
 }; // struct First_Table<Token_Kind_t>
 } // namespace yuki::pg

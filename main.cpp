@@ -11,7 +11,7 @@ int main(int argc,char** argv){
     yuki::Cmd_Lexer<ypg::Cmd_Data> cmd_lexer(std::move(ypg::opt_table));
     cmd_lexer.process(cmd_data,argc,argv);
     if(!cmd_data.post_process())
-        std::exit(EXIT_FAILURE);
+        exit(EXIT_FAILURE);
 
     ypg::Meta_Lexer0 meta_lexer0(std::move(cmd_data));
     meta_lexer0.lex();
@@ -41,6 +41,6 @@ int main(int argc,char** argv){
     }
     }catch(const std::runtime_error& e){
         fprintf(stderr,"ICE: %s\n",e.what());
-        std::exit(EXIT_FAILURE);
+        exit(EXIT_FAILURE);
     }
 }

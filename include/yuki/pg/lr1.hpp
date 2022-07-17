@@ -23,7 +23,7 @@ struct LR1_Action_Entry{
     LR1_Action_Entry() noexcept = default;
 
     template<typename S_R>
-    constexpr LR1_Action_Entry(unsigned kind_target,S_R s_r) noexcept :
+    constexpr LR1_Action_Entry(const unsigned kind_target,const S_R s_r) noexcept :
         kind_{static_cast<LR1_Action_Kind>(kind_target)},state_(0)
     {
         switch(kind_){
@@ -65,7 +65,7 @@ struct LR1_Action_Table{
             table_[att.state][TS::terminal_kind_to_index(att.kind)]=att.ae;
         }
     }
-    constexpr LR1_Action_Entry<state_t,rule_num_t> operator()(state_t state,typename TS::Token_Kind_t kind) const noexcept {
+    constexpr LR1_Action_Entry<state_t,rule_num_t> operator()(const state_t state,const typename TS::Token_Kind_t kind) const noexcept {
         assert(state<state_size_);
         return table_[state][TS::terminal_kind_to_index(kind)];
     }
@@ -90,7 +90,7 @@ struct LR1_Goto_Table{
         }
     }
 
-    constexpr state_t operator()(state_t state,typename TS::Token_Kind_t kind) const noexcept {
+    constexpr state_t operator()(const state_t state,const typename TS::Token_Kind_t kind) const noexcept {
         assert(state<state_size_);
         return table_[state][TS::nterminal_kind_to_index(kind)];
     }
@@ -122,11 +122,11 @@ struct AbsLR1Parser : AbsParser<TS> {
         stack_.clear();
     }
 
-    void SHIFT_(typename AbsParser<TS>::Token_t&& t,size_t s){
+    void SHIFT_(typename AbsParser<TS>::Token_t&& t,const size_t s){
         YUKI_PG_TARGET_DBGO("SHIFT {} {}\n",TS::token_name[t.kind()],s);
         stack_.emplace_back(std::move(t),s);
     }
-    void SET_STATE(size_t s) {state_=s;}
+    void SET_STATE(const size_t s) {state_=s;}
 
   protected:
     size_t state_;

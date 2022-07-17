@@ -39,7 +39,7 @@ class Meta_Lexer1;
         #ifndef YUKI_PG_CODE_RESERVE
         #define YUKI_PG_CODE_RESERVE 2048
         #endif
-        str_temp1.reserve(YUKI_PG_CODE_RESERVE);
+        str_temp0.reserve(YUKI_PG_CODE_RESERVE);
     }
   public:
     struct Token_Coordinate{
@@ -74,21 +74,21 @@ class Meta_Lexer1;
     Assoc current_assoc;
     Assoc assoc_default = Assoc::RIGHT;
 
-    std::string str_temp1;
+    std::string str_temp0;
     std::string code_qualifier;
 
     void clear_temps(){
         std::unordered_map<std::string,size_t> umap;
         using std::swap;
         swap(vtoken_types,umap);
-        str_temp1.clear();
+        str_temp0.clear();
         code_qualifier.clear();
     }
 
-    yuki::Vector<Token_Data>& get_token_table(bool is_term_p){
+    yuki::Vector<Token_Data>& get_token_table(const bool is_term_p){
         return is_term_p ? terms : nterms;
     }
-    Token_Data& get_token_data(Token_Coordinate co){
+    Token_Data& get_token_data(const Token_Coordinate co){
         return (co.is_term ? terms : nterms)[co.idx];
     }
     Token_Data& get_token_data(const std::string& s){
@@ -141,7 +141,7 @@ id [A-Za-z_]\p{Word}*
 
 \%simple_token\p{Space}*    {
     options.token_impl_type=Options::Token_Impl_Type::SIMPLE;
-    str_temp1.clear();
+    str_temp0.clear();
     start(O_SPTOKEN);
 }
 
@@ -150,8 +150,8 @@ id [A-Za-z_]\p{Word}*
 \%namespace\p{Space}*    {start(O_NSPACE);}
 \%parser\p{Space}*    {start(O_PARSER);}
 \%token_settings\p{Space}*    {start(O_TS);}
-\%lexer\p{Space}*    {str_temp1.clear();start(O_LEXER);}
-\%parser_tables\p{Space}*    {str_temp1.clear();start(O_PT);}
+\%lexer\p{Space}*    {str_temp0.clear();start(O_LEXER);}
+\%parser_tables\p{Space}*    {str_temp0.clear();start(O_PT);}
 
 \%no_final_function    {options.no_final_function = true;}
 \%no_final_class    {options.no_final_class = true;}
@@ -172,9 +172,9 @@ id [A-Za-z_]\p{Word}*
         fprintf(stderr,"Error: Alias declaration precedes token name declaration: %s\n",text());
         ++errors;
     }else{
-        str_temp1 = str();
-        get_token_table(is_term).back().alias = str_temp1;
-        token_htable.insert_or_assign(std::move(str_temp1),Token_Coordinate{is_term,get_token_table(is_term).size()-1});
+        str_temp0 = str();
+        get_token_table(is_term).back().alias = str_temp0;
+        token_htable.insert_or_assign(std::move(str_temp0),Token_Coordinate{is_term,get_token_table(is_term).size()-1});
     }
 }
 
@@ -182,12 +182,12 @@ id [A-Za-z_]\p{Word}*
 
 {id}    {
     token_declared = true;
-    str_temp1 = str();
-    token_htable.insert_or_assign(str_temp1,Token_Coordinate{is_term,get_token_table(is_term).size()});
-    get_token_table(is_term).emplace_back(std::move(str_temp1),assoc_default);
+    str_temp0 = str();
+    token_htable.insert_or_assign(str_temp0,Token_Coordinate{is_term,get_token_table(is_term).size()});
+    get_token_table(is_term).emplace_back(std::move(str_temp0),assoc_default);
 }
 
-\{\p{Space}*    {brace_level=0;str_temp1.clear();start(TOKEN_DEF);}
+\{\p{Space}*    {brace_level=0;str_temp0.clear();start(TOKEN_DEF);}
 
 \/\/.*\R    {} // Comments.
 }
@@ -195,40 +195,40 @@ id [A-Za-z_]\p{Word}*
 
 
 <TOKEN_DEF>{
-\{    {++brace_level;str_temp1.push_back('{');}
+\{    {++brace_level;str_temp0.push_back('{');}
 
 \}    {
     if(brace_level!=0){
         --brace_level;
-        str_temp1.push_back('}');
+        str_temp0.push_back('}');
     }else{
         start(ALLOC0);
     }
 }
 
 :\p{Space}*    {
-    yuki::trim_trailing_spaces(str_temp1);
-    get_token_table(is_term).back().types.emplace_back(std::move(str_temp1));
+    yuki::trim_trailing_spaces(str_temp0);
+    get_token_table(is_term).back().types.emplace_back(std::move(str_temp0));
 }
 
 ;\p{Space}*    {
     if(options.token_impl_type==Options::Token_Impl_Type::TUPLE){
-        yuki::trim_trailing_spaces(str_temp1);
-        get_token_table(is_term).back().names.emplace_back(std::move(str_temp1));
-    }else if(!str_temp1.empty())
-        fprintf(stderr,"Warning: Token member name (\"%s\" in token \"%s\") is effective only with tuple-token!\n",str_temp1.c_str(),get_token_table(is_term).back().name.c_str());
+        yuki::trim_trailing_spaces(str_temp0);
+        get_token_table(is_term).back().names.emplace_back(std::move(str_temp0));
+    }else if(!str_temp0.empty())
+        fprintf(stderr,"Warning: Token member name (\"%s\" in token \"%s\") is effective only with tuple-token!\n",str_temp0.c_str(),get_token_table(is_term).back().name.c_str());
 }
 
-\R    {str_temp1.push_back(' ');}
+\R    {str_temp0.push_back(' ');}
 
 \p{Space}    {
-    if(!str_temp1.empty())
-        str_temp1.push_back(chr());
+    if(!str_temp0.empty())
+        str_temp0.push_back(chr());
 }
 
-{any}    {str_temp1.push_back(chr());}
+{any}    {str_temp0.push_back(chr());}
 
-::    {str_temp1.push_back(':');str_temp1.push_back(':');}
+::    {str_temp0.push_back(':');str_temp0.push_back(':');}
 
 \/\/.*\R    {} // Comments.
 }
@@ -250,7 +250,7 @@ id [A-Za-z_]\p{Word}*
 \%    {
     fprintf(stderr,"Fatal Error: %% encountered while scanning token allocator number of \"%s\". Did you forget the ; ?\n",get_token_table(is_term).back().name.c_str());
     ++errors;
-    std::exit(EXIT_FAILURE);
+    exit(EXIT_FAILURE);
 }
 
 ;    {
@@ -301,7 +301,7 @@ id [A-Za-z_]\p{Word}*
 \%\%    {
     fprintf(stderr,"Fatal Error: %%%% encountered while scanning token allocator name of \"%s\". Did you forget the ; ?\n",get_token_table(is_term).back().name.c_str());
     ++errors;
-    std::exit(EXIT_FAILURE);
+    exit(EXIT_FAILURE);
 }
 }
 
@@ -309,15 +309,15 @@ id [A-Za-z_]\p{Word}*
 
 <PREC>{
 (\"[^\"]*\")|({id})    {
-    str_temp1 = str();
+    str_temp0 = str();
     try{
-        Token_Coordinate co = token_htable.at(str_temp1);
+        const Token_Coordinate co = token_htable.at(str_temp0);
         if(!co.is_term)
-            fprintf(stderr,"Warning: %%prec for non-terminals makes no sense: %s\n",str_temp1.c_str());
+            fprintf(stderr,"Warning: %%prec for non-terminals makes no sense: %s\n",str_temp0.c_str());
         else
             get_token_data(co).prec = current_prec;
     }catch(const std::out_of_range&){
-        fprintf(stderr,"Error: Unknown token name encountered while parsing %%prec declaration: %s\n",str_temp1.c_str());
+        fprintf(stderr,"Error: Unknown token name encountered while parsing %%prec declaration: %s\n",str_temp0.c_str());
         ++errors;
     }
 }
@@ -333,11 +333,11 @@ id [A-Za-z_]\p{Word}*
 
 <ASSOC>{
 (\"[^\"]*\")|({id})    {
-    str_temp1 = str();
+    str_temp0 = str();
     try{
-        Token_Coordinate co = token_htable.at(str_temp1);
+        const Token_Coordinate co = token_htable.at(str_temp0);
         if(!co.is_term)
-            fprintf(stderr,"Warning: %%left/%%right for non-terminals makes no sense: %s\n",str_temp1.c_str());
+            fprintf(stderr,"Warning: %%left/%%right for non-terminals makes no sense: %s\n",str_temp0.c_str());
         else{
             Token_Data& td = get_token_data(co);
             td.prec = current_prec;
@@ -345,7 +345,7 @@ id [A-Za-z_]\p{Word}*
             td.assoc = current_assoc;
         }
     }catch(const std::out_of_range&){
-        fprintf(stderr,"Error: Unknown token name encountered while parsing %%left/%%right declaration: %s\n",str_temp1.c_str());
+        fprintf(stderr,"Error: Unknown token name encountered while parsing %%left/%%right declaration: %s\n",str_temp0.c_str());
         ++errors;
     }
 }
@@ -370,7 +370,7 @@ id [A-Za-z_]\p{Word}*
 \p{Space}+    {} // Spaces as well as newlines are ignored.
 \{    {
     brace_level=0;
-    str_temp1.clear();
+    str_temp0.clear();
     start(CODE1);
 }
 }
@@ -379,19 +379,19 @@ id [A-Za-z_]\p{Word}*
 
 
 <CODE1>{
-\{    {++brace_level;str_temp1.push_back('{');}
+\{    {++brace_level;str_temp0.push_back('{');}
 \}    {
     if(brace_level!=0){
         --brace_level;
-        str_temp1.push_back('}');
+        str_temp0.push_back('}');
     }else{
-        yuki::trim_trailing_spaces(str_temp1);
-        code_htable.at(code_qualifier) = std::move(str_temp1);
+        yuki::trim_trailing_spaces(str_temp0);
+        code_htable.at(code_qualifier) = std::move(str_temp0);
         start(INITIAL);
     }
 }
 
-{any}    {str_temp1.push_back(chr());}
+{any}    {str_temp0.push_back(chr());}
 
 }
 
@@ -400,19 +400,19 @@ id [A-Za-z_]\p{Word}*
 <O_SPTOKEN>{
 \/\/.*\R    {} // Comments.
 
-\\\%    {str_temp1.push_back('%');}
+\\\%    {str_temp0.push_back('%');}
 
 (?=\%)    {
-    if(str_temp1.empty())
+    if(str_temp0.empty())
         options.sp_token = "void";
     else{
-        yuki::trim_trailing_spaces(str_temp1);
-        options.sp_token = std::move(str_temp1);
+        yuki::trim_trailing_spaces(str_temp0);
+        options.sp_token = std::move(str_temp0);
     }
     start(INITIAL);
 }
-\R    {str_temp1.push_back(' ');}
-.    {str_temp1.push_back(chr());}
+\R    {str_temp0.push_back(' ');}
+.    {str_temp0.push_back(chr());}
 }
 
 
@@ -440,29 +440,29 @@ id [A-Za-z_]\p{Word}*
 <O_LEXER>{
 \/\/.*\R    {} // Comments.
 
-\\\%    {str_temp1.push_back('%');}
+\\\%    {str_temp0.push_back('%');}
 
 (?=\%)    {
-    yuki::trim_trailing_spaces(str_temp1);
-    options.lexer = std::move(str_temp1);
+    yuki::trim_trailing_spaces(str_temp0);
+    options.lexer = std::move(str_temp0);
     start(INITIAL);
 }
-\R    {str_temp1.push_back(' ');}
-.    {str_temp1.push_back(chr());}
+\R    {str_temp0.push_back(' ');}
+.    {str_temp0.push_back(chr());}
 }
 
 <O_PT>{
 \/\/.*\R    {} // Comments.
 
-\\\%    {str_temp1.push_back('%');}
+\\\%    {str_temp0.push_back('%');}
 
 (?=\%)    {
-    yuki::trim_trailing_spaces(str_temp1);
-    options.parser_tables = std::move(str_temp1);
+    yuki::trim_trailing_spaces(str_temp0);
+    options.parser_tables = std::move(str_temp0);
     start(INITIAL);
 }
-\R    {str_temp1.push_back(' ');}
-.    {str_temp1.push_back(chr());}
+\R    {str_temp0.push_back(' ');}
+.    {str_temp0.push_back(chr());}
 }
 
 %%
@@ -550,15 +550,15 @@ static void write_token(FILE* const out_token,const Options& options,yuki::Vecto
         nterms.size(), terms.size()
     );
     fprintf(out_token,
-        IND "static constexpr bool is_nterminal_f(Token_Kind_t kind) {return kind>=nterminal_first && kind<=nterminal_last;}\n"
-        IND "static constexpr bool is_terminal_f(Token_Kind_t kind) {return kind>=terminal_first && kind<=terminal_last;}\n"
+        IND "static constexpr bool is_nterminal_f(const Token_Kind_t kind) {return kind>=nterminal_first && kind<=nterminal_last;}\n"
+        IND "static constexpr bool is_terminal_f(const Token_Kind_t kind) {return kind>=terminal_first && kind<=terminal_last;}\n"
         "\n"
-        IND "static constexpr size_t nterminal_kind_to_index(Token_Kind_t kind){\n"
+        IND "static constexpr size_t nterminal_kind_to_index(const Token_Kind_t kind){\n"
         IND2 "assert(is_nterminal_f(kind));\n"
         IND2 "return kind-nterminal_first;\n"
         IND "}\n"
         "\n"
-        IND "static constexpr size_t terminal_kind_to_index(Token_Kind_t kind){\n"
+        IND "static constexpr size_t terminal_kind_to_index(const Token_Kind_t kind){\n"
         IND2 "assert(is_terminal_f(kind));\n"
         IND2 "return kind-terminal_first;\n"
         IND "}\n"
@@ -726,19 +726,19 @@ static void write_traits_alloc(FILE* const out_token,const char* const ts_cstr,c
     fprintf(out_token,
         "{\n"
         IND "template<typename T>\n"
-        IND "auto allocate(size_t n=1) -> typename type_to_alloc_t<T>::pointer {return type_to_alloc_t<T>::allocate(n);}\n"
+        IND "auto allocate(const size_t n=1) -> typename type_to_alloc_t<T>::pointer {return type_to_alloc_t<T>::allocate(n);}\n"
         "\n"
         IND "template<typename T>\n"
-        IND "void deallocate(const yuki::pg::TToken_Base* p,size_t n=1) {type_to_alloc_t<T>::deallocate(static_cast<const T*>(p),n);}\n"
+        IND "void deallocate(const yuki::pg::TToken_Base* const p,const size_t n=1) {type_to_alloc_t<T>::deallocate(static_cast<const T*>(p),n);}\n"
         "\n"
         IND "template<typename T>\n"
-        IND "void destroy_deallocate(const yuki::pg::TToken_Base* p){\n"
+        IND "void destroy_deallocate(const yuki::pg::TToken_Base* const p){\n"
         IND2 "if constexpr(!std::is_trivially_destructible_v<T>)\n"
         IND3 "static_cast<const T*>(p) -> ~T();\n"
         IND2 "type_to_alloc_t<T>::deallocate(static_cast<const T*>(p));\n"
         IND "}\n"
         "\n"
-        IND "void dynamic_destroy_deallocate(Token_Kind_t k,const yuki::pg::TToken_Base* p){\n"
+        IND "void dynamic_destroy_deallocate(const Token_Kind_t k,const yuki::pg::TToken_Base* const p){\n"
         IND2 "using enum Token_Kind::enum_t;\n"
         IND2 "switch(k){\n"
     );

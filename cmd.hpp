@@ -49,7 +49,7 @@ namespace cmd_impl{
     }
     inline void version(Cmd_Data&,yuki::Vector<std::string>&){
         fmt::print(stdout,"ParserGen by Yuki, version {}.{}\n",1,0);
-        std::exit(EXIT_SUCCESS);
+        exit(EXIT_SUCCESS);
     }
 }
 
@@ -78,7 +78,7 @@ inline bool Cmd_Data::post_process(){
     }
 
     // Check for input file-ext collision.
-    auto [input_no_ext,input_ext] = yuki::vsplit_filename(in);
+    const auto [input_no_ext,input_ext] = yuki::vsplit_filename(in);
 
     if(input_ext=="cpp" || input_ext=="h" || input_ext=="hpp" || input_ext=="log"){
         yuki::print_error(stderr,"input file has extension \'cpp\', \'h\', \'hpp\' or \'log\', which might collide with the output files.\n");
@@ -94,7 +94,7 @@ inline bool Cmd_Data::post_process(){
     }
     fp_out_cpp=fopen(out_cpp.c_str(),"w");
     // The default h-out filename is the same as the CPP-OUT file.
-    std::string_view out_cpp_no_ext=yuki::vsplit_filename(out_cpp).zeroth;
+    const std::string_view out_cpp_no_ext=yuki::vsplit_filename(out_cpp).zeroth;
     if(out_h.empty()){
         out_h.reserve(out_cpp_no_ext.size()+2);
         out_h.append(out_cpp_no_ext);

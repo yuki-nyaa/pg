@@ -19,7 +19,7 @@
 template<>
 struct fmt::formatter<yuki::pg::Assoc,char> : yuki::simple_formatter<yuki::pg::Assoc,char> {
     template<typename OutputIt>
-    auto format(yuki::pg::Assoc assoc,fmt::basic_format_context<OutputIt,char>& ctx) -> typename fmt::basic_format_context<OutputIt,char>::iterator {
+    auto format(const yuki::pg::Assoc assoc,fmt::basic_format_context<OutputIt,char>& ctx) -> typename fmt::basic_format_context<OutputIt,char>::iterator {
         switch(assoc){
             case yuki::pg::Assoc::LEFT : {return fmt::format_to(ctx.out(),"{}","LEFT");}
             default : {return fmt::format_to(ctx.out(),"{}","RIGHT");}
@@ -55,7 +55,7 @@ size_t LR1_Writer<Token_Kind_t>::write_table(
     const size_t token_total = term_total + nterm_total;
 
     Action_Candidates* action_row = new Action_Candidates[term_total];
-    std::memset(action_row,0, term_total * sizeof(Action_Candidates) );
+    memset(action_row,0, term_total * sizeof(Action_Candidates) );
 
     size_t sr_conflict_total = 0;
     size_t rr_conflict_total = 0;
@@ -82,8 +82,9 @@ size_t LR1_Writer<Token_Kind_t>::write_table(
     while(!worklist.empty()){
         action_count = 0;
         goto_count = 0;
-        const LR1_Item_Set& items = worklist.front()->key;
-        const size_t items_num = worklist.front()->mapped;
+        const typename LR1_Item_Set_Set::const_iterator front = worklist.pop_front_v();
+        const LR1_Item_Set& items = front->key;
+        const size_t items_num = front->mapped;
 
         typename LR1_Item_Set::const_iterator it = items.begin();
         Token_Kind_t cursored_current=it.cursored();
@@ -97,10 +98,10 @@ size_t LR1_Writer<Token_Kind_t>::write_table(
                 items_pending.emplace(it.left(),it.rights(),it.lookahead(),it.cursor()+1);
             items_pending.closure(rules,first_table);
 
-            yuki::IB_Pair<typename LR1_Item_Set_Set::const_iterator> insert_result= cc.insert(std::move(items_pending));
+            const yuki::IB_Pair<typename LR1_Item_Set_Set::const_iterator> insert_result= cc.insert(std::move(items_pending));
             if(insert_result.has_inserted)
                 worklist.emplace_back(insert_result.iterator);
-            size_t items_pending_number = insert_result.iterator->mapped;
+            const size_t items_pending_number = insert_result.iterator->mapped;
 
             if(cursored_current>=nterm_total && cursored_current<token_total){ // `cursored_current` is terminal.
                 action_row[cursored_current-nterm_total].shift=items_pending_number;
@@ -127,7 +128,7 @@ size_t LR1_Writer<Token_Kind_t>::write_table(
                         }
                     }
                 }
-                std::memset(action_row,0, term_total * sizeof(Action_Candidates) );
+                memset(action_row,0, term_total * sizeof(Action_Candidates) );
                 goto loop_1_end;
             }else{
                 cursored_current=it.cursored();
@@ -135,7 +136,7 @@ size_t LR1_Writer<Token_Kind_t>::write_table(
         }
 
         for(;!it.is_end();++it){ // Handles "reduce".
-            auto rule_it = rules.find({it.left(),it.rights(),0});
+            const auto rule_it = rules.find({it.left(),it.rights(),0});
             assert(rule_it!=rules.end());
             if(Action_Candidates& action_this = action_row[it.lookahead()-nterm_total] ; action_this.reduce.rule_num!=0){
                 yuki::try_print(fp_log,"RR-conflict encountered. action({},{}) = reduce {}({}) / {}({}). ",
@@ -169,7 +170,7 @@ size_t LR1_Writer<Token_Kind_t>::write_table(
                         ++action_count;
                         print_action_break();
                     }
-                    std::memset(action_row+(i-nterm_total),0,sizeof(Action_Candidates));
+                    memset(action_row+(i-nterm_total),0,sizeof(Action_Candidates));
                     break;
                 }
                 case Action_Candidates::State::R : {
@@ -181,7 +182,7 @@ size_t LR1_Writer<Token_Kind_t>::write_table(
                         ++action_count;
                         print_action_break();
                     }
-                    std::memset(action_row+(i-nterm_total),0,sizeof(Action_Candidates));
+                    memset(action_row+(i-nterm_total),0,sizeof(Action_Candidates));
                     break;
                 }
                 case Action_Candidates::State::SR : {
@@ -217,13 +218,12 @@ size_t LR1_Writer<Token_Kind_t>::write_table(
                         }
                     }
                     ++sr_conflict_total;
-                    std::memset(action_row+(i-nterm_total),0,sizeof(Action_Candidates));
+                    memset(action_row+(i-nterm_total),0,sizeof(Action_Candidates));
                     break;
                 }
             }
         }
         loop_1_end:
-        worklist.pop_front();
         // Write the accept action.
         // The accept item-set might contain reduce-items with lookahead EOF_. Those will be overwritten, WITHOUT diagnostics. Such conflicts should be rare, however. The production-set that entails such conflicts should be obviously wrong, like "A -> A".
         if(is_switch){
@@ -247,7 +247,7 @@ size_t LR1_Writer<Token_Kind_t>::write_table(
             if(!action_row[i-nterm_total].empty())
                 YUKI_PG_DBGO("non-empty action_candidates at ({},{}).\n",items_num,i);
         }
-        std::memset(action_row,0, term_total * sizeof(Action_Candidates) );
+        memset(action_row,0, term_total * sizeof(Action_Candidates) );
         #endif
     } // while(!worklist.empty())
 
@@ -274,12 +274,12 @@ void LR1_Writer<Token_Kind_t>::write_parse_array(
     const yuki::Vector<Token_Data>& nterms,const yuki::Vector<Token_Data>& terms,
     const Rule_Set<Token_Kind_t>& rules)
 {
-    auto get_token_data = [&nterms,&terms](Token_Kind_t k) -> const Token_Data& {
+    auto get_token_data = [&nterms,&terms](const Token_Kind_t k) -> const Token_Data& {
         assert(k!=(Token_Kind_t)-1);
         return k>=nterms.size() ? terms[k-nterms.size()] : nterms[k];
     };
 
-    auto print_rule = [get_token_data](FILE* fp,const Rule<Token_Kind_t>& r) -> void {
+    auto print_rule = [get_token_data](FILE* const fp,const Rule<Token_Kind_t>& r) -> void {
         fprintf(fp,"%s ->",
             r.left!=(Token_Kind_t)-1 ? get_token_data(r.left).name_or_alias().c_str() : "Goal_"
         );
@@ -287,7 +287,7 @@ void LR1_Writer<Token_Kind_t>::write_parse_array(
             fprintf(fp," %s",get_token_data(k).name_or_alias().c_str());
     };
 
-    auto print_rule_escaped = [get_token_data](FILE* fp,const Rule<Token_Kind_t>& r) -> void {
+    auto print_rule_escaped = [get_token_data](FILE* const fp,const Rule<Token_Kind_t>& r) -> void {
         static std::string buf;
 
         if(r.left!=(Token_Kind_t)-1){
@@ -481,12 +481,12 @@ void LR1_Writer<Token_Kind_t>::write_parse_switch(
     const yuki::Vector<Token_Data>& nterms,const yuki::Vector<Token_Data>& terms,
     const Rule_Set<Token_Kind_t>& rules)
 {
-    auto get_token_data = [&nterms,&terms](Token_Kind_t k) -> const Token_Data& {
+    auto get_token_data = [&nterms,&terms](const Token_Kind_t k) -> const Token_Data& {
         assert(k!=(Token_Kind_t)-1);
         return k>=nterms.size() ? terms[k-nterms.size()] : nterms[k];
     };
 
-    auto print_rule = [get_token_data](FILE* fp,const Rule<Token_Kind_t>& r) -> void {
+    auto print_rule = [get_token_data](FILE* const fp,const Rule<Token_Kind_t>& r) -> void {
         fprintf(fp,"%s ->",
             r.left!=(Token_Kind_t)-1 ? get_token_data(r.left).name_or_alias().c_str() : "Goal_"
         );
@@ -494,7 +494,7 @@ void LR1_Writer<Token_Kind_t>::write_parse_switch(
             fprintf(fp," %s",get_token_data(k).name_or_alias().c_str());
     };
 
-    auto print_rule_escaped = [get_token_data](FILE* fp,const Rule<Token_Kind_t>& r) -> void {
+    auto print_rule_escaped = [get_token_data](FILE* const fp,const Rule<Token_Kind_t>& r) -> void {
         static std::string buf;
 
         if(r.left!=(Token_Kind_t)-1){
@@ -819,7 +819,7 @@ void LR1_Writer<Token_Kind_t>::write(
         );
     }
     if(!options.no_default_ctor){
-        fprintf(out_h,IND "constexpr %s(%s* l=nullptr) noexcept : lexer(l) {}\n\n",options.parser.c_str(),options.lexer.c_str());
+        fprintf(out_h,IND "constexpr %s(%s* const l=nullptr) noexcept : lexer(l) {}\n\n",options.parser.c_str(),options.lexer.c_str());
     }
     fprintf(out_h,
         IND "int parse(%s&);\n"

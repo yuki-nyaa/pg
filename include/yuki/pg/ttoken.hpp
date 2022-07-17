@@ -116,10 +116,10 @@ struct Any_TToken{
     constexpr Any_TToken() noexcept = default;
 
     template<typename T> requires TS::template is_token_v<T>
-    explicit constexpr Any_TToken(T*& p_token_other,Location_Range location_range_p={}) noexcept : kind_(T::kind_static),location_range_(location_range_p),p_base(p_token_other) {p_token_other=nullptr;}
+    explicit constexpr Any_TToken(T*& p_token_other,const Location_Range location_range_p={}) noexcept : kind_(T::kind_static),location_range_(location_range_p),p_base(p_token_other) {p_token_other=nullptr;}
 
     template<typename T> requires TS::template is_token_v<T>
-    explicit constexpr Any_TToken(T*&& p_token_other,Location_Range location_range_p={}) noexcept : kind_(T::kind_static),location_range_(location_range_p),p_base(p_token_other) {p_token_other=nullptr;}
+    explicit constexpr Any_TToken(T*&& p_token_other,const Location_Range location_range_p={}) noexcept : kind_(T::kind_static),location_range_(location_range_p),p_base(p_token_other) {p_token_other=nullptr;}
 
     Any_TToken(const Any_TToken&) = delete;
     constexpr Any_TToken(Any_TToken&& other) noexcept : kind_(other.kind_),location_range_(other.location_range_),p_base(other.p_base) {other.p_base=nullptr;}
