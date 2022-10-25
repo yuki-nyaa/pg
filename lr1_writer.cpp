@@ -87,12 +87,11 @@ size_t LR1_Writer<Token_Kind_t>::write_table(
         const size_t items_num = front->mapped;
 
         typename LR1_Item_Set::const_iterator it = items.begin();
-        Token_Kind_t cursored_current=it.cursored();
 
         if(is_switch)
             fmt::print(fp_file,IND "case {}: CC{}: switch(t_.kind()){{\n",items_num,items_num);
 
-        while(cursored_current!=Token_Kind_t(-1)){ // Handles "shift" and "goto".
+        for(Token_Kind_t cursored_current=it.cursored(); cursored_current!=Token_Kind_t(-1); cursored_current=it.cursored()){ // Handles "shift" and "goto".
             assert(items_pending.empty());
             for(;!it.is_end() && it.cursored()==cursored_current; ++it)
                 items_pending.emplace(it.left(),it.rights(),it.lookahead(),it.cursor()+1);
@@ -130,8 +129,6 @@ size_t LR1_Writer<Token_Kind_t>::write_table(
                 }
                 memset(action_row,0, term_total * sizeof(Action_Candidates) );
                 goto loop_1_end;
-            }else{
-                cursored_current=it.cursored();
             }
         }
 

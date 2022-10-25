@@ -221,9 +221,7 @@ struct First_Table{
         for(Token_Kind_t i = term_first_;i<=token_total;++i)
             vec_.force_emplace_back(yuki::from_ordered_tag,yuki::from_variadic_tag,i);
 
-        {
-        bool changed = true;
-        while(changed){
+        for(bool changed=true;changed;){
             changed=false;
             for(const Rule<Token_Kind_t>& rule : rules){
                 if(!rule.is_goal()){
@@ -246,7 +244,6 @@ struct First_Table{
                         changed = true;
                 }
             }
-        }
         }
     }
 
