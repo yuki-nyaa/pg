@@ -1,9 +1,9 @@
 #include"cconfig"
 #include"debug.hpp"
-#include"lr1_writer.h"
+#include"LR1_Writer.h"
 #include"cmd.hpp"
-#include"meta_lexer0.h"
-#include"meta_lexer1.h"
+#include"Meta_Lexer0.h"
+#include"Meta_Lexer1.h"
 #include<fmt/core.h>
 int main(int argc,char** argv){
     namespace ypg=yuki::pg;

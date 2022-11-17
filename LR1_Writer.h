@@ -4,9 +4,9 @@
 #include<string>
 #include<unordered_map>
 #include<fmt/core.h>
-#include<yuki/map.hpp>
-#include<yuki/vector.hpp>
-#include<yuki/ring_queue.hpp>
+#include<yuki/Map.hpp>
+#include<yuki/Vector.hpp>
+#include<yuki/RingQueue.hpp>
 #include"common.hpp"
 
 namespace yuki::pg{

@@ -1,8 +1,8 @@
 #include"cconfig"
 #include<yuki/print.hpp>
-#include<yuki/ring_queue.hpp>
+#include<yuki/RingQueue.hpp>
 #include"cmd.hpp"
-#include"lr1_writer.h"
+#include"LR1_Writer.h"
 #include"debug.hpp"
 
 #define IND YUKI_PG_IND

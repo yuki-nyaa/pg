@@ -4,7 +4,7 @@
 #include<concepts>
 #include<cassert>
 #include<initializer_list>
-#include<yuki/vector.hpp>
+#include<yuki/Vector.hpp>
 #include<yuki/pg/_debug.hpp>
 #include<yuki/pg/core.hpp>
 

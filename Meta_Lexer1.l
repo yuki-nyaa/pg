@@ -1,5 +1,5 @@
 %option fast unicode nodefault noline
-%option outfile="meta_lexer1.cpp" header_file="meta_lexer1.h"
+%option outfile="Meta_Lexer1.cpp" header_file="Meta_Lexer1.h"
 %option namespace="yuki::pg" prefix="yuki_pg_meta1" lexer="Meta_Lexer1" lex="lex" token-type="int" templated_lexer="Meta_Lexer1<Token_Kind_t>"
 
 %code_cpptop{
@@ -8,7 +8,7 @@
 
 %code_htop{
 #include"cmd.hpp"
-#include"meta_lexer0.h"
+#include"Meta_Lexer0.h"
 }
 
 %code_hafter{

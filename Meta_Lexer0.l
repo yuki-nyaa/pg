@@ -1,5 +1,5 @@
 %option fast unicode nodefault noline
-%option outfile="meta_lexer0.cpp" header-file="meta_lexer0.h"
+%option outfile="Meta_Lexer0.cpp" header-file="Meta_Lexer0.h"
 %option namespace="yuki::pg" prefix="yuki_pg_meta0" lexer="Meta_Lexer0" lex="lex" token-type="int"
 
 %code_cpptop{
@@ -490,9 +490,9 @@ static void write_token(FILE* const out_token,const Options& options,yuki::Vecto
         "#include<yuki/pg/core.hpp>\n"
     );
     switch(token_impl_type){
-        case Options::Token_Impl_Type::VARIANT: fprintf(out_token,"#include<yuki/pg/vtoken.hpp>\n\n");break;
-        case Options::Token_Impl_Type::SIMPLE: fprintf(out_token,"#include<yuki/pg/stoken.hpp>\n\n");break;
-        case Options::Token_Impl_Type::TUPLE: fprintf(out_token,"#include<yuki/pg/ttoken.hpp>\n#include<yuki/allocator.hpp>\n\n");break;
+        case Options::Token_Impl_Type::VARIANT: fprintf(out_token,"#include<yuki/pg/VToken.hpp>\n\n");break;
+        case Options::Token_Impl_Type::SIMPLE: fprintf(out_token,"#include<yuki/pg/SToken.hpp>\n\n");break;
+        case Options::Token_Impl_Type::TUPLE: fprintf(out_token,"#include<yuki/pg/TToken.hpp>\n#include<yuki/Allocator.hpp>\n\n");break;
     }
     if(!options.nspace.empty())
         fprintf(out_token,"namespace %s{\n",options.nspace.c_str());
