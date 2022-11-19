@@ -5,6 +5,7 @@ using Foo=yuki::pg::Token<unsigned,0,const char*,double,int,int>;
 
 const Foo foofunc_const(){return {"Foo", 3.14};}
 Foo foofunc(){return {"Foo", 3.14};}
+
 int main(){
     Foo t = {"Foo", 3.14};
     const Foo t_const = {"Foo", 3.14};

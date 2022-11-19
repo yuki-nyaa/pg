@@ -405,10 +405,8 @@ struct VToken : private TIT {
     constexpr decltype(auto) get() && {assert(I==token_index_table[kind_]);return tu_.template get<I>();}
     template<Token_Kind_t I>
     constexpr decltype(auto) get() const&& {assert(I==token_index_table[kind_]);return tu_.template get<I>();}
-};
-
+}; // struct VToken
 } // namespace yuki::pg
-
 
 /*
 Implementation notes:

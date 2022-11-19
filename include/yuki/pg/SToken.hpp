@@ -4,7 +4,6 @@
 #include<yuki/pg/core.hpp>
 
 namespace yuki::pg{
-
 template<std::unsigned_integral Token_Kind_t,typename T>
 struct SToken{
     Token_Kind_t kind_ = -1;

@@ -3,6 +3,7 @@
 #include<fmt/core.h>
 #include<yuki/string_split.hpp>
 #include<yuki/cmd.hpp>
+
 namespace yuki::pg{
 struct Cmd_Data{
     std::string in;
@@ -115,5 +116,4 @@ inline bool Cmd_Data::post_process(){
 
     return true;
 } // bool Cmd_Data::post_process()
-
 } // namespace yuki::pg
