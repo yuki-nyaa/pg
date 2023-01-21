@@ -1,5 +1,3 @@
-#include"cconfig"
-#include"debug.hpp"
 #include"LR1_Writer.h"
 #include"cmd.hpp"
 #include"Meta_Lexer0.h"

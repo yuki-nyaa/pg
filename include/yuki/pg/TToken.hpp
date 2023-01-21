@@ -128,7 +128,7 @@ struct Any_TToken{
     Any_TToken& operator=(Any_TToken&& other) noexcept {
         if(this!=&other){
             if(p_base){
-                YUKI_PG_TARGET_DBGO_ANY_TOKEN_MOVE_ASSIGN("`any_token` fallback destructor called in move assignment with kind {}.\n",kind_);
+                YUKI_PG_DBGO_ANY_TOKEN_MOVE_ASSIGN("`any_token` fallback destructor called in move assignment with kind {}.\n",kind_);
                 alloc.dynamic_destroy_deallocate(kind_,p_base);
             }
             kind_=other.kind_;
@@ -141,7 +141,7 @@ struct Any_TToken{
 
     ~Any_TToken() noexcept {
         if(p_base){
-            YUKI_PG_TARGET_DBGO_ANY_TOKEN_DTOR("`any_token` fallback destructor called with kind {}.\n",kind_);
+            YUKI_PG_DBGO_ANY_TOKEN_DTOR("`any_token` fallback destructor called with kind {}.\n",kind_);
             alloc.dynamic_destroy_deallocate(kind_,p_base);
         }
     }

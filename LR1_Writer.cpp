@@ -1,9 +1,9 @@
 #include"cconfig"
+#include"debug.hpp"
 #include<yuki/print.hpp>
 #include<yuki/RingQueue.hpp>
 #include"cmd.hpp"
 #include"LR1_Writer.h"
-#include"debug.hpp"
 
 #define IND YUKI_PG_IND
 #define IND2 IND IND
@@ -239,10 +239,10 @@ size_t LR1_Writer<Token_Kind_t>::write_table(
         }
         if(goto_count % YUKI_PG_LR1_TABLE_MAX_LINE_ITEM != 0)
             fmt::print(fp_goto,"\n");
-        #ifdef YUKI_PG_DBG
+        #ifdef YUKI_PG_META_DBG
         for(Token_Kind_t i=nterm_total;i<token_total;++i){
             if(!action_row[i-nterm_total].empty())
-                YUKI_PG_DBGO("non-empty action_candidates at ({},{}).\n",items_num,i);
+                YUKI_PG_META_DBGO("non-empty action_candidates at ({},{}).\n",items_num,i);
         }
         memset(action_row,0, term_total * sizeof(Action_Candidates) );
         #endif
@@ -442,7 +442,7 @@ void LR1_Writer<Token_Kind_t>::write_parse_array(
                 case Options::Token_Impl_Type::SIMPLE: fprintf(out,IND6 "stack_.emplace_back(std::move(token_target_),state_);\n"); break;
                 case Options::Token_Impl_Type::TUPLE: fprintf(out,IND6 "stack_.emplace_back(Token_t(p_token_target_,loc_target_),state_);\n"); break;
             }
-            fprintf(out,IND6 "YUKI_PG_TARGET_DBGO(\"REDUCE ");
+            fprintf(out,IND6 "YUKI_PG_DBGO(\"REDUCE ");
             print_rule_escaped(out,rule);
             fprintf(out,
                 "\\n\");\n"
@@ -639,7 +639,7 @@ void LR1_Writer<Token_Kind_t>::write_parse_switch(
                 case Options::Token_Impl_Type::SIMPLE: fprintf(out,IND4 "stack_.emplace_back(std::move(token_target_),state_);\n"); break;
                 case Options::Token_Impl_Type::TUPLE: fprintf(out,IND4 "stack_.emplace_back(Token_t(p_token_target_,loc_target_),state_);\n"); break;
             }
-            fprintf(out,IND4 "YUKI_PG_TARGET_DBGO(\"REDUCE ");
+            fprintf(out,IND4 "YUKI_PG_DBGO(\"REDUCE ");
             print_rule_escaped(out,rule);
             fprintf(out,
                 "\\n\");\n"

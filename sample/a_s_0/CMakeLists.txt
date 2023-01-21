@@ -12,14 +12,14 @@ if(NOT CMAKE_BUILD_TYPE)
 endif()
 
 if(CMAKE_BUILD_TYPE MATCHES Debug)
-    set(YUKI_PG_DBG TRUE)
+    set(YUKI_PG_SAMPLE_DBG TRUE)
     message("Build type: Debug")
 else()
-    set(YUKI_PG_DBG FALSE)
+    set(YUKI_PG_SAMPLE_DBG FALSE)
     message("Build type: Release")
 endif()
 
-configure_file(cconfig.in cconfig)
+configure_file(debug.hpp.in debug.hpp)
 
 set(YUKI_PG_ROOT "../..")
 

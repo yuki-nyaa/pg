@@ -123,7 +123,7 @@ struct AbsLR1Parser : AbsParser<TS> {
     }
 
     void SHIFT_(typename AbsParser<TS>::Token_t&& t,const size_t s){
-        YUKI_PG_TARGET_DBGO("SHIFT {} {}\n",TS::token_name[t.kind()],s);
+        YUKI_PG_DBGO("SHIFT {} {}\n",TS::token_name[t.kind()],s);
         stack_.emplace_back(std::move(t),s);
     }
     void SET_STATE(const size_t s) {state_=s;}

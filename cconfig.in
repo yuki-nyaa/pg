@@ -1,16 +1,9 @@
 #pragma once
+
 #define YUKI_PG_VERSION_MAJOR @yuki.pg_VERSION_MAJOR@
 #define YUKI_PG_VERSION_MINOR @yuki.pg_VERSION_MINOR@
-#cmakedefine YUKI_PG_DBG
-#ifdef YUKI_PG_DBG
-    #undef NDEBUG
-    // The individual flags may be turned on/off according to your demand.
-    #define DEBUG_REFLEX TEST
-#else
-    #define NDEBUG
-    // The individual flags may be turned on/off according to your demand.
-    #undef DEBUG_REFLEX
-#endif
+
+#cmakedefine YUKI_PG_META_DBG
 
 #define YUKI_PG_IND "    "
 #define YUKI_PG_HIND "  "
