@@ -150,8 +150,8 @@ id [A-Za-z_]\p{Word}*
 \%namespace\p{Space}*    {start(O_NSPACE);}
 \%parser\p{Space}*    {start(O_PARSER);}
 \%token_settings\p{Space}*    {start(O_TS);}
-\%lexer\p{Space}*    {str_temp0.clear();start(O_LEXER);}
-\%parser_tables\p{Space}*    {str_temp0.clear();start(O_PT);}
+\%lexer\p{Space}*    {start(O_LEXER);}
+\%parser_tables\p{Space}*    {start(O_PT);}
 
 \%no_final_function    {options.no_final_function = true;}
 \%no_final_class    {options.no_final_class = true;}
@@ -435,34 +435,16 @@ id [A-Za-z_]\p{Word}*
 \/\/.*\R    {} // Comments.
 }
 
-
-
 <O_LEXER>{
+{id}    {options.lexer.assign(text(),size());start(INITIAL);}
+\p{Space}+    {} // Spaces as well as newlines are ignored.
 \/\/.*\R    {} // Comments.
-
-\\\%    {str_temp0.push_back('%');}
-
-(?=\%)    {
-    yuki::trim_trailing_spaces(str_temp0);
-    options.lexer = std::move(str_temp0);
-    start(INITIAL);
-}
-\R    {str_temp0.push_back(' ');}
-.    {str_temp0.push_back(chr());}
 }
 
 <O_PT>{
+{id}    {options.parser_tables.assign(text(),size());start(INITIAL);}
+\p{Space}+    {} // Spaces as well as newlines are ignored.
 \/\/.*\R    {} // Comments.
-
-\\\%    {str_temp0.push_back('%');}
-
-(?=\%)    {
-    yuki::trim_trailing_spaces(str_temp0);
-    options.parser_tables = std::move(str_temp0);
-    start(INITIAL);
-}
-\R    {str_temp0.push_back(' ');}
-.    {str_temp0.push_back(chr());}
 }
 
 %%
