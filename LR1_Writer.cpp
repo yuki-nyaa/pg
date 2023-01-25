@@ -146,7 +146,7 @@ size_t LR1_Writer<Token_Kind_t>::write_table(
                 );
                 resolve_rr_conflict(action_this,rule_it->num,rule_it->prec_sr,rule_it->prec_rr);
                 ++rr_conflict_total;
-                yuki::try_print(fp_log,"Resolved to rule {}.",action_this.reduce.rule_num);
+                yuki::try_print(fp_log,"Resolved to rule {}.\n",action_this.reduce.rule_num);
             }else{
                 action_this.reduce={rule_it->num,rule_it->prec_sr,rule_it->prec_rr};
             }
