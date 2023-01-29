@@ -816,7 +816,12 @@ void LR1_Writer<Token_Kind_t>::write(
         );
     }
     if(!options.no_default_ctor){
-        fprintf(out_h,IND "constexpr %s(%s* const l=nullptr) noexcept : lexer(l) {}\n\n",options.parser.c_str(),options.lexer.c_str());
+        fprintf(out_h,
+            IND "constexpr %s() noexcept = default;\n"
+            IND "explicit constexpr %s(%s* const l) noexcept : lexer(l) {}\n\n",
+            options.parser.c_str(),
+            options.parser.c_str(),options.lexer.c_str()
+        );
     }
     fprintf(out_h,
         IND "int parse(%s&);\n"
