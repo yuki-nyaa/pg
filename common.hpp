@@ -100,7 +100,7 @@ struct Rule<Token_Kind_t>::Rough_Less{
         return std::strong_ordering::equal;
     }
 
-    static bool compare(const Rule<Token_Kind_t>& lhs,const Rule<Token_Kind_t>& rhs) {return compare3(lhs,rhs)==std::strong_ordering::less;}
+    bool operator()(const Rule<Token_Kind_t>& lhs,const Rule<Token_Kind_t>& rhs) const {return compare3(lhs,rhs)==std::strong_ordering::less;}
 };
 
 template<std::unsigned_integral Token_Kind_t>

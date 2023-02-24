@@ -44,7 +44,7 @@ struct LR1_Writer{
         {}
 
         struct To_Key{
-            static LR1_Item_Body_Key project(const LR1_Item_Body& ib) {return {ib.rights.size(),ib.lookahead,ib.cursor};}
+            LR1_Item_Body_Key operator()(const LR1_Item_Body& ib) const {return {ib.rights.size(),ib.lookahead,ib.cursor};}
         };
 
         friend bool operator==(const LR1_Item_Body& lhs,const LR1_Item_Body& rhs){
@@ -166,7 +166,7 @@ struct LR1_Writer{
                 if(const std::strong_ordering cmp=lhs.map_.size()<=>rhs.map_.size(); cmp!=0) return cmp;
                 return std::strong_ordering::equal;
             }
-            static bool compare(const LR1_Item_Set& lhs,const LR1_Item_Set& rhs) {return compare3(lhs,rhs)==std::strong_ordering::less;}
+            bool operator()(const LR1_Item_Set& lhs,const LR1_Item_Set& rhs) const {return compare3(lhs,rhs)==std::strong_ordering::less;}
         };
 
         friend LR1_Item_Set_Set;

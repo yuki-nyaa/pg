@@ -1,80 +1,119 @@
 #pragma once
 #include<string>
-#include<fmt/core.h>
 #include<yuki/string_split.hpp>
 #include<yuki/cmd.hpp>
 
 namespace yuki::pg{
 struct Cmd_Data{
-    std::string in;
-    std::string out_cpp;
+    std::string_view in;
+    std::string_view out_cpp;
     std::string out_h;
     std::string out_token;
-    std::string out_log;
+
     // Members for later process.
     FILE* fp_in = nullptr;
     FILE* fp_out_cpp = nullptr;
     FILE* fp_out_h = nullptr;
     FILE* fp_out_token = nullptr;
-    FILE* fp_out_log = nullptr;
+    FILE* fp_log = nullptr;
 
     FILE* fp_goto = tmpfile();
-
-    void close_all(){
-        if(fp_in!=nullptr && fp_in!=stdin) {fclose(fp_in);fp_in=nullptr;}
-        if(fp_out_cpp!=nullptr && fp_out_cpp!=stdout && fp_out_cpp!=stderr) {fclose(fp_out_cpp);fp_out_cpp=nullptr;}
-        if(fp_out_h!=nullptr && fp_out_h!=stdout && fp_out_h!=stderr) {fclose(fp_out_h);fp_out_h=nullptr;}
-        if(fp_out_token!=nullptr && fp_out_token!=stdout && fp_out_token!=stderr) {fclose(fp_out_token);fp_out_token=nullptr;}
-        if(fp_out_log!=nullptr && fp_out_log!=stdout && fp_out_log!=stderr) {fclose(fp_out_log);fp_out_log=nullptr;}
-        if(fp_goto!=nullptr) {fclose(fp_goto);fp_goto=nullptr;}
-    }
 
     bool post_process();
 };
 
 namespace cmd_impl{
-    inline void i(Cmd_Data& cmd_data,yuki::Vector<std::string>& args){
-        cmd_data.in=std::move(args[0]);
+    inline void i(Cmd_Data& cmd_data,const char*const*const argv,const size_t argc){
+        switch(argc){
+            case 0:
+                fprintf(stderr,"Warning: Empty input filepath.\n");
+                break;
+            default:
+                fprintf(stderr,"Warning: Multiple outputs specified. (Note: Enclose the path in quotes if it contains spaces.)\n");
+                [[fallthrough]];
+            case 1:
+                cmd_data.fp_in = fopen(argv[0],"r");
+                if(!cmd_data.fp_in)
+                    fprintf(stderr,"Error: The input file \"%s\" somehow cannot be opened!\n",argv[0]);
+                else
+                    cmd_data.in = argv[0];
+                break;
+        }
     }
-    inline void o(Cmd_Data& cmd_data,yuki::Vector<std::string>& args){
-        cmd_data.out_cpp=std::move(args[0]);
+
+    inline void o(Cmd_Data& cmd_data,const char*const*const argv,const size_t argc){
+        switch(argc){
+            case 0:
+                fprintf(stderr,"Warning: Empty output filepath.\n");
+                break;
+            default:
+                fprintf(stderr,"Warning: Multiple outputs specified. (Note: Enclose the path in quotes if it contains spaces.)\n");
+                [[fallthrough]];
+            case 1:
+                cmd_data.out_cpp = argv[0];
+                break;
+        }
     }
-    inline void h(Cmd_Data& cmd_data,yuki::Vector<std::string>& args){
-        cmd_data.out_h=std::move(args[0]);
+
+    inline void h(Cmd_Data& cmd_data,const char*const*const argv,const size_t argc){
+        switch(argc){
+            case 0:
+                fprintf(stderr,"Warning: Empty output header filepath.\n");
+                break;
+            default:
+                fprintf(stderr,"Warning: Multiple output headers specified. (Note: Enclose the path in quotes if it contains spaces.)\n");
+                [[fallthrough]];
+            case 1:
+                cmd_data.out_h = argv[0];
+                break;
+        }
     }
-    inline void t(Cmd_Data& cmd_data,yuki::Vector<std::string>& args){
-        cmd_data.out_token=std::move(args[0]);
+
+    inline void t(Cmd_Data& cmd_data,const char*const*const argv,const size_t argc){
+        switch(argc){
+            case 0:
+                fprintf(stderr,"Warning: Empty output token def filepath.\n");
+                break;
+            default:
+                fprintf(stderr,"Warning: Multiple output token def files specified. (Note: Enclose the path in quotes if it contains spaces.)\n");
+                [[fallthrough]];
+            case 1:
+                cmd_data.out_token = argv[0];
+                break;
+        }
     }
-    inline void l(Cmd_Data& cmd_data,yuki::Vector<std::string>& args){
-        cmd_data.out_log=std::move(args[0]);
+
+    inline void l(Cmd_Data& cmd_data,const char*const*const argv,const size_t argc){
+        switch(argc){
+            case 0:
+                fprintf(stderr,"Warning: Empty log filepath.\n");
+                break;
+            default:
+                fprintf(stderr,"Warning: Multiple log paths specified. (Note: Enclose the path in quotes if it contains spaces.)\n");
+                [[fallthrough]];
+            case 1:
+                cmd_data.fp_log = fopen(argv[0],"w");
+                if(!cmd_data.fp_log)
+                    fprintf(stderr,"Error: The log file \"%s\" somehow cannot be opened!\n",argv[0]);
+        }
     }
-    inline void version(Cmd_Data&,yuki::Vector<std::string>&){
-        fmt::print(stdout,"ParserGen by Yuki, version {}.{}\n",1,0);
-        exit(EXIT_SUCCESS);
-    }
+
+    inline void version(FILE* const out) {fprintf(out,"pg by Yuki, version 1.0\n");}
+    inline void version(Cmd_Data&,const char*const*,size_t) {version(stderr); exit(EXIT_SUCCESS);}
 }
 
-inline yuki::cmd_opt_table_t<Cmd_Data> opt_table={ // Option property table
-    {"version",{yuki::Cmd_Token::L, 0, 0, &cmd_impl::version}},
-    {"v",{yuki::Cmd_Token::Sa, 0, 0, &cmd_impl::version}},
-
-    {"i",{yuki::Cmd_Token::Sa,1,1, &cmd_impl::i}},
-    {"o",{yuki::Cmd_Token::Sa,1,1, &cmd_impl::o}},
-    {"h",{yuki::Cmd_Token::Sa,1,1, &cmd_impl::h}},
-    {"t",{yuki::Cmd_Token::Sa,1,1, &cmd_impl::t}},
-    {"l",{yuki::Cmd_Token::Sa,1,1, &cmd_impl::l}},
+inline constexpr yuki::Cmd_Option<Cmd_Data> coarr[] = {
+    {"version",U'v',cmd_impl::version,"Print version information."},
+    {"",U'i',cmd_impl::i,"The input file."},
+    {"",U'o',cmd_impl::o,"The output cpp file."},
+    {"",U'h',cmd_impl::h,"The output header file."},
+    {"",U't',cmd_impl::t,"The output token def file."},
+    {"",U'l',cmd_impl::l,"The output log file."}
 };
 
 inline bool Cmd_Data::post_process(){
-    // Check for empty input.
-    if(in.empty()){
-        yuki::print_error(stderr,"no input is specified.\n");
-        yuki::print_note(stderr,"use \'-i\' to specify input file.\n");
-        return false;
-    }
-    fp_in=fopen(in.c_str(),"r");
     if(!fp_in){
-        yuki::print_error(stderr,"the input file \'{}\' cannot be opened!\n",in);
+        fprintf(stderr,"Error: No input is specified! (Note: use \"-i\" to specify input file.)\n");
         return false;
     }
 
@@ -82,36 +121,51 @@ inline bool Cmd_Data::post_process(){
     const auto [input_no_ext,input_ext] = yuki::vsplit_filename(in);
 
     if(input_ext=="cpp" || input_ext=="h" || input_ext=="hpp" || input_ext=="log"){
-        yuki::print_error(stderr,"input file has extension \'cpp\', \'h\', \'hpp\' or \'log\', which might collide with the output files.\n");
+        fprintf(stderr,"Error: The input file has extension \".cpp\", \".h\", \".hpp\", or \".log\", which might collide with the output files!\n");
         return false;
     }
 
     // Set default values;
-    // The default cpp-out filename is the same as the input file.
+
+    std::string out_cpp_default;
     if(out_cpp.empty()){
-        out_cpp.reserve(input_no_ext.size()+4);
-        out_cpp.append(input_no_ext);
-        out_cpp.append(".cpp");
+        // The default cpp-out filename is the same as the input file.
+        out_cpp_default.reserve(input_no_ext.size()+4);
+        out_cpp_default.append(input_no_ext);
+        out_cpp_default.append(".cpp");
+        out_cpp = out_cpp_default;
     }
-    fp_out_cpp=fopen(out_cpp.c_str(),"w");
-    // The default h-out filename is the same as the CPP-OUT file.
+    fp_out_cpp=fopen(out_cpp.data(),"w");
+    if(!fp_out_cpp){
+        fprintf(stderr,"Error: The out file \"%s\" somehow cannot be created!\n",out_cpp.data());
+        return false;
+    }
+
     const std::string_view out_cpp_no_ext=yuki::vsplit_filename(out_cpp).zeroth;
+
     if(out_h.empty()){
+        // The default h-out filename is the same as the CPP-OUT file.
         out_h.reserve(out_cpp_no_ext.size()+2);
         out_h.append(out_cpp_no_ext);
         out_h.append(".h");
     }
     fp_out_h=fopen(out_h.c_str(),"w");
-    // The default token-out filename is the same as the CPP-OUT file.
+    if(!fp_out_h){
+        fprintf(stderr,"Error: The out header \"%s\" somehow cannot be created!\n",out_h.c_str());
+        return false;
+    }
+
     if(out_token.empty()){
+        // The default token-out filename is the same as the CPP-OUT file.
         out_token.reserve(out_cpp_no_ext.size()+10);
         out_token.append(out_cpp_no_ext);
         out_token.append(".token.hpp");
     }
+    out_cpp = std::string_view{};
     fp_out_token=fopen(out_token.c_str(),"w");
-    // Log-out is optional.
-    if(!out_log.empty()){
-        fp_out_log=fopen(out_log.c_str(),"w");
+    if(!fp_out_token){
+        fprintf(stderr,"Error: The out token def file \"%s\" somehow cannot be created!\n",out_token.c_str());
+        return false;
     }
 
     return true;

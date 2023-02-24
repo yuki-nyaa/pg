@@ -697,7 +697,7 @@ void LR1_Writer<Token_Kind_t>::write(
     }else{
         fprintf(out,"constinit %s::Action_Table %s::action_table = {\n",options.parser_tables.c_str(),options.parser_tables.c_str());
     }
-    const size_t state_size = write_table(is_switch,nterms,terms,rules,options.assoc0,cmd_data.fp_out_cpp,cmd_data.fp_goto,stderr,cmd_data.fp_out_log);
+    const size_t state_size = write_table(is_switch,nterms,terms,rules,options.assoc0,cmd_data.fp_out_cpp,cmd_data.fp_goto,stderr,cmd_data.fp_log);
     if(is_switch){
         fprintf(out,
             IND "default: return {(size_t)-1,(size_t)-1};\n"
