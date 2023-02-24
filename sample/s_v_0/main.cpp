@@ -1,4 +1,4 @@
-#include"debug.hpp"
+#include"cconfig"
 #include"lexer.h"
 #include"parser.h"
 #include<cstdio>

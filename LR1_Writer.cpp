@@ -1,5 +1,4 @@
 #include"cconfig"
-#include"debug.hpp"
 #include<yuki/print.hpp>
 #include<yuki/RingQueue.hpp>
 #include"cmd.hpp"

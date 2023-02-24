@@ -19,7 +19,7 @@ else()
     message("Build type: Release")
 endif()
 
-configure_file(debug.hpp.in debug.hpp)
+configure_file(cconfig.in cconfig)
 
 set(YUKI_PG_ROOT "../..")
 
