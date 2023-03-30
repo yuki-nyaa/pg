@@ -667,7 +667,7 @@ void LR1_Writer<Token_Kind_t>::write_parse_switch(
 template<std::unsigned_integral Token_Kind_t>
 void LR1_Writer<Token_Kind_t>::write(
     const Cmd_Data& cmd_data,const Options& options,
-    const std::unordered_map<std::string,std::string> code_htable,
+    const std::unordered_map<std::string,std::string>& code_htable,
     const yuki::Vector<Token_Data>& nterms,const yuki::Vector<Token_Data>& terms,
     const Rule_Set<Token_Kind_t>& rules)
 {

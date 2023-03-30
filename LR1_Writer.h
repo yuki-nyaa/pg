@@ -295,7 +295,7 @@ struct LR1_Writer{
 
     enum struct Action_Kind {SHIFT,REDUCE};
 
-    static Action_Kind resolve_sr_conflict(const yuki::Vector<Token_Data>& nterms,const yuki::Vector<Token_Data>& terms,const Assoc assoc0,const Action_Candidates& ac,const unsigned long long lookahead){
+    static Action_Kind resolve_sr_conflict(const yuki::Vector<Token_Data>& nterms,const yuki::Vector<Token_Data>& terms,const Assoc assoc0,const Action_Candidates ac,const unsigned long long lookahead){
         auto get_prec = [&nterms,&terms](const unsigned long long k) -> prec_t
         {
             return (k>=nterms.size() ? terms[k-nterms.size()] : nterms[k]).prec;
@@ -337,7 +337,7 @@ struct LR1_Writer{
 
     static void write(
         const Cmd_Data& cmd_data,const Options& options,
-        const std::unordered_map<std::string,std::string> code_htable,
+        const std::unordered_map<std::string,std::string>& code_htable,
         const yuki::Vector<Token_Data>& nterms,const yuki::Vector<Token_Data>& terms,
         const Rule_Set<Token_Kind_t>& rules);
 }; // struct LR1_Writer<Token_Kind_t>
