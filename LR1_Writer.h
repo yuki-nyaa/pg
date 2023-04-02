@@ -2,7 +2,6 @@
 #include<concepts>
 #include<compare>
 #include<string>
-#include<unordered_map>
 #include<fmt/core.h>
 #include<yuki/Map.hpp>
 #include<yuki/Vector.hpp>
@@ -13,6 +12,7 @@ namespace yuki::pg{
 
 struct Cmd_Data; // Forward declaration required for `LR1_Writer::write`.
 
+// Although `LR1_Writer` is declared as a `struct`, it is intended to function as a "templated namespace". It does not have any non-static members.
 template<std::unsigned_integral Token_Kind_t>
 struct LR1_Writer{
     struct LR1_Item_Head{
@@ -311,34 +311,28 @@ struct LR1_Writer{
             return Action_Kind::REDUCE;
         }else{
             switch(ac.reduce.prec_sr==0 ? assoc0 : get_assoc(lookahead)){
-                case Assoc::RIGHT : return Action_Kind::SHIFT;
                 case Assoc::LEFT : return Action_Kind::REDUCE;
-                default : return Action_Kind::SHIFT; // Unreachable
+                case Assoc::RIGHT : return Action_Kind::SHIFT;
+                default : return Action_Kind::REDUCE; // Unreachable
             }
         }
     }
 
     static size_t write_table(
         const bool is_switch,
+        const Assoc assoc0,
         const yuki::Vector<Token_Data>& nterms,const yuki::Vector<Token_Data>& terms,
         const Rule_Set<Token_Kind_t>& rules,
-        const Assoc assoc0,
         FILE* const fp_file,FILE* const fp_goto,FILE* const fp_err,FILE* const fp_log);
 
-    static void write_parse_array(
-        FILE* const out,const Options& options,
-        const yuki::Vector<Token_Data>& nterms,const yuki::Vector<Token_Data>& terms,
-        const Rule_Set<Token_Kind_t>& rules);
+    static void write_parse_array(FILE* const out,const Sec0_Data& sec0_data,const Rule_Set<Token_Kind_t>& rules);
 
-    static void write_parse_switch(
-        FILE* const out,const Options& options,
-        const yuki::Vector<Token_Data>& nterms,const yuki::Vector<Token_Data>& terms,
-        const Rule_Set<Token_Kind_t>& rules);
+    static void write_parse_switch(FILE* const out,const Sec0_Data& sec0_data,const Rule_Set<Token_Kind_t>& rules);
 
-    static void write(
-        const Cmd_Data& cmd_data,const Options& options,
-        const std::unordered_map<std::string,std::string>& code_htable,
-        const yuki::Vector<Token_Data>& nterms,const yuki::Vector<Token_Data>& terms,
-        const Rule_Set<Token_Kind_t>& rules);
+    static void write(const Cmd_Data& cmd_data,const Sec0_Data& sec0_data,const Rule_Set<Token_Kind_t>& rules);
 }; // struct LR1_Writer<Token_Kind_t>
+
+static_assert(std::is_empty_v<LR1_Writer<unsigned>>);
+
 } // namespace yuki::pg
+

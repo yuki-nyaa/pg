@@ -302,10 +302,9 @@ template<auto K>
 inline constexpr in_place_kind_t<K> in_place_kind;
 
 
-template<std::unsigned_integral Token_Kind_t,typename TIT,typename... Ts>
-struct VToken : private TIT {
+template<std::unsigned_integral Token_Kind_t,const Token_Kind_t* token_index_table,typename... Ts>
+struct VToken{
   public:
-    using TIT::token_index_table;
     static constexpr size_t size = sizeof...(Ts) + 1;
   private:
     vtoken_impl_::tree_union<vtoken_impl_::dm,Ts...> tu_;

@@ -9,6 +9,7 @@ struct Cmd_Data{
     std::string_view out_cpp;
     std::string out_h;
     std::string out_token;
+    bool default_log=false;
 
     // Members for later process.
     FILE* fp_in = nullptr;
@@ -29,7 +30,7 @@ namespace cmd_impl{
                 fprintf(stderr,"Warning: Empty input filepath.\n");
                 break;
             default:
-                fprintf(stderr,"Warning: Multiple outputs specified. (Note: Enclose the path in quotes if it contains spaces.)\n");
+                fprintf(stderr,"Warning: Multiple inputs specified. (Note: Enclose the path in quotes if it contains spaces.)\n");
                 [[fallthrough]];
             case 1:
                 cmd_data.fp_in = fopen(argv[0],"r");
@@ -86,7 +87,7 @@ namespace cmd_impl{
     inline void l(Cmd_Data& cmd_data,const char*const*const argv,const size_t argc){
         switch(argc){
             case 0:
-                fprintf(stderr,"Warning: Empty log filepath.\n");
+                cmd_data.default_log=true;
                 break;
             default:
                 fprintf(stderr,"Warning: Multiple log paths specified. (Note: Enclose the path in quotes if it contains spaces.)\n");
@@ -113,7 +114,7 @@ inline constexpr yuki::Cmd_Option<Cmd_Data> coarr[] = {
 
 inline bool Cmd_Data::post_process(){
     if(!fp_in){
-        fprintf(stderr,"Error: No input is specified! (Note: use \"-i\" to specify input file.)\n");
+        fprintf(stderr,"Fatal Error: No input is specified! (Note: use \"-i\" to specify input file.)\n");
         return false;
     }
 
@@ -121,23 +122,23 @@ inline bool Cmd_Data::post_process(){
     const auto [input_no_ext,input_ext] = yuki::vsplit_filename(in);
 
     if(input_ext=="cpp" || input_ext=="h" || input_ext=="hpp" || input_ext=="log"){
-        fprintf(stderr,"Error: The input file has extension \".cpp\", \".h\", \".hpp\", or \".log\", which might collide with the output files!\n");
+        fprintf(stderr,"Fatal Error: The input file has extension \".cpp\", \".h\", \".hpp\", or \".log\", which might collide with the output files!\n");
         return false;
     }
 
     // Set default values;
 
-    std::string out_cpp_default;
+    std::string str_temp;
     if(out_cpp.empty()){
         // The default cpp-out filename is the same as the input file.
-        out_cpp_default.reserve(input_no_ext.size()+4);
-        out_cpp_default.append(input_no_ext);
-        out_cpp_default.append(".cpp");
-        out_cpp = out_cpp_default;
+        str_temp.reserve(input_no_ext.size()+4);
+        str_temp.append(input_no_ext);
+        str_temp.append(".cpp");
+        out_cpp=str_temp;
     }
     fp_out_cpp=fopen(out_cpp.data(),"w");
     if(!fp_out_cpp){
-        fprintf(stderr,"Error: The out file \"%s\" somehow cannot be created!\n",out_cpp.data());
+        fprintf(stderr,"Fatal Error: The out file \"%s\" somehow cannot be created!\n",out_cpp.data());
         return false;
     }
 
@@ -151,7 +152,7 @@ inline bool Cmd_Data::post_process(){
     }
     fp_out_h=fopen(out_h.c_str(),"w");
     if(!fp_out_h){
-        fprintf(stderr,"Error: The out header \"%s\" somehow cannot be created!\n",out_h.c_str());
+        fprintf(stderr,"Fatal Error: The out header \"%s\" somehow cannot be created!\n",out_h.c_str());
         return false;
     }
 
@@ -161,12 +162,24 @@ inline bool Cmd_Data::post_process(){
         out_token.append(out_cpp_no_ext);
         out_token.append(".token.hpp");
     }
-    out_cpp = std::string_view{};
     fp_out_token=fopen(out_token.c_str(),"w");
     if(!fp_out_token){
-        fprintf(stderr,"Error: The out token def file \"%s\" somehow cannot be created!\n",out_token.c_str());
+        fprintf(stderr,"Fatal Error: The out token def file \"%s\" somehow cannot be created!\n",out_token.c_str());
         return false;
     }
+
+    if(default_log && fp_log==nullptr){
+        // The default log filename is the same as the CPP-OUT file.
+        std::string str_temp1;
+        str_temp1.reserve(out_cpp_no_ext.size()+4);
+        str_temp1.append(out_cpp_no_ext);
+        str_temp1.append(".log");
+        fp_log=fopen(str_temp1.c_str(),"w");
+        if(!fp_log)
+            fprintf(stderr,"Warning: The default log file \"%s\" somehow cannot be created!\n",str_temp1.c_str());
+    }
+
+    out_cpp=std::string_view{}; // `out_cpp` (as a `std::string_view`) could possibly points to `str_temp`, which is going to be destroyed when the function returns.
 
     return true;
 } // bool Cmd_Data::post_process()

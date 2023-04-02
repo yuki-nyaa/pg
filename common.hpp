@@ -3,13 +3,36 @@
 #include<string>
 #include<yuki/Set.hpp>
 #include<yuki/Set_OV.hpp>
+#include<yuki/unordered_map_str.hpp>
+#include<yuki/uchar.hpp>
 
 namespace yuki::pg{
 
 typedef unsigned short prec_t;
-enum struct Assoc : unsigned char {RIGHT,LEFT};
+enum struct Assoc : unsigned char {DEFAULT,LEFT,RIGHT,};
 
-struct Options{
+
+struct Token_Data{
+    // The following 3 members' order should not be changed.
+    std::string name;
+    std::string alias;
+
+    std::string alloc;
+    //< The preceding 3 members' order should not be changed.
+    prec_t prec=0;
+    Assoc assoc=Assoc::DEFAULT;
+
+    yuki::Vector<std::string,yuki::Allocator<std::string>,yuki::Default_EC<2,1,1,1024>> types;
+    yuki::Vector<std::string,yuki::Allocator<std::string>,yuki::Default_EC<2,1,1,1024>> names;
+
+    size_t vtoken_index = 0;
+
+    std::string& name_or_alias() noexcept {return alias.empty() ? name : alias;}
+    const std::string& name_or_alias() const noexcept {return alias.empty() ? name : alias;}
+};
+
+
+struct Sec0_Data{
     std::string nspace;
     std::string parser = "Parser";
     std::string ts = "Token_Settings";
@@ -28,35 +51,108 @@ struct Options{
 
     enum struct Token_Impl_Type : unsigned char {VARIANT,SIMPLE,TUPLE} token_impl_type = Token_Impl_Type::VARIANT;
 
-    Assoc assoc0 = Assoc::RIGHT;
-
     bool is_variant() const {return token_impl_type==Token_Impl_Type::VARIANT;}
     bool is_simple() const {return token_impl_type==Token_Impl_Type::SIMPLE;}
     bool is_tuple() const {return token_impl_type==Token_Impl_Type::TUPLE;}
-};
 
-struct Token_Data{
-    std::string name;
-    std::string alias;
+    Assoc assoc0 = Assoc::LEFT;
 
-    prec_t prec=0;
-    Assoc assoc;
+    unsigned errors=0;
 
-    yuki::Vector<std::string,yuki::Allocator<std::string>,yuki::Default_EC<2,1,1,1024>> types;
-    size_t type_index = 0;
-    yuki::Vector<std::string,yuki::Allocator<std::string>,yuki::Default_EC<2,1,1,1024>> names;
+    #ifndef YUKI_PG_TOKEN_HTABLE_BUCKET
+    #define YUKI_PG_TOKEN_HTABLE_BUCKET 256
+    #endif
 
-    std::string alloc;
+    yuki::Vector<Token_Data> nterms{yuki::reserve_tag,YUKI_PG_TOKEN_HTABLE_BUCKET};
+    yuki::Vector<Token_Data> terms{yuki::reserve_tag,YUKI_PG_TOKEN_HTABLE_BUCKET};
 
-    Token_Data(std::string&& n,const Assoc assoc_p) noexcept :
-        name(std::move(n)),
-        assoc(assoc_p)
-    {}
+    struct Token_Coordinate{
+        bool is_term;
+        size_t idx;
+    };
 
-    std::string& name_or_alias() noexcept {return alias.empty() ? name : alias;}
-    const std::string& name_or_alias() const noexcept {return alias.empty() ? name : alias;}
+    Token_Data& get_token_data(const Token_Coordinate co){
+        return (co.is_term ? terms : nterms)[co.idx];
+    }
+    Token_Data& get_token_data(const std::string& s){
+        return get_token_data(token_htable[s]);
+    }
+
+    template<std::unsigned_integral Token_Kind_t>
+    const Token_Data& get_token_data(const Token_Kind_t k) const {
+        assert(k!=(Token_Kind_t)-1);
+        return k>=nterms.size() ? terms[k-nterms.size()] : nterms[k];
+    }
+
+    template<std::unsigned_integral Token_Kind_t>
+    Token_Kind_t to_token_num(const Token_Coordinate co){
+        return !co.is_term ? co.idx : nterms.size()+co.idx ;
+    }
+
+    yuki::unordered_map_str<std::string,Token_Coordinate> token_htable;
+
+    struct Code{
+        std::string_view qualifier;
+        std::string contents;
+    };
+
+    Code codes[7]={
+        {"class"},
+        {"cpp_top"},
+        {"h_top"},
+        {"token_top"},
+        {"SEC2_"},
+        {"token_bottom"},
+        {"h_bottom"},
+    };
+
+    prec_t current_prec=0;
+
+    struct Input{
+        size_t lineno_orig=1;
+        size_t colno_orig=1;
+        size_t lineno=1;
+        size_t colno=1;
+
+        yuki::U8Char get(FILE* const in){
+            lineno_orig=lineno;
+            colno_orig=colno;
+            const yuki::U8Char c(in);
+            if(c==yuki::U8Char(static_cast<unsigned char>('\n'))){
+                ++lineno;
+                colno=1;
+            }else if(c!=yuki::EOF_U8)
+                ++colno;
+            return c;
+        }
+
+        /// @return `0` if the next byte is not '/'; `EOF` if the next byte is '/' the skipping ends with `EOF`; `(unsigned char)'\n'` if the next byte is '/' the skipping ends with it.
+        int try_skip_comment(FILE* const in){
+            if(const int peek=fgetc(in); peek==static_cast<unsigned char>('/')){
+                while(1){
+                    switch(const int peek1=fgetc(in); peek1){
+                        case EOF: return EOF;
+                        case static_cast<unsigned char>('\r'): fgetc(in); [[fallthrough]];
+                        case static_cast<unsigned char>('\n'): ++lineno; colno=1; return static_cast<unsigned char>('\n');
+                    }
+                }
+            }else{
+                ungetc(peek,in);
+                return 0;
+            }
+        }
+    } input;
+}; // Sec0_Data
+
+
+struct Str_Loc{
+    size_t lineno;
+    size_t colno;
+    std::string str;
 };
 } // namespace yuki::pg
+
+
 
 
 namespace yuki::pg{
@@ -102,6 +198,7 @@ struct Rule<Token_Kind_t>::Rough_Less{
 
     bool operator()(const Rule<Token_Kind_t>& lhs,const Rule<Token_Kind_t>& rhs) const {return compare3(lhs,rhs)==std::strong_ordering::less;}
 };
+
 
 template<std::unsigned_integral Token_Kind_t>
 struct Rule_Set : private yuki::MultiSet<Rule<Token_Kind_t>,typename Rule<Token_Kind_t>::Rough_Less> {
@@ -189,6 +286,7 @@ struct Rule_Set : private yuki::MultiSet<Rule<Token_Kind_t>,typename Rule<Token_
     using MultiSet_::erase;
 };
 
+
 template<std::unsigned_integral Token_Kind_t>
 using First_Set = yuki::Set_OV<Token_Kind_t>;
 
@@ -200,6 +298,7 @@ void remove_epsilon(First_Set<Token_Kind_t>& fs,const std::type_identity_t<Token
 
 template<std::unsigned_integral Token_Kind_t>
 void insert_epsilon(First_Set<Token_Kind_t>& fs,const std::type_identity_t<Token_Kind_t> e) {if(!contains_epsilon(fs,e)) fs.tree_base().vec_base().emplace_back(e);}
+
 
 template<std::unsigned_integral Token_Kind_t>
 struct First_Table{
