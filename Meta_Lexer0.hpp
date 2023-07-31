@@ -16,6 +16,30 @@ namespace sec0_impl{
             fprintf(stderr,"--%zu:%zu %s\n",args->lineno,args->colno,args->str.c_str());
     }
 
+    inline void plr1(Sec0_Data& data,Str_Loc* const,unsigned const args_size,const size_t lineno,const size_t colno,const char* const filename){
+        if(args_size!=0){
+            fprintf(stderr,"%zu:%zu - %s\n",lineno,colno,filename);
+            fprintf(stderr,"Warning: %%plr1 does not expect any arguments!\n");
+        }
+        data.alg_type=Sec0_Data::Alg_Type::PLR1;
+    }
+
+    inline void clr1(Sec0_Data& data,Str_Loc* const,unsigned const args_size,const size_t lineno,const size_t colno,const char* const filename){
+        if(args_size!=0){
+            fprintf(stderr,"%zu:%zu - %s\n",lineno,colno,filename);
+            fprintf(stderr,"Warning: %%clr1 does not expect any arguments!\n");
+        }
+        data.alg_type=Sec0_Data::Alg_Type::CLR1;
+    }
+
+    inline void lalr1(Sec0_Data& data,Str_Loc* const,unsigned const args_size,const size_t lineno,const size_t colno,const char* const filename){
+        if(args_size!=0){
+            fprintf(stderr,"%zu:%zu - %s\n",lineno,colno,filename);
+            fprintf(stderr,"Warning: %%lalr1 does not expect any arguments!\n");
+        }
+        data.alg_type=Sec0_Data::Alg_Type::LALR1;
+    }
+
     inline void variant_token(Sec0_Data& data,Str_Loc* const,unsigned const args_size,const size_t lineno,const size_t colno,const char* const filename){
         if(args_size!=0){
             fprintf(stderr,"%zu:%zu - %s\n",lineno,colno,filename);
@@ -201,12 +225,12 @@ namespace sec0_impl{
             ++data.current_prec;
         for(;args_size!=0;++args,--args_size){
             try{
-                const Sec0_Data::Token_Coordinate co = data.token_htable.at(args->str);
+                const Token_Datas::Coordinate co = data.token_datas.at(args->str);
                 if(!co.is_term){
                     fprintf(stderr,"%zu:%zu - %s\n",args->lineno,args->colno,filename);
                     fprintf(stderr,"Warning: %%left/%%right for non-terminals makes no sense: %s\n",args->str.c_str());
                 }else{
-                    Token_Data& td = data.get_token_data(co);
+                    Token_Data& td = data.token_datas[co];
                     td.prec = data.current_prec;
                     td.assoc = assoc;
                 }
@@ -228,12 +252,12 @@ namespace sec0_impl{
             ++data.current_prec;
         for(;args_size!=0;++args,--args_size){
             try{
-                const Sec0_Data::Token_Coordinate co = data.token_htable.at(args->str);
+                const Token_Datas::Coordinate co = data.token_datas.at(args->str);
                 if(!co.is_term){
                     fprintf(stderr,"%zu:%zu - %s\n",args->lineno,args->colno,filename);
                     fprintf(stderr,"Warning: %%prec for non-terminals makes no sense: %s\n",args->str.c_str());
                 }else{
-                    data.get_token_data(co).prec = data.current_prec;
+                    data.token_datas[co].prec = data.current_prec;
                 }
             }catch(const std::out_of_range&){
                 fprintf(stderr,"%zu:%zu - %s\n",args->lineno,args->colno,filename);
@@ -280,10 +304,10 @@ namespace sec0_impl{
 
     template<bool is_term>
     void term(Sec0_Data& data,Str_Loc* const args,unsigned args_size,const size_t lineno,const size_t colno,const char* const filename){
-        auto& terms = is_term ? data.terms : data.nterms;
+        auto& terms = is_term ? data.token_datas.terms : data.token_datas.nterms;
 
         auto redef_error = [&data,filename,&terms](const Str_Loc& str_loc){
-            if(!data.token_htable.try_emplace(str_loc.str,is_term,terms.size()).second){
+            if(!data.token_datas.token_htable.try_emplace(str_loc.str,is_term,terms.size()).second){
                 fprintf(stderr,"%zu:%zu - %s\n",str_loc.lineno,str_loc.colno,filename);
                 fprintf(stderr,"Error: Redefinition of token \"%s\"!\n",str_loc.str.c_str());
                 ++data.errors;
@@ -368,11 +392,11 @@ namespace sec0_impl{
         void (*action)(Sec0_Data&,Str_Loc*,unsigned,size_t,size_t,const char*);
 
         struct SV{
-            constexpr std::string_view operator()(const Sec0_Entry se) const {return se.key;}
+            static constexpr std::string_view operator()(const Sec0_Entry se) {return se.key;}
         };
 
         struct Nil{
-            constexpr bool operator()(const Sec0_Entry se) const {return !se.action;}
+            static constexpr bool operator()(const Sec0_Entry se) {return !se.action;}
         };
     };
 
@@ -388,6 +412,9 @@ namespace sec0_impl{
 
 
 constexpr yuki::CHashTable_Str<sec0_impl::Sec0_Entry,sec0_impl::Sec0_Entry::SV,sec0_impl::Sec0_Entry::Nil,128> sec0_actions = {
+    {"plr1",sec0_impl::plr1},
+    {"clr1",sec0_impl::clr1},
+    {"lalr1",sec0_impl::lalr1},
     {"variant_token",sec0_impl::variant_token},
     {"tuple_token",sec0_impl::tuple_token},
     {"action_switch",sec0_impl::action_switch},

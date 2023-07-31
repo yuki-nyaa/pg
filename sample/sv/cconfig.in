@@ -1,11 +1,9 @@
 #cmakedefine YUKI_PARSER_SAMPLE_DBG
 #ifdef YUKI_PARSER_SAMPLE_DBG
-    #undef NDEBUG
     #define YUKI_PG_DBG
     #define YUKI_PG_DBG_ANY_TOKEN_DTOR
     #define YUKI_PG_DBG_ANY_TOKEN_MOVE_ASSIGN
 #else
-    #define NDEBUG
     #undef YUKI_PG_DBG
     #undef YUKI_PG_DBG_ANY_TOKEN_DTOR
     #undef YUKI_PG_DBG_ANY_TOKEN_MOVE_ASSIGN

@@ -1,11 +1,10 @@
 #include"cconfig"
-#include"LR1_Writer.h"
 #include"cmd.hpp"
 #include"Meta_Lexer0.hpp"
 #include"Meta_Lexer1.h"
 
 namespace yuki::pg{
-void write_traits_alloc(FILE* const,const Sec0_Data&);
+void write_traits_alloc(FILE* const out_token,const char* const ts_cstr,const yuki::Vector<Token_Data>& nterms,const yuki::Vector<Token_Data>& terms);
 
 void write_token(FILE* const out_token,Sec0_Data& sec0_data){
     #define IND YUKI_PG_IND
@@ -14,6 +13,8 @@ void write_token(FILE* const out_token,Sec0_Data& sec0_data){
     #define IND4 IND IND IND IND
 
     const Sec0_Data::Token_Impl_Type token_impl_type = sec0_data.token_impl_type;
+    yuki::Vector<Token_Data>& nterms = sec0_data.token_datas.nterms;
+    yuki::Vector<Token_Data>& terms = sec0_data.token_datas.terms;
 
     fprintf(out_token,"#pragma once\n");
     for(const Sec0_Data::Code& code : sec0_data.codes){
@@ -44,7 +45,7 @@ void write_token(FILE* const out_token,Sec0_Data& sec0_data){
     fprintf(out_token,
         IND "static constexpr size_t token_total = %zu;\n"
         IND "typedef yuki::uint_auto_t<token_total> Token_Kind_t;\n",
-        sec0_data.nterms.size()+sec0_data.terms.size()
+        nterms.size()+terms.size()
     );
     fprintf(out_token,
         IND "struct Token_Kind{\n"
@@ -54,7 +55,7 @@ void write_token(FILE* const out_token,Sec0_Data& sec0_data){
     const Assoc assoc0 = sec0_data.assoc0;
     yuki::unordered_map_str<std::string,size_t> vtoken_types;
     std::string alloc_temp;
-    const char** const vtoken_types_linear = new const char*[sec0_data.nterms.size()+sec0_data.terms.size()];
+    const char** const vtoken_types_linear = new const char*[nterms.size()+terms.size()];
     auto td_finalize = [token_impl_type,assoc0,&vtoken_types,&alloc_temp,vtoken_types_linear](Token_Data& td){
         if(td.assoc==Assoc::DEFAULT)
             td.assoc=assoc0;
@@ -82,11 +83,11 @@ void write_token(FILE* const out_token,Sec0_Data& sec0_data){
                 break;
         }
     };
-    for(Token_Data& td : sec0_data.nterms){
+    for(Token_Data& td : nterms){
         td_finalize(td);
         fprintf(out_token,"%s,",td.name.c_str());
     }
-    for(Token_Data& td : sec0_data.terms){
+    for(Token_Data& td : terms){
         td_finalize(td);
         fprintf(out_token,"%s,",td.name.c_str());
     }
@@ -96,13 +97,13 @@ void write_token(FILE* const out_token,Sec0_Data& sec0_data){
         IND "};\n"
     );
     fprintf(out_token,IND "static constexpr const char* token_name[token_total] = {");
-    for(const Token_Data& td : sec0_data.nterms){
+    for(const Token_Data& td : nterms){
         if(td.alias.empty())
             fprintf(out_token,"\"%s\",",td.name.c_str());
         else
             fprintf(out_token,"%s,",td.alias.c_str());
     }
-    for(const Token_Data& td : sec0_data.terms){
+    for(const Token_Data& td : terms){
         if(td.alias.empty())
             fprintf(out_token,"\"%s\",",td.name.c_str());
         else
@@ -116,13 +117,13 @@ void write_token(FILE* const out_token,Sec0_Data& sec0_data){
         IND "static constexpr Token_Kind_t terminal_last = Token_Kind::EOF_;\n"
         IND "static constexpr Token_Kind_t eof_ = Token_Kind::EOF_;\n"
         "\n",
-        sec0_data.nterms[0].name.c_str(), sec0_data.nterms.back().name.c_str(), sec0_data.terms[0].name.c_str()
+        nterms[0].name.c_str(), nterms.back().name.c_str(), terms[0].name.c_str()
     );
     fprintf(out_token,
         IND "static constexpr size_t nterminal_total = %zu;\n"
         IND "static constexpr size_t terminal_total = %zu;\n"
         "\n",
-        sec0_data.nterms.size(), sec0_data.terms.size()
+        nterms.size(), terms.size()
     );
     fprintf(out_token,
         IND "static constexpr bool is_nterminal_f(const Token_Kind_t kind) {return kind>=nterminal_first && kind<=nterminal_last;}\n"
@@ -141,12 +142,12 @@ void write_token(FILE* const out_token,Sec0_Data& sec0_data){
     );
     switch(token_impl_type){
         case Sec0_Data::Token_Impl_Type::VARIANT:{
-            fprintf(out_token,IND "static constexpr Token_Kind_t token_index_table[%zu] = {\n",sec0_data.nterms.size()+sec0_data.terms.size());
+            fprintf(out_token,IND "static constexpr Token_Kind_t token_index_table[%zu] = {\n",nterms.size()+terms.size());
             #ifndef YUKI_PG_TOKEN_INDEX_TABLE_MAX_LINE_ITEM
             #define YUKI_PG_TOKEN_INDEX_TABLE_MAX_LINE_ITEM 32
             #endif
             size_t token_count = 0;
-            for(const Token_Data& td : sec0_data.nterms){
+            for(const Token_Data& td : nterms){
                 if(token_count==0)
                     fprintf(out_token,IND2);
                 fprintf(out_token,"%zu, ",td.vtoken_index);
@@ -156,7 +157,7 @@ void write_token(FILE* const out_token,Sec0_Data& sec0_data){
                 }else
                     ++token_count;
             }
-            for(const Token_Data& td : sec0_data.terms){
+            for(const Token_Data& td : terms){
                 if(token_count==0)
                     fprintf(out_token,IND2);
                 fprintf(out_token,"%zu, ",td.vtoken_index);
@@ -218,20 +219,20 @@ void write_token(FILE* const out_token,Sec0_Data& sec0_data){
                 "\n"
                 IND "struct Token{\n"
             );
-            for(const Token_Data& td : sec0_data.nterms){
+            for(const Token_Data& td : nterms){
                 fprintf(out_token,IND2 "using %s = TToken_Tp<Token_Kind::%s",td.name.c_str(),td.name.c_str());
                 for(const std::string& type : td.types)
                     fprintf(out_token,",%s",type.c_str());
                 fprintf(out_token,">;\n");
             }
-            for(const Token_Data& td : sec0_data.terms){
+            for(const Token_Data& td : terms){
                 fprintf(out_token,IND2 "using %s = TToken_Tp<Token_Kind::%s",td.name.c_str(),td.name.c_str());
                 for(const std::string& type : td.types)
                     fprintf(out_token,",%s",type.c_str());
                 fprintf(out_token,">;\n");
             }
             fprintf(out_token,IND "}; // struct Token\n\n");
-            write_traits_alloc(out_token,sec0_data);
+            write_traits_alloc(out_token,sec0_data.ts.c_str(),nterms,terms);
             if(!sec0_data.nspace.empty())
                 fprintf(out_token,"} // namespace %s\n",sec0_data.nspace.c_str());
             break;
@@ -247,7 +248,7 @@ void write_token(FILE* const out_token,Sec0_Data& sec0_data){
 } // write_token
 
 
-void write_traits_alloc(FILE* const out_token,const Sec0_Data& sec0_data){
+void write_traits_alloc(FILE* const out_token,const char* const ts_cstr,const yuki::Vector<Token_Data>& nterms,const yuki::Vector<Token_Data>& terms){
     fprintf(out_token,
         IND "template<typename T> struct is_nterminal : std::false_type {};\n"
         IND "template<typename T> static constexpr bool is_nterminal_v = is_nterminal<T>::value;\n"
@@ -266,33 +267,33 @@ void write_traits_alloc(FILE* const out_token,const Sec0_Data& sec0_data){
         IND "struct Allocator;\n"
         "}; // struct %s\n"
         "\n",
-        sec0_data.ts.c_str()
+        ts_cstr
     );
-    for(const Token_Data& td : sec0_data.nterms)
-        fprintf(out_token,"template<> struct %s::is_nterminal<%s::Token::%s> : std::true_type {};\n",sec0_data.ts.c_str(),sec0_data.ts.c_str(),td.name.c_str());
+    for(const Token_Data& td : nterms)
+        fprintf(out_token,"template<> struct %s::is_nterminal<%s::Token::%s> : std::true_type {};\n",ts_cstr,ts_cstr,td.name.c_str());
     fprintf(out_token,"\n");
-    for(const Token_Data& td : sec0_data.terms)
-        fprintf(out_token,"template<> struct %s::is_terminal<%s::Token::%s> : std::true_type {};\n",sec0_data.ts.c_str(),sec0_data.ts.c_str(),td.name.c_str());
+    for(const Token_Data& td : terms)
+        fprintf(out_token,"template<> struct %s::is_terminal<%s::Token::%s> : std::true_type {};\n",ts_cstr,ts_cstr,td.name.c_str());
     fprintf(out_token,"\n");
-    for(const Token_Data& td : sec0_data.nterms)
+    for(const Token_Data& td : nterms)
         fprintf(out_token,"template<> struct %s::kind_to_type<%s::Token_Kind::%s> {typedef %s::Token::%s type;};\n",
-            sec0_data.ts.c_str(), sec0_data.ts.c_str(), td.name.c_str(),
-            sec0_data.ts.c_str(), td.name.c_str()
+            ts_cstr, ts_cstr, td.name.c_str(),
+            ts_cstr, td.name.c_str()
         );
-    for(const Token_Data& td : sec0_data.terms)
+    for(const Token_Data& td : terms)
         fprintf(out_token,"template<> struct %s::kind_to_type<%s::Token_Kind::%s> {typedef %s::Token::%s type;};\n",
-            sec0_data.ts.c_str(), sec0_data.ts.c_str(), td.name.c_str(),
-            sec0_data.ts.c_str(), td.name.c_str()
+            ts_cstr, ts_cstr, td.name.c_str(),
+            ts_cstr, td.name.c_str()
         );
 
     fprintf(out_token,"\n");
 
-    fprintf(out_token,"struct %s::Allocator :\n",sec0_data.ts.c_str());
-    for(const Token_Data& td : sec0_data.nterms)
+    fprintf(out_token,"struct %s::Allocator :\n",ts_cstr);
+    for(const Token_Data& td : nterms)
         fprintf(out_token,IND "private type_to_alloc_t<Token::%s>,\n",td.name.c_str());
-    for(size_t i = 0;i!=sec0_data.terms.size();++i){
-        fprintf(out_token,IND "private type_to_alloc_t<Token::%s>",sec0_data.terms[i].name.c_str());
-        if(i+1!=sec0_data.terms.size())
+    for(size_t i = 0;i!=terms.size();++i){
+        fprintf(out_token,IND "private type_to_alloc_t<Token::%s>",terms[i].name.c_str());
+        if(i+1!=terms.size())
             fprintf(out_token,",");
         fprintf(out_token,"\n");
     }
@@ -315,13 +316,21 @@ void write_traits_alloc(FILE* const out_token,const Sec0_Data& sec0_data){
         IND2 "using enum Token_Kind::enum_t;\n"
         IND2 "switch(k){\n"
     );
-    for(const Token_Data& td : sec0_data.nterms)
+    for(const Token_Data& td : nterms)
         fprintf(out_token,IND3 "case %s : {destroy_deallocate<Token::%s>(p);break;}\n",td.name.c_str(),td.name.c_str());
-    for(const Token_Data& td : sec0_data.terms)
+    for(const Token_Data& td : terms)
         fprintf(out_token,IND3 "case %s : {destroy_deallocate<Token::%s>(p);break;}\n",td.name.c_str(),td.name.c_str());
-    fprintf(out_token,IND2 "}\n" IND "}\n}; // struct %s::Allocator\n",sec0_data.ts.c_str());
+    fprintf(out_token,IND2 "}\n" IND "}\n}; // struct %s::Allocator\n",ts_cstr);
 } // write_traits_alloc
 } // namespace yuki::pg
+
+
+
+
+namespace yuki::pg::lr{
+template<std::unsigned_integral Token_Kind_t>
+void write(const Cmd_Data& cmd_data,const Sec0_Data& sec0_data,const Rule_Set<Token_Kind_t>& rules);
+}
 
 
 
@@ -339,39 +348,41 @@ int main(const int argc,const char*const*const argv){
         exit(EXIT_FAILURE);
 
     yuki::pg::Sec0_Data sec0_data = yuki::pg::parse_sec0(cmd_data.fp_in,cmd_data.in.data());
-    if(sec0_data.nterms.empty()){
+    if(sec0_data.token_datas.nterms.empty()){
         fprintf(stderr,"Fatal Error: No non-terminals are declared!\n");
         fprintf(stderr,"%u errors encountered.\n",sec0_data.errors+1);
         return EXIT_FAILURE;
     }
-    sec0_data.terms.emplace_back("EOF_");
-    sec0_data.terms.back().assoc=yuki::pg::Assoc::LEFT;
+    sec0_data.token_datas.terms.emplace_back("EOF_");
+    sec0_data.token_datas.terms.back().assoc=yuki::pg::Assoc::LEFT;
     if(sec0_data.parser_tables.empty())
         (sec0_data.parser_tables=sec0_data.parser).append("_Tables");
     yuki::pg::write_token(cmd_data.fp_out_token,sec0_data);
+    fclose(cmd_data.fp_out_token);
+    cmd_data.fp_out_token=nullptr;
 
     unsigned total_errors=0;
 
     try{
-        switch(yuki::uint_auto_f(sec0_data.nterms.size()+sec0_data.terms.size())){
+        switch(yuki::uint_auto_f(sec0_data.token_datas.nterms.size()+sec0_data.token_datas.terms.size()+1)){
             case yuki::uint_enum::UCHAR:{
                 yuki::pg::Meta_Lexer1<unsigned char> meta_lexer1(cmd_data.fp_in,std::move(sec0_data));
                 meta_lexer1.lex();
-                yuki::pg::LR1_Writer<unsigned char>::write(cmd_data,meta_lexer1.sec0_data,meta_lexer1.rs);
+                yuki::pg::lr::write<unsigned char>(cmd_data,meta_lexer1.sec0_data,meta_lexer1.rs);
                 total_errors=meta_lexer1.sec0_data.errors;
                 break;
             }
             case yuki::uint_enum::USHORT:{
                 yuki::pg::Meta_Lexer1<unsigned short> meta_lexer1(cmd_data.fp_in,std::move(sec0_data));
                 meta_lexer1.lex();
-                yuki::pg::LR1_Writer<unsigned short>::write(cmd_data,meta_lexer1.sec0_data,meta_lexer1.rs);
+                yuki::pg::lr::write<unsigned short>(cmd_data,meta_lexer1.sec0_data,meta_lexer1.rs);
                 total_errors=meta_lexer1.sec0_data.errors;
                 break;
             }
             case yuki::uint_enum::UINT:{
                 yuki::pg::Meta_Lexer1<unsigned> meta_lexer1(cmd_data.fp_in,std::move(sec0_data));
                 meta_lexer1.lex();
-                yuki::pg::LR1_Writer<unsigned>::write(cmd_data,meta_lexer1.sec0_data,meta_lexer1.rs);
+                yuki::pg::lr::write<unsigned>(cmd_data,meta_lexer1.sec0_data,meta_lexer1.rs);
                 total_errors=meta_lexer1.sec0_data.errors;
                 break;
             }

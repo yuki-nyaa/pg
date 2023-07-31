@@ -1,21 +1,27 @@
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.20)
 project(yuki.pg VERSION 1.0)
 
-set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 set(CMAKE_CXX_EXTENSIONS OFF)
-set(CMAKE_CXX_FLAGS_DEBUG "-Wextra -Wno-missing-field-initializers -g -O0")
-set(CMAKE_CXX_FLAGS_RELEASE "-O2")
+
 if(NOT CMAKE_BUILD_TYPE)
     message("No build type specified. Defaulted to 'Release'.")
     set(CMAKE_BUILD_TYPE Release)
 endif()
 
-if(CMAKE_BUILD_TYPE MATCHES Debug)
+if(CMAKE_BUILD_TYPE STREQUAL Debug)
     set(YUKI_PG_META_DBG TRUE)
+    add_compile_options(-Wextra -O0)
+    if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+        add_compile_options(-Wno-missing-field-initializers)
+    elseif(NOT (CMAKE_CXX_COMPILER_ID STREQUAL "Clang"))
+        message(FATAL_ERROR "Unsupported compiler! Please use GCC or Clang!")
+    endif()
     message("Build type: Debug")
 else()
     set(YUKI_PG_META_DBG FALSE)
+    add_compile_options(-O2)
     message("Build type: Release")
 endif()
 
@@ -31,7 +37,7 @@ add_custom_command(OUTPUT Meta_Lexer1.cpp Meta_Lexer1.h
 add_custom_target(Meta_Lexer1
     DEPENDS Meta_Lexer1.cpp Meta_Lexer1.h)
 
-add_executable(ypg main.cpp Meta_Lexer1.cpp LR1_Writer.cpp)
+add_executable(ypg main.cpp Meta_Lexer1.cpp lr.cpp)
 target_link_libraries(ypg reflex fmt)
 
 install(DIRECTORY include/yuki TYPE INCLUDE)

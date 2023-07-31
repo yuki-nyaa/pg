@@ -15,14 +15,13 @@
     inline FILE* const meta_dbg_fp_=fopen(YUKI_PG_META_DBG_LOG,"w");
     #define YUKI_PG_META_DBG_FP yuki::pg::meta_dbg_fp_
     #endif
+    size_t debug_dummy=0;
     }
     #define YUKI_PG_META_DBGO(...) yuki::dbgout_base(YUKI_PG_META_DBG_FP,"YUKI_PG_META",__VA_ARGS__)
-    #undef NDEBUG
     #define DEBUG_REFLEX YUKI_PG_META_REFLEX
     #define YUKI_PG_SEC0_MAX_AGRS 8
 #else
     #define YUKI_PG_META_DBGO(...)
-    #define NDEBUG
     #undef DEBUG_REFLEX
 #endif
 

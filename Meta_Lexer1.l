@@ -35,8 +35,6 @@ template<std::unsigned_integral Token_Kind_t>
     static constexpr size_t ordinal_max = 2;
     static_assert(ordinal_max < sizeof(ordinal)/sizeof(const char*));
 
-    typedef Sec0_Data::Token_Coordinate Token_Coordinate;
-
     Sec0_Data sec0_data;
 
     unsigned brace_level=0;
@@ -45,7 +43,6 @@ template<std::unsigned_integral Token_Kind_t>
     Rule<Token_Kind_t> rule;
     Rule_Set<Token_Kind_t> rs;
 
-    Token_Kind_t left_current = -1;
     Token_Kind_t token_current = -1;
 
     bool init_encountered = false;
@@ -65,20 +62,18 @@ id [A-Za-z_]\p{Word}*
 %%
 <INITIAL>{
 Goal_    {
-    rule.clear();
-    left_current = -1;
+    rule.left=-1;
 }
 (\".*\")|({id}+)    {
     str_temp0 = str();
     try{
-        const Token_Coordinate co = sec0_data.token_htable.at(str_temp0);
+        const Token_Datas::Coordinate co = sec0_data.token_datas.token_htable.at(str_temp0);
         if(co.is_term){
             fprintf(stderr,"Fatal Error: Terminal name encountered when parsing lhs of a rule: %s\n",str_temp0.c_str());
             ++sec0_data.errors;
             exit(EXIT_FAILURE);
         }else{
-            rule.clear();
-            left_current = sec0_data.to_token_num<Token_Kind_t>(co);
+            rule.left = sec0_data.token_datas.to_num<Token_Kind_t>(co);
         }
     }catch(const std::out_of_range&){
         fprintf(stderr,"Fatal Error: Unknown token name encountered when parsing lhs of a rule: %s\n",str_temp0.c_str());
@@ -93,12 +88,12 @@ Goal_    {
     // Make sure that the goal symbol is the first non-terminal, so that the accepting state has number 1.
     const typename Rule_Set<Token_Kind_t>::const_iterator it = rs.first_equiv_greater({(Token_Kind_t)-1,{},0});
     if(it==rs.end()){
-        fprintf(stderr,"Warning: No goal symbol specified. Defaulted to the first non-terminal - %s - .\n",sec0_data.nterms[0].name.c_str());
+        fprintf(stderr,"Warning: No goal symbol specified. Defaulted to the first non-terminal - %s - .\n",sec0_data.token_datas.nterms[0].name.c_str());
         rs.emplace((Token_Kind_t)-1,std::initializer_list<Token_Kind_t>{0},(Token_Kind_t)0);
     }else{
         Token_Kind_t goal = (it->rights)[0];
         if(goal!=0){
-            fprintf(stderr,"Fatal Error: Right hand side of goal production - %s - is not the same as the first non-terminal - %s - !\n",sec0_data.get_token_data(goal).name.c_str(),sec0_data.nterms[0].name.c_str());
+            fprintf(stderr,"Fatal Error: Right hand side of goal production - %s - is not the same as the first non-terminal - %s - !\n",sec0_data.token_datas[goal].name.c_str(),sec0_data.token_datas.nterms[0].name.c_str());
             ++sec0_data.errors;
             exit(EXIT_FAILURE);
         }
@@ -115,12 +110,11 @@ Goal_    {
 (\"[^\"]*\")|({id}+)    {
     str_temp0 = str();
     try{
-        const Token_Coordinate co = sec0_data.token_htable.at(str_temp0);
+        const Token_Datas::Coordinate co = sec0_data.token_datas.token_htable.at(str_temp0);
         init_encountered = false;
-        rule.left = left_current;
-        rule.rights.push_back(sec0_data.to_token_num<Token_Kind_t>(co));
+        rule.rights.push_back(sec0_data.token_datas.to_num<Token_Kind_t>(co));
         if(co.is_term)
-            rule.prec_sr = sec0_data.terms[co.idx].prec;
+            rule.prec_sr = sec0_data.token_datas.terms[co.idx].prec;
     }catch(const std::out_of_range&){
         fprintf(stderr,"Fatal Error: Unknown token name encountered when parsing rhs of a rule: %s\n",str_temp0.c_str());
         ++sec0_data.errors;
@@ -149,17 +143,16 @@ Goal_    {
     start(INIT_BRACKET);
 }
 \|    {
-    rule.num = left_current!=(Token_Kind_t)-1 ? ++rule_num : 0;
+    rule.num = rule.left!=(Token_Kind_t)-1 ? ++rule_num : 0;
     rs.emplace(std::move(rule));
     rule.clear();
     init_encountered = false;
 }
 ;    {
-    rule.num = left_current!=(Token_Kind_t)-1 ? ++rule_num : 0;
+    rule.num = rule.left!=(Token_Kind_t)-1 ? ++rule_num : 0;
     rs.emplace(std::move(rule));
     rule.clear();
     init_encountered = false;
-    left_current = -1;
     start(INITIAL);
 }
 \%prec    {start(RULE_PREC);}
@@ -193,8 +186,8 @@ Goal_    {
     ++sec0_data.errors;
     switch(sec0_data.token_impl_type){
         case Sec0_Data::Token_Impl_Type::VARIANT:{
-            if(sec0_data.get_token_data(left_current).types.empty()){
-                fprintf(stderr,"Error: Token with no semantic value is named: %s\n",sec0_data.get_token_data(left_current).name.c_str());
+            if(sec0_data.token_datas[rule.left].types.empty()){
+                fprintf(stderr,"Error: Token with no semantic value is named: %s\n",sec0_data.token_datas[rule.left].name.c_str());
                 ++sec0_data.errors;
             }
             str_temp0.append("token_target_");
@@ -202,7 +195,7 @@ Goal_    {
         }
         case Sec0_Data::Token_Impl_Type::SIMPLE: str_temp0.append("token_target_.value"); break;
         case Sec0_Data::Token_Impl_Type::TUPLE:{
-            token_current = left_current;
+            token_current = rule.left;
             previous_state = INIT_BRACE;
             str_temp0.append("token_target_");
             start(TOKEN0);
@@ -216,14 +209,14 @@ Goal_    {
         case Sec0_Data::Token_Impl_Type::VARIANT:{
             try{
                 const Token_Kind_t k = rule.rights.at(strtoull(text()+1,nullptr,10));
-                if(sec0_data.get_token_data(k).types.empty()){
-                    fprintf(stderr,"Error: Token with no semantic value is named: %s\n",sec0_data.get_token_data(k).name.c_str());
+                if(sec0_data.token_datas[k].types.empty()){
+                    fprintf(stderr,"Error: Token with no semantic value is named: %s\n",sec0_data.token_datas[k].name.c_str());
                     ++sec0_data.errors;
                 }
                 str_temp0.append("token").append(text()+1,size()-1).push_back('_');
                 break;
             }catch(const std::out_of_range&){
-                fprintf(stderr,"Fatal Error: Token index out of range: %s with %s.rights.size()=%zu\n",text()+1,sec0_data.get_token_data(left_current).name.c_str(),rule.rights.size());
+                fprintf(stderr,"Fatal Error: Token index out of range: %s with %s.rights.size()=%zu\n",text()+1,sec0_data.token_datas[rule.left].name.c_str(),rule.rights.size());
                 ++sec0_data.errors;
                 exit(EXIT_FAILURE);
             }
@@ -237,7 +230,7 @@ Goal_    {
                 start(TOKEN0);
                 break;
             }catch(const std::out_of_range&){
-                fprintf(stderr,"Fatal Error: Token index out of range: %s with %s.rights.size()=%zu\n",text()+1,sec0_data.get_token_data(left_current).name.c_str(),rule.rights.size());
+                fprintf(stderr,"Fatal Error: Token index out of range: %s with %s.rights.size()=%zu\n",text()+1,sec0_data.token_datas[rule.left].name.c_str(),rule.rights.size());
                 ++sec0_data.errors;
                 exit(EXIT_FAILURE);
             }
@@ -291,8 +284,8 @@ Goal_    {
     ++sec0_data.errors;
     switch(sec0_data.token_impl_type){
         case Sec0_Data::Token_Impl_Type::VARIANT:{
-            if(sec0_data.get_token_data(left_current).types.empty()){
-                fprintf(stderr,"Error: Token with no semantic value is named: %s\n",sec0_data.get_token_data(left_current).name.c_str());
+            if(sec0_data.token_datas[rule.left].types.empty()){
+                fprintf(stderr,"Error: Token with no semantic value is named: %s\n",sec0_data.token_datas[rule.left].name.c_str());
                 ++sec0_data.errors;
             }
             str_temp0.append("token_target_");
@@ -300,7 +293,7 @@ Goal_    {
         }
         case Sec0_Data::Token_Impl_Type::SIMPLE: str_temp0.append("token_target_.value"); break;
         case Sec0_Data::Token_Impl_Type::TUPLE:{
-            token_current = left_current;
+            token_current = rule.left;
             previous_state = INIT_BRACKET;
             str_temp0.append("token_target_");
             start(TOKEN0);
@@ -314,14 +307,14 @@ Goal_    {
         case Sec0_Data::Token_Impl_Type::VARIANT:{
             try{
                 const Token_Kind_t k = rule.rights.at(strtoull(text()+1,nullptr,10));
-                if(sec0_data.get_token_data(k).types.empty()){
-                    fprintf(stderr,"Error: Token with no semantic value is named: %s\n",sec0_data.get_token_data(k).name.c_str());
+                if(sec0_data.token_datas[k].types.empty()){
+                    fprintf(stderr,"Error: Token with no semantic value is named: %s\n",sec0_data.token_datas[k].name.c_str());
                     ++sec0_data.errors;
                 }
                 str_temp0.append("token").append(text()+1,size()-1).push_back('_');
                 break;
             }catch(const std::out_of_range&){
-                fprintf(stderr,"Fatal Error: Token index out of range: %s with %s.rights.size()=%zu\n",text()+1,sec0_data.get_token_data(left_current).name.c_str(),rule.rights.size());
+                fprintf(stderr,"Fatal Error: Token index out of range: %s with %s.rights.size()=%zu\n",text()+1,sec0_data.token_datas[rule.left].name.c_str(),rule.rights.size());
                 ++sec0_data.errors;
                 exit(EXIT_FAILURE);
             }
@@ -335,7 +328,7 @@ Goal_    {
                 start(TOKEN0);
                 break;
             }catch(const std::out_of_range&){
-                fprintf(stderr,"Fatal Error: Token index out of range: %s with %s.rights.size()=%zu\n",text()+1,sec0_data.get_token_data(left_current).name.c_str(),rule.rights.size());
+                fprintf(stderr,"Fatal Error: Token index out of range: %s with %s.rights.size()=%zu\n",text()+1,sec0_data.token_datas[rule.left].name.c_str(),rule.rights.size());
                 ++sec0_data.errors;
                 exit(EXIT_FAILURE);
             }
@@ -386,8 +379,8 @@ Goal_    {
 \$\$    {
     switch(sec0_data.token_impl_type){
         case Sec0_Data::Token_Impl_Type::VARIANT:{
-            if(sec0_data.get_token_data(left_current).types.empty()){
-                fprintf(stderr,"Error: Token with no semantic value is named: %s\n",sec0_data.get_token_data(left_current).name.c_str());
+            if(sec0_data.token_datas[rule.left].types.empty()){
+                fprintf(stderr,"Error: Token with no semantic value is named: %s\n",sec0_data.token_datas[rule.left].name.c_str());
                 ++sec0_data.errors;
             }
             str_temp0.append("token_target_");
@@ -395,7 +388,7 @@ Goal_    {
         }
         case Sec0_Data::Token_Impl_Type::SIMPLE: str_temp0.append("token_target_.value"); break;
         case Sec0_Data::Token_Impl_Type::TUPLE:{
-            token_current = left_current;
+            token_current = rule.left;
             previous_state = CODE;
             str_temp0.append("token_target_");
             start(TOKEN0);
@@ -409,14 +402,14 @@ Goal_    {
         case Sec0_Data::Token_Impl_Type::VARIANT:{
             try{
                 const Token_Kind_t k = rule.rights.at(strtoull(text()+1,nullptr,10));
-                if(sec0_data.get_token_data(k).types.empty()){
-                    fprintf(stderr,"Error: Token with no semantic value is named: %s\n",sec0_data.get_token_data(k).name.c_str());
+                if(sec0_data.token_datas[k].types.empty()){
+                    fprintf(stderr,"Error: Token with no semantic value is named: %s\n",sec0_data.token_datas[k].name.c_str());
                     ++sec0_data.errors;
                 }
                 str_temp0.append("token").append(text()+1,size()-1).push_back('_');
                 break;
             }catch(const std::out_of_range&){
-                fprintf(stderr,"Fatal Error: Token index out of range: %s with %s.rights.size()=%zu\n",text()+1,sec0_data.get_token_data(left_current).name.c_str(),rule.rights.size());
+                fprintf(stderr,"Fatal Error: Token index out of range: %s with %s.rights.size()=%zu\n",text()+1,sec0_data.token_datas[rule.left].name.c_str(),rule.rights.size());
                 ++sec0_data.errors;
                 exit(EXIT_FAILURE);
             }
@@ -430,7 +423,7 @@ Goal_    {
                 start(TOKEN0);
                 break;
             }catch(const std::out_of_range&){
-                fprintf(stderr,"Fatal Error: Token index out of range: %s with %s.rights.size()=%zu\n",text()+1,sec0_data.get_token_data(left_current).name.c_str(),rule.rights.size());
+                fprintf(stderr,"Fatal Error: Token index out of range: %s with %s.rights.size()=%zu\n",text()+1,sec0_data.token_datas[rule.left].name.c_str(),rule.rights.size());
                 ++sec0_data.errors;
                 exit(EXIT_FAILURE);
             }
@@ -478,12 +471,12 @@ Goal_    {
 
 \]    {
     size_t i = 0;
-    const auto& names = sec0_data.get_token_data(token_current).names;
+    const auto& names = sec0_data.token_datas[token_current].names;
     for(;i!=names.size();++i){
         if(str_temp1==names[i])
             goto suc;
     }
-    fprintf(stderr,"Fatal Error: Unknown token member name: \"%s\" in token \"%s\"\n",str_temp1.c_str(),sec0_data.get_token_data(token_current).name.c_str());
+    fprintf(stderr,"Fatal Error: Unknown token member name: \"%s\" in token \"%s\"\n",str_temp1.c_str(),sec0_data.token_datas[token_current].name.c_str());
     ++sec0_data.errors;
     exit(EXIT_FAILURE);
     suc:
@@ -508,10 +501,10 @@ Goal_    {
 (\"[^\"]*\")|({id}+)    {
     str_temp0 = str();
     try{
-        const Token_Coordinate co = sec0_data.token_htable.at(str_temp0);
-        rule.prec_sr = sec0_data.get_token_data(co).prec;
+        const Token_Datas::Coordinate co = sec0_data.token_datas.token_htable.at(str_temp0);
+        rule.prec_sr = sec0_data.token_datas[co].prec;
     }catch(const std::out_of_range&){
-        fprintf(stderr,"Fatal Error: Unknown token name encountered when parsing %%prec of a rule: \"%s\" with lhs \"%s\"\n",str_temp0.c_str(),sec0_data.get_token_data(left_current).name.c_str());
+        fprintf(stderr,"Fatal Error: Unknown token name encountered when parsing %%prec of a rule: \"%s\" with lhs \"%s\"\n",str_temp0.c_str(),sec0_data.token_datas[rule.left].name.c_str());
         ++sec0_data.errors;
         exit(EXIT_FAILURE);
     }

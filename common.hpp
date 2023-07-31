@@ -2,7 +2,8 @@
 #include<concepts>
 #include<string>
 #include<yuki/Set.hpp>
-#include<yuki/Set_OV.hpp>
+#include<yuki/algorithm.hpp>
+#include<yuki/Vector.hpp>
 #include<yuki/unordered_map_str.hpp>
 #include<yuki/uchar.hpp>
 
@@ -32,6 +33,52 @@ struct Token_Data{
 };
 
 
+struct Token_Datas{
+    #ifndef YUKI_PG_NTERMINAL_EXPECTED
+    #define YUKI_PG_NTERMINAL_EXPECTED 128
+    #endif
+    #ifndef YUKI_PG_TERMINAL_EXPECTED
+    #define YUKI_PG_TERMINAL_EXPECTED 128
+    #endif
+    yuki::Vector<Token_Data> nterms{yuki::reserve_tag,YUKI_PG_NTERMINAL_EXPECTED};
+    yuki::Vector<Token_Data> terms{yuki::reserve_tag,YUKI_PG_TERMINAL_EXPECTED};
+    struct Coordinate{
+        bool is_term;
+        size_t idx;
+    };
+    yuki::unordered_map_str<std::string,Coordinate> token_htable{YUKI_PG_NTERMINAL_EXPECTED+YUKI_PG_TERMINAL_EXPECTED};
+
+    size_t goal=0;
+
+    Token_Data& operator[](const Coordinate co) {return (co.is_term ? terms : nterms)[co.idx];}
+    const Token_Data& operator[](const Coordinate co) const {return (co.is_term ? terms : nterms)[co.idx];}
+    Token_Data& operator[](const std::string& s) {return operator[](token_htable[s]);}
+
+    Coordinate at(const std::string& s) const noexcept(false) {return token_htable.at(s);}
+
+    template<std::unsigned_integral Token_Kind_t>
+    const Token_Data& operator[](const Token_Kind_t k) const {return operator[](to_co(k));}
+
+    template<std::unsigned_integral Token_Kind_t>
+    Token_Kind_t to_num(const Coordinate co) const {
+        return !co.is_term ? co.idx : nterms.size()+co.idx;
+    }
+
+    template<std::unsigned_integral Token_Kind_t>
+    Coordinate to_co(const Token_Kind_t k) const {
+        assert(k<nterms.size()+terms.size());
+        return k<nterms.size() ? Coordinate{false,k} : Coordinate{true,k-nterms.size()};
+    }
+
+    size_t eof() const {return nterms.size()+terms.size()-1;}
+
+    template<std::unsigned_integral Token_Kind_t>
+    bool is_nterm(const Token_Kind_t k) const {return k<nterms.size();}
+
+
+};
+
+
 struct Sec0_Data{
     std::string nspace;
     std::string parser = "Parser";
@@ -49,6 +96,8 @@ struct Sec0_Data{
 
     bool is_switch = true;
 
+    enum struct Alg_Type : unsigned char {PLR1,CLR1,LALR1} alg_type = Alg_Type::PLR1;
+
     enum struct Token_Impl_Type : unsigned char {VARIANT,SIMPLE,TUPLE} token_impl_type = Token_Impl_Type::VARIANT;
 
     bool is_variant() const {return token_impl_type==Token_Impl_Type::VARIANT;}
@@ -59,37 +108,7 @@ struct Sec0_Data{
 
     unsigned errors=0;
 
-    #ifndef YUKI_PG_TOKEN_HTABLE_BUCKET
-    #define YUKI_PG_TOKEN_HTABLE_BUCKET 256
-    #endif
-
-    yuki::Vector<Token_Data> nterms{yuki::reserve_tag,YUKI_PG_TOKEN_HTABLE_BUCKET};
-    yuki::Vector<Token_Data> terms{yuki::reserve_tag,YUKI_PG_TOKEN_HTABLE_BUCKET};
-
-    struct Token_Coordinate{
-        bool is_term;
-        size_t idx;
-    };
-
-    Token_Data& get_token_data(const Token_Coordinate co){
-        return (co.is_term ? terms : nterms)[co.idx];
-    }
-    Token_Data& get_token_data(const std::string& s){
-        return get_token_data(token_htable[s]);
-    }
-
-    template<std::unsigned_integral Token_Kind_t>
-    const Token_Data& get_token_data(const Token_Kind_t k) const {
-        assert(k!=(Token_Kind_t)-1);
-        return k>=nterms.size() ? terms[k-nterms.size()] : nterms[k];
-    }
-
-    template<std::unsigned_integral Token_Kind_t>
-    Token_Kind_t to_token_num(const Token_Coordinate co){
-        return !co.is_term ? co.idx : nterms.size()+co.idx ;
-    }
-
-    yuki::unordered_map_str<std::string,Token_Coordinate> token_htable;
+    Token_Datas token_datas;
 
     struct Code{
         std::string_view qualifier;
@@ -172,16 +191,15 @@ struct Rule{
     }
 
     void clear(){
-        left = -1;
         rights.clear();
         num = 0;
         prec_sr = 0;
         prec_rr = 0;
-        init.clear();
-        code.clear();
     }
 
     bool is_goal() const {return left==(Token_Kind_t)-1;}
+
+    Token_Kind_t first() const {return rights.empty()? -1 : rights[0];}
 
     struct Rough_Less;
 };
@@ -189,14 +207,13 @@ struct Rule{
 template<std::unsigned_integral Token_Kind_t>
 struct Rule<Token_Kind_t>::Rough_Less{
     static std::strong_ordering compare3(const Rule<Token_Kind_t>& lhs,const Rule<Token_Kind_t>& rhs){
-        if(std::strong_ordering cmp=lhs.left<=>rhs.left;cmp!=0) return cmp;
-        if(std::strong_ordering cmp=lhs.rights.size()<=>rhs.rights.size();cmp!=0) return cmp;
-        if(!lhs.rights.empty())
-            if(std::strong_ordering cmp=lhs.rights[0]<=>rhs.rights[0];cmp!=0) return cmp;
+        if(std::strong_ordering cmp=lhs.left<=>rhs.left; cmp!=0) return cmp;
+        if(std::strong_ordering cmp=lhs.first()<=>rhs.first(); cmp!=0) return cmp;
+        if(std::strong_ordering cmp=lhs.rights.size()<=>rhs.rights.size(); cmp!=0) return cmp;
         return std::strong_ordering::equal;
     }
 
-    bool operator()(const Rule<Token_Kind_t>& lhs,const Rule<Token_Kind_t>& rhs) const {return compare3(lhs,rhs)==std::strong_ordering::less;}
+    static bool operator()(const Rule<Token_Kind_t>& lhs,const Rule<Token_Kind_t>& rhs) {return compare3(lhs,rhs)<0;}
 };
 
 
@@ -215,7 +232,7 @@ struct Rule_Set : private yuki::MultiSet<Rule<Token_Kind_t>,typename Rule<Token_
     using typename MultiSet_::difference_type;
 
     using MultiSet_::MultiSet_;
-    friend constexpr void swap(Rule_Set& lhs,Rule_Set& rhs) noexcept {swap(static_cast<MultiSet_&>(lhs),static_cast<MultiSet_&>(rhs));}
+    friend void swap(Rule_Set& lhs,Rule_Set& rhs) noexcept {swap(static_cast<MultiSet_&>(lhs),static_cast<MultiSet_&>(rhs));}
 
     using MultiSet_::clear;
     using MultiSet_::empty;
@@ -225,12 +242,10 @@ struct Rule_Set : private yuki::MultiSet<Rule<Token_Kind_t>,typename Rule<Token_
     using typename MultiSet_::const_iterator;
 
     using MultiSet_::begin;
-    const_iterator begin(const Token_Kind_t token) const {
-        const_iterator i = first_equiv_greater({token,{},0});
-        return (i!=end() && i->left==token) ? i : end();
-    }
+    const_iterator begin(const Token_Kind_t token) const {return first_equiv_greater({token,std::basic_string<Token_Kind_t>(1,0),0});}
+
     using MultiSet_::end;
-    const_iterator end(Token_Kind_t token) const {return first_equiv_greater({++token,{},0});}
+    const_iterator end(Token_Kind_t token) const {return first_equiv_greater({++token,std::basic_string<Token_Kind_t>(1,0),0});}
 
     using MultiSet_::min;
     using MultiSet_::max;
@@ -263,7 +278,7 @@ struct Rule_Set : private yuki::MultiSet<Rule<Token_Kind_t>,typename Rule<Token_
         const const_iterator i = MultiSet_::emplace(std::forward<Args>(args)...);
         for(const_iterator feg = first_equiv_greater(*i);feg!=i;++feg){
             if(*feg==*i){
-                erase(feg);
+                MultiSet_::erase(feg);
                 return {i,false};
             }
         }
@@ -276,143 +291,235 @@ struct Rule_Set : private yuki::MultiSet<Rule<Token_Kind_t>,typename Rule<Token_
         const const_iterator i = MultiSet_::emplace(left,std::move(rights),num,std::forward<Args>(others)...);
         for(const_iterator feg = first_equiv_greater(*i);feg!=i;++feg){
             if(*feg==*i){
-                erase(feg);
+                MultiSet_::erase(feg);
                 return {i,false};
             }
         }
         return {i,true};
     }
+};
+} // namespace yuki::pg
 
-    using MultiSet_::erase;
+
+
+
+namespace yuki::pg{
+inline constexpr struct dummy_lookahead_t{} dummy_lookahead;
+
+template<std::unsigned_integral Token_Kind_t>
+struct Lookaheads{
+  private:
+    std::basic_string<Token_Kind_t> str;
+  public:
+    constexpr Lookaheads() noexcept = default;
+    constexpr Lookaheads(const Token_Kind_t t) noexcept : str(1,t) {}
+    constexpr Lookaheads(dummy_lookahead_t) noexcept : str(1,(Token_Kind_t)-1) {}
+    constexpr Lookaheads(const Lookaheads<Token_Kind_t>& other,dummy_lookahead_t) noexcept :
+        str(other.str)
+    {insert(dummy_lookahead);}
+
+    friend constexpr void swap(Lookaheads& lhs,Lookaheads& rhs) noexcept {swap(lhs.str,rhs.str);}
+
+    constexpr bool empty() const {return str.empty();}
+    constexpr size_t size() const {return str.size();}
+
+    void clear() {str.clear();}
+
+    constexpr bool contains(const Token_Kind_t t) const {return yuki::bcontains(str.begin(),str.end(),t);}
+    constexpr bool contains(dummy_lookahead_t) const {return !str.empty() && str.back()==(Token_Kind_t)-1;}
+
+    constexpr bool intersects(const Lookaheads<Token_Kind_t>& other) const {
+        for(const Token_Kind_t t : other)
+            if(contains(t))
+                return true;
+        return false;
+    }
+
+    typedef typename std::basic_string<Token_Kind_t>::const_iterator const_iterator;
+
+    constexpr const_iterator begin() const {return str.begin();}
+    /// @note Does NOT include dummy.
+    constexpr const_iterator end() const {return contains(dummy_lookahead) ? str.end()-1 : str.end();}
+
+    constexpr Token_Kind_t back() const {assert(!str.empty()); return str.back();}
+    constexpr Token_Kind_t operator[](const size_t i) const {assert(i<str.size()); return str[i];}
+
+    bool insert(const Token_Kind_t t){
+        const const_iterator pos = yuki::first_equiv_greater(str.begin(),str.end(),t);
+        return (pos!=str.end() && *pos==t) ? false : (str.insert(pos,t),true);
+    }
+    void insert(dummy_lookahead_t) {assert(!contains(dummy_lookahead)); str.push_back(-1);}
+
+    void force_insert(const Token_Kind_t t){
+        assert(str.empty() || str.back()<t);
+        str.push_back(t);
+    }
+
+    void pop_back() {assert(!empty()); str.pop_back();}
+
+    size_t merge(const Token_Kind_t t) {return insert(t) ? 1 : 0;}
+    size_t merge(dummy_lookahead_t) {return contains(dummy_lookahead) ? 0 : (insert(dummy_lookahead),1);}
+    size_t merge(const Lookaheads& other){
+        if(str.empty()){
+            str = other.str;
+            return other.str.size();
+        }else{
+            const size_t orig = str.size();
+            for(const Token_Kind_t t : other.str)
+                insert(t);
+            return str.size()-orig;
+        }
+    }
+    template<typename... L>
+    std::enable_if_t<(sizeof...(L)>1),size_t> merge(const L&... l) {return (...+merge(l));}
+
+    friend constexpr bool operator==(const Lookaheads&,const Lookaheads&) noexcept = default;
 };
 
 
 template<std::unsigned_integral Token_Kind_t>
-using First_Set = yuki::Set_OV<Token_Kind_t>;
+struct TC_Context{
+  protected:
+    const Rule_Set<Token_Kind_t>& rules;
+    Token_Kind_t* const depth;
+    Token_Kind_t* const stack;
+    Token_Kind_t stack_size;
+    const Token_Kind_t nterms_size;
+  public:
+    TC_Context(const size_t nsp,const Rule_Set<Token_Kind_t>& rp) noexcept :
+        rules(rp),
+        depth(new Token_Kind_t[nsp]{}),
+        stack(new Token_Kind_t[nsp]),
+        stack_size(0),
+        nterms_size(nsp)
+    {}
+
+    ~TC_Context() noexcept {delete[] depth; delete[] stack;}
+
+    void reset(){
+        assert(stack_size==0);
+        memset(depth,0,nterms_size*sizeof(Token_Kind_t));
+    }
+};
+
 
 template<std::unsigned_integral Token_Kind_t>
-bool contains_epsilon(First_Set<Token_Kind_t>& fs,const std::type_identity_t<Token_Kind_t> e) {return !fs.empty() && fs.tree_base().back()==e;}
-
-template<std::unsigned_integral Token_Kind_t>
-void remove_epsilon(First_Set<Token_Kind_t>& fs,const std::type_identity_t<Token_Kind_t> e) {if(contains_epsilon(fs,e)) fs.tree_base().pop_back();}
-
-template<std::unsigned_integral Token_Kind_t>
-void insert_epsilon(First_Set<Token_Kind_t>& fs,const std::type_identity_t<Token_Kind_t> e) {if(!contains_epsilon(fs,e)) fs.tree_base().vec_base().emplace_back(e);}
-
+struct Make_FT;
 
 template<std::unsigned_integral Token_Kind_t>
 struct First_Table{
+    friend Make_FT<Token_Kind_t>;
   private:
-    yuki::Vector<First_Set<Token_Kind_t>> vec_;
-    size_t term_first_;
+    Lookaheads<Token_Kind_t>* first_;
+    bool* nullable_;
+
+    First_Table(const Token_Kind_t nterms_size) noexcept :
+        first_(new Lookaheads<Token_Kind_t>[nterms_size]),
+        nullable_(new bool[nterms_size]{})
+    {}
   public:
-	First_Table() = delete;
+    void free() const {
+        delete[] first_;
+        delete[] nullable_;
+    }
 
-    First_Table(const size_t nterm_total,const size_t term_total,const Rule_Set<Token_Kind_t>& rules) noexcept :
-        term_first_(nterm_total)
-    {
-        const size_t token_total = term_first_ + term_total;
-        vec_.reserve(token_total+1);
+    const Lookaheads<Token_Kind_t>& operator[](const Token_Kind_t nt) const {return first_[nt];}
+    bool nullable(const Token_Kind_t nt) const {return nullable_[nt];}
 
-        // From "Engineering A Compiler (2nd Edition)" P104
-        for(Token_Kind_t i = 0;i<term_first_;++i)
-            vec_.force_emplace_back();
-        for(Token_Kind_t i = term_first_;i<=token_total;++i)
-            vec_.force_emplace_back(yuki::from_ordered_tag,yuki::from_variadic_tag,i);
+    /// @return `true` if `l...` are populated, i.e. `rights` is nullable.
+    template<typename... L>
+    bool populate(Lookaheads<Token_Kind_t>& target,const size_t nterms_size,std::basic_string_view<Token_Kind_t> rights,const L&... l) const {
+        while(1){
+            if(rights.empty()){
+                (...,target.merge(l));
+                return true;
+            }
+            const Token_Kind_t front = rights.front();
+            if(front>=nterms_size){
+                target.insert(front);
+                return false;
+            }
+            target.merge(first_[front]);
+            if(nullable_[front])
+                rights.remove_prefix(1);
+            else
+                return false;
+        }
+    }
+};
 
-        for(bool changed=true;changed;){
-            changed=false;
-            for(const Rule<Token_Kind_t>& rule : rules){
-                if(!rule.is_goal()){
-                    const size_t rule_rights_size = rule.rights.size();
-                    First_Set<Token_Kind_t> rhs = vec_[rule.rights[0]];
-                    remove_epsilon(rhs,token_total);
-                    size_t i = 0;
-                    while(i+2<=rule_rights_size && contains_epsilon(vec_[rule.rights[i]],token_total)){
-                        bool rhs_epsilon = contains_epsilon(rhs,token_total);
-                        rhs.merge(vec_[rule.rights[i+1]]);
-                        if(!rhs_epsilon)
-                            remove_epsilon(rhs,token_total);
-                        ++i;
-                    }
-                    if(i+1==rule_rights_size && contains_epsilon(vec_[rule.rights[i]],token_total))
-                        insert_epsilon(rhs,token_total);
-                    const size_t size_orig = vec_[rule.left].size();
-                    vec_[rule.left].merge(std::move(rhs));
-                    if(vec_[rule.left].size()!=size_orig)
-                        changed = true;
+template<std::unsigned_integral Token_Kind_t>
+struct Make_FT : protected TC_Context<Token_Kind_t>{
+  protected:
+    const First_Table<Token_Kind_t> first_table;
+    using TC_Context<Token_Kind_t>::rules;
+    using TC_Context<Token_Kind_t>::depth;
+    using TC_Context<Token_Kind_t>::stack;
+    using TC_Context<Token_Kind_t>::stack_size;
+    using TC_Context<Token_Kind_t>::nterms_size;
+  private:
+    void traverse(const Token_Kind_t k){
+        assert(stack_size<nterms_size);
+        stack[stack_size++]=k;
+        const Token_Kind_t depth_orig = stack_size;
+        depth[k]=depth_orig;
+
+        typename Rule_Set<Token_Kind_t>::const_iterator b = rules.begin(k);
+        const typename Rule_Set<Token_Kind_t>::const_iterator e = rules.end(k);
+
+        for(;b!=e && b->first()<nterms_size;++b){
+            for(const Token_Kind_t r : b->rights){
+                if(r>=nterms_size){
+                    first_table.first_[k].insert(r);
+                    goto next_rule;
+                }else{
+                    if(depth[r]==0){
+                        traverse(r);
+                        first_table.first_[k].merge(first_table.first_[r]);
+                    }else if(r!=k)
+                        first_table.first_[k].merge(first_table.first_[r]);
+                    if(depth[r] < depth[k])
+                        depth[k] = depth[r];
+                    if(!first_table.nullable_[r])
+                        goto next_rule;
                 }
+            }
+            first_table.nullable_[k]=true;
+            next_rule:;
+        }
+
+        for(;b!=e;++b){
+            const Token_Kind_t rule_first = b->first();
+            if(rule_first==(Token_Kind_t)-1){
+                first_table.nullable_[k]=true;
+                break;
+            }
+            first_table.first_[k].insert(rule_first);
+        }
+
+        if(depth[k]==depth_orig){
+            while(1){
+                const Token_Kind_t pop = stack[--stack_size];
+                depth[pop] = -1;
+                if(pop==k)
+                    return;
+                else
+                    first_table.first_[pop]=first_table.first_[k];
             }
         }
     }
-
-    First_Table(const yuki::Vector<Token_Data>& nterms,const yuki::Vector<Token_Data>& terms,const Rule_Set<Token_Kind_t>& rules) noexcept :
-        First_Table(nterms.size(),terms.size(),rules)
+  public:
+    Make_FT(const size_t nsp,const Rule_Set<Token_Kind_t>& rp) noexcept :
+        TC_Context<Token_Kind_t>(nsp,rp),
+        first_table(nsp)
     {}
 
-    size_t term_first() const {return term_first_;}
-    size_t eof() const {return vec_.size()-2;}
-    size_t epsilon() const {return vec_.size()-1;}
-
-    const First_Set<Token_Kind_t>& operator[](const size_t i) const {return vec_[i];}
-
-    struct extended_const_iterator_ne{ // `extended_const_iterator` without epsilon.
-      private:
-        std::basic_string<Token_Kind_t> tokens;
-        const First_Table* ftable;
-        typename std::basic_string<Token_Kind_t>::const_iterator x;
-        typename First_Set<Token_Kind_t>::const_iterator y;
-      public:
-        const Token_Kind_t& operator*() const noexcept {return *y;}
-
-        // Since the iterator points to a built-in integral type, no `operator->` is needed.
-
-        bool is_end() const noexcept {return x==tokens.cend();}
-
-        extended_const_iterator_ne& operator++(){
-            ++y;
-            if(y==(*ftable)[*x].end()){
-                x=tokens.cend();
-                return *this;
-            }
-            while(*y==ftable->epsilon()){
-                ++x;
-                if(!is_end())
-                    y = (*ftable)[*x].begin();
-                else
-                    return *this;
-            }
-            return *this;
-        }
-
-        extended_const_iterator_ne() = delete;
-
-        // This constructor finds the first non-epsilon symbol. If there is none, then the iterator points to epsilon, of course.
-        extended_const_iterator_ne(const First_Table* const ftable_p, const std::basic_string_view<Token_Kind_t> tokens_p, const Token_Kind_t token2_p) noexcept :
-            ftable(ftable_p)
-        {
-            tokens.reserve(tokens_p.size()+1);
-            tokens.append(tokens_p.data(),tokens_p.size());
-            tokens.push_back(token2_p);
-            x=tokens.cbegin();
-            y = (*ftable)[*x].begin();
-
-            while(*y==ftable->epsilon()){
-                ++x;
-                if(!is_end())
-                    y = (*ftable)[*x].begin();
-                else
-                    return;
-            }
-        }
-
-        // Used for debugging.
-        extended_const_iterator_ne(const First_Table* const ftable_p, std::initializer_list<Token_Kind_t> tokens_p, const Token_Kind_t token2_p) noexcept :
-            extended_const_iterator_ne(ftable_p,std::basic_string_view<Token_Kind_t>(tokens_p.begin(),tokens_p.size()),token2_p)
-        {}
-    }; // struct extended_const_iterator_ne
-
-    extended_const_iterator_ne begin_ne(const std::basic_string_view<Token_Kind_t> tokens,const Token_Kind_t token2) const {return extended_const_iterator_ne(this,tokens,token2);}
-    extended_const_iterator_ne begin_ne(std::initializer_list<Token_Kind_t> tokens,const Token_Kind_t token2) const {return extended_const_iterator_ne(this,tokens,token2);}
-}; // struct First_Table<Token_Kind_t>
+    First_Table<Token_Kind_t> calc(){
+        traverse(0);
+        for(Token_Kind_t i=1;i<nterms_size;++i)
+            if(depth[i]==0)
+                traverse(i);
+        return first_table;
+    }
+};
 } // namespace yuki::pg
