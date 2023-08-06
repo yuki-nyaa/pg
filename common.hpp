@@ -357,21 +357,28 @@ struct Lookaheads{
 
     void pop_back() {assert(!empty()); str.pop_back();}
 
-    size_t merge(const Token_Kind_t t) {return insert(t) ? 1 : 0;}
-    size_t merge(dummy_lookahead_t) {return contains(dummy_lookahead) ? 0 : (insert(dummy_lookahead),1);}
-    size_t merge(const Lookaheads& other){
+    void merge(const Token_Kind_t t) {insert(t);}
+    void merge(dummy_lookahead_t) {if(!contains(dummy_lookahead)) insert(dummy_lookahead);}
+    void merge(const Lookaheads& other){
         if(str.empty()){
             str = other.str;
-            return other.str.size();
         }else{
-            const size_t orig = str.size();
             for(const Token_Kind_t t : other.str)
                 insert(t);
-            return str.size()-orig;
         }
     }
-    template<typename... L>
-    std::enable_if_t<(sizeof...(L)>1),size_t> merge(const L&... l) {return (...+merge(l));}
+    void merge(Lookaheads&& other){
+        if(str.empty()){
+            str=std::move(other.str);
+        }else{
+            if(other.size()<size()){
+                using std::swap;
+                swap(str,other.str);
+            }
+            for(const Token_Kind_t t : other.str)
+                insert(t);
+        }
+    }
 
     friend constexpr bool operator==(const Lookaheads&,const Lookaheads&) noexcept = default;
 };
