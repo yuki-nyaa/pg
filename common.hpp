@@ -23,8 +23,8 @@ struct Token_Data{
     prec_t prec=0;
     Assoc assoc=Assoc::DEFAULT;
 
-    yuki::Vector<std::string,yuki::Allocator<std::string>,yuki::Default_EC<2,1,1,1024>> types;
-    yuki::Vector<std::string,yuki::Allocator<std::string>,yuki::Default_EC<2,1,1,1024>> names;
+    yuki::Vector<std::string,yuki::Allocator<std::string>,yuki::Default_EC<2,1,1>> types;
+    yuki::Vector<std::string,yuki::Allocator<std::string>,yuki::Default_EC<2,1,1>> names;
 
     size_t vtoken_index = 0;
 
@@ -74,8 +74,6 @@ struct Token_Datas{
 
     template<std::unsigned_integral Token_Kind_t>
     bool is_nterm(const Token_Kind_t k) const {return k<nterms.size();}
-
-
 };
 
 
@@ -96,7 +94,7 @@ struct Sec0_Data{
 
     bool is_switch = true;
 
-    enum struct Alg_Type : unsigned char {PLR1,CLR1,LALR1} alg_type = Alg_Type::PLR1;
+    enum struct Alg_Type : unsigned char {NIL,PLR1,CLR1,LALR1} alg_type = Alg_Type::NIL;
 
     enum struct Token_Impl_Type : unsigned char {VARIANT,SIMPLE,TUPLE} token_impl_type = Token_Impl_Type::VARIANT;
 
@@ -382,6 +380,12 @@ struct Lookaheads{
 
     friend constexpr bool operator==(const Lookaheads&,const Lookaheads&) noexcept = default;
 };
+
+template<std::unsigned_integral Token_Kind_t>
+constexpr size_t lookahead_count(Token_Kind_t) {return 1;}
+constexpr size_t lookahead_count(dummy_lookahead_t) {return 1;}
+template<std::unsigned_integral Token_Kind_t>
+size_t lookahead_count(const Lookaheads<Token_Kind_t>& l) {return l.size();}
 
 
 template<std::unsigned_integral Token_Kind_t>

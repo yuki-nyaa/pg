@@ -8,7 +8,7 @@
 namespace yuki::pg{
 
 namespace sec0_impl{
-    inline void noop(Sec0_Data&,Str_Loc*,unsigned,size_t,size_t,const char*) {}
+    constexpr void noop(Sec0_Data&,Str_Loc*,unsigned,size_t,size_t,const char*) {}
 
     inline void debug(Sec0_Data&,Str_Loc* args,unsigned args_size,const size_t lineno,const size_t colno,const char* const filename){
         fprintf(stderr,"%zu:%zu:%u - %s - %%__debug\n",lineno,colno,args_size,filename);
@@ -16,204 +16,57 @@ namespace sec0_impl{
             fprintf(stderr,"--%zu:%zu %s\n",args->lineno,args->colno,args->str.c_str());
     }
 
-    inline void plr1(Sec0_Data& data,Str_Loc* const,unsigned const args_size,const size_t lineno,const size_t colno,const char* const filename){
-        if(args_size!=0){
-            fprintf(stderr,"%zu:%zu - %s\n",lineno,colno,filename);
-            fprintf(stderr,"Warning: %%plr1 does not expect any arguments!\n");
-        }
-        data.alg_type=Sec0_Data::Alg_Type::PLR1;
+    #define YUKI_PG_META_ML0_ZERO_PARAM(name,...) \
+    inline void name(Sec0_Data& data,Str_Loc* const,unsigned const args_size,const size_t lineno,const size_t colno,const char* const filename){ \
+        if(args_size!=0){ \
+            fprintf(stderr,"%zu:%zu - %s\n",lineno,colno,filename); \
+            fputs("Warning: %" #name " does not expect any arguments!\n",stderr); \
+        } \
+        __VA_ARGS__ \
     }
 
-    inline void clr1(Sec0_Data& data,Str_Loc* const,unsigned const args_size,const size_t lineno,const size_t colno,const char* const filename){
-        if(args_size!=0){
-            fprintf(stderr,"%zu:%zu - %s\n",lineno,colno,filename);
-            fprintf(stderr,"Warning: %%clr1 does not expect any arguments!\n");
-        }
-        data.alg_type=Sec0_Data::Alg_Type::CLR1;
+    YUKI_PG_META_ML0_ZERO_PARAM(variant_token,data.token_impl_type=Sec0_Data::Token_Impl_Type::VARIANT;)
+    YUKI_PG_META_ML0_ZERO_PARAM(tuple_token,data.token_impl_type=Sec0_Data::Token_Impl_Type::TUPLE;)
+
+    YUKI_PG_META_ML0_ZERO_PARAM(plr1,data.alg_type=Sec0_Data::Alg_Type::PLR1;)
+    YUKI_PG_META_ML0_ZERO_PARAM(clr1,data.alg_type=Sec0_Data::Alg_Type::CLR1;)
+    YUKI_PG_META_ML0_ZERO_PARAM(lalr1,data.alg_type=Sec0_Data::Alg_Type::LALR1;)
+
+    YUKI_PG_META_ML0_ZERO_PARAM(action_switch,data.is_switch=true;)
+    YUKI_PG_META_ML0_ZERO_PARAM(action_array,data.is_switch=false;)
+
+    YUKI_PG_META_ML0_ZERO_PARAM(no_final_function,data.no_final_function=true;)
+    YUKI_PG_META_ML0_ZERO_PARAM(no_final_class,data.no_final_class=true;)
+    YUKI_PG_META_ML0_ZERO_PARAM(no_default_ctor,data.no_default_ctor=true;)
+
+    YUKI_PG_META_ML0_ZERO_PARAM(default_left,data.assoc0=Assoc::LEFT;)
+    YUKI_PG_META_ML0_ZERO_PARAM(default_right,data.assoc0=Assoc::RIGHT;)
+
+    #define YUKI_PG_META_ML0_ONE_PARAM(name,...) \
+    inline void name(Sec0_Data& data,Str_Loc* const args,unsigned const args_size,const size_t lineno,const size_t colno,const char* const filename){ \
+        switch(args_size){ \
+            case 0: \
+                fprintf(stderr,"%zu:%zu - %s\n",lineno,colno,filename); \
+                fputs("Warning: %" #name "without argument!\n",stderr); \
+                return; \
+            default: \
+                fprintf(stderr,"%zu:%zu - %s\n",lineno,colno,filename); \
+                fputs("Error: %" #name "with more than one arguments! (Note: Did you mistype some spaces?)\n",stderr); \
+                ++data.errors; \
+                [[fallthrough]]; \
+            case 1: \
+                __VA_ARGS__ \
+                return; \
+        } \
     }
 
-    inline void lalr1(Sec0_Data& data,Str_Loc* const,unsigned const args_size,const size_t lineno,const size_t colno,const char* const filename){
-        if(args_size!=0){
-            fprintf(stderr,"%zu:%zu - %s\n",lineno,colno,filename);
-            fprintf(stderr,"Warning: %%lalr1 does not expect any arguments!\n");
-        }
-        data.alg_type=Sec0_Data::Alg_Type::LALR1;
-    }
+    YUKI_PG_META_ML0_ONE_PARAM(nspace,data.nspace=std::move(args->str);)
+    YUKI_PG_META_ML0_ONE_PARAM(parser,data.parser=std::move(args->str);)
+    YUKI_PG_META_ML0_ONE_PARAM(ts,data.ts=std::move(args->str);)
+    YUKI_PG_META_ML0_ONE_PARAM(lexer,data.lexer=std::move(args->str);)
+    YUKI_PG_META_ML0_ONE_PARAM(pt,data.parser_tables=std::move(args->str);)
 
-    inline void variant_token(Sec0_Data& data,Str_Loc* const,unsigned const args_size,const size_t lineno,const size_t colno,const char* const filename){
-        if(args_size!=0){
-            fprintf(stderr,"%zu:%zu - %s\n",lineno,colno,filename);
-            fprintf(stderr,"Warning: %%variant_token does not expect any arguments!\n");
-        }
-        data.token_impl_type=Sec0_Data::Token_Impl_Type::VARIANT;
-    }
-
-    inline void tuple_token(Sec0_Data& data,Str_Loc* const,unsigned const args_size,const size_t lineno,const size_t colno,const char* const filename){
-        if(args_size!=0){
-            fprintf(stderr,"%zu:%zu - %s\n",lineno,colno,filename);
-            fprintf(stderr,"Warning: %%tuple_token does not expect any arguments!\n");
-        }
-        data.token_impl_type=Sec0_Data::Token_Impl_Type::TUPLE;
-    }
-
-    inline void action_switch(Sec0_Data& data,Str_Loc* const,unsigned const args_size,const size_t lineno,const size_t colno,const char* const filename){
-        if(args_size!=0){
-            fprintf(stderr,"%zu:%zu - %s\n",lineno,colno,filename);
-            fprintf(stderr,"Warning: %%action_switch does not expect any arguments!\n");
-        }
-        data.is_switch=true;
-    }
-
-    inline void action_array(Sec0_Data& data,Str_Loc* const,unsigned const args_size,const size_t lineno,const size_t colno,const char* const filename){
-        if(args_size!=0){
-            fprintf(stderr,"%zu:%zu - %s\n",lineno,colno,filename);
-            fprintf(stderr,"Warning: %%action_array does not expect any arguments!\n");
-        }
-        data.is_switch=false;
-    }
-
-    inline void no_final_function(Sec0_Data& data,Str_Loc* const,unsigned const args_size,const size_t lineno,const size_t colno,const char* const filename){
-        if(args_size!=0){
-            fprintf(stderr,"%zu:%zu - %s\n",lineno,colno,filename);
-            fprintf(stderr,"Warning: %%no_final_function does not expect any arguments!\n");
-        }
-        data.no_final_function=true;
-    }
-
-    inline void no_final_class(Sec0_Data& data,Str_Loc* const,unsigned const args_size,const size_t lineno,const size_t colno,const char* const filename){
-        if(args_size!=0){
-            fprintf(stderr,"%zu:%zu - %s\n",lineno,colno,filename);
-            fprintf(stderr,"Warning: %%no_final_class does not expect any arguments!\n");
-        }
-        data.no_final_class=true;
-    }
-
-    inline void no_default_ctor(Sec0_Data& data,Str_Loc* const,unsigned const args_size,const size_t lineno,const size_t colno,const char* const filename){
-        if(args_size!=0){
-            fprintf(stderr,"%zu:%zu - %s\n",lineno,colno,filename);
-            fprintf(stderr,"Warning: %%no_default_ctor does not expect any arguments!\n");
-        }
-        data.no_default_ctor=true;
-    }
-
-    inline void nspace(Sec0_Data& data,Str_Loc* const args,unsigned const args_size,const size_t lineno,const size_t colno,const char* const filename){
-        switch(args_size){
-            case 0:
-                fprintf(stderr,"%zu:%zu - %s\n",lineno,colno,filename);
-                fprintf(stderr,"Warning: %%namespace without a namespace name!\n");
-                return;
-            default:
-                fprintf(stderr,"%zu:%zu - %s\n",lineno,colno,filename);
-                fprintf(stderr,"Error: Namespace name contains spaces!\n");
-                ++data.errors;
-                [[fallthrough]];
-            case 1:
-                data.nspace=std::move(args->str);
-                return;
-        }
-    }
-
-    inline void parser(Sec0_Data& data,Str_Loc* const args,unsigned const args_size,const size_t lineno,const size_t colno,const char* const filename){
-        switch(args_size){
-            case 0:
-                fprintf(stderr,"%zu:%zu - %s\n",lineno,colno,filename);
-                fprintf(stderr,"Warning: %%parser without a parser name!\n");
-                return;
-            default:
-                fprintf(stderr,"%zu:%zu - %s\n",lineno,colno,filename);
-                fprintf(stderr,"Error: Parser name contains spaces!\n");
-                ++data.errors;
-                [[fallthrough]];
-            case 1:
-                data.parser=std::move(args->str);
-                return;
-        }
-    }
-
-    inline void ts(Sec0_Data& data,Str_Loc* const args,unsigned const args_size,const size_t lineno,const size_t colno,const char* const filename){
-        switch(args_size){
-            case 0:
-                fprintf(stderr,"%zu:%zu - %s\n",lineno,colno,filename);
-                fprintf(stderr,"Warning: %%token_settings without a Token Settings name!\n");
-                return;
-            default:
-                fprintf(stderr,"%zu:%zu - %s\n",lineno,colno,filename);
-                fprintf(stderr,"Error: Token Settings name contains spaces!\n");
-                ++data.errors;
-                [[fallthrough]];
-            case 1:
-                data.ts=std::move(args->str);
-                return;
-        }
-    }
-
-    inline void lexer(Sec0_Data& data,Str_Loc* const args,unsigned const args_size,const size_t lineno,const size_t colno,const char* const filename){
-        switch(args_size){
-            case 0:
-                fprintf(stderr,"%zu:%zu - %s\n",lineno,colno,filename);
-                fprintf(stderr,"Warning: %%lexer without a lexer name!\n");
-                return;
-            default:
-                fprintf(stderr,"%zu:%zu - %s\n",lineno,colno,filename);
-                fprintf(stderr,"Error: Lexer name contains spaces!\n");
-                ++data.errors;
-                [[fallthrough]];
-            case 1:
-                data.lexer=std::move(args->str);
-                return;
-        }
-    }
-
-    inline void pt(Sec0_Data& data,Str_Loc* const args,unsigned const args_size,const size_t lineno,const size_t colno,const char* const filename){
-        switch(args_size){
-            case 0:
-                fprintf(stderr,"%zu:%zu - %s\n",lineno,colno,filename);
-                fprintf(stderr,"Warning: %%parser_tables without a Parser Tables name!\n");
-                return;
-            default:
-                fprintf(stderr,"%zu:%zu - %s\n",lineno,colno,filename);
-                fprintf(stderr,"Error: Parser Tables name contains spaces!\n");
-                ++data.errors;
-                [[fallthrough]];
-            case 1:
-                data.parser_tables=std::move(args->str);
-                return;
-        }
-    }
-
-    inline void simple_token(Sec0_Data& data,Str_Loc* const args,unsigned const args_size,const size_t lineno,const size_t colno,const char* const filename){
-        switch(args_size){
-            case 0:
-                fprintf(stderr,"%zu:%zu - %s\n",lineno,colno,filename);
-                fprintf(stderr,"Warning: %%simple_token without a type name!\n");
-                return;
-            default:
-                fprintf(stderr,"%zu:%zu - %s\n",lineno,colno,filename);
-                fprintf(stderr,"Error: Simple Token type name contains spaces!\n");
-                ++data.errors;
-                [[fallthrough]];
-            case 1:
-                data.sp_token=std::move(args->str);
-                data.token_impl_type=Sec0_Data::Token_Impl_Type::SIMPLE;
-                return;
-        }
-    }
-
-    inline void default_left(Sec0_Data& data,Str_Loc* const,unsigned const args_size,const size_t lineno,const size_t colno,const char* const filename){
-        if(args_size!=0){
-            fprintf(stderr,"%zu:%zu - %s\n",lineno,colno,filename);
-            fprintf(stderr,"Warning: %%default_left does not expect any arguments!\n");
-        }
-        data.assoc0=Assoc::LEFT;
-    }
-
-    inline void default_right(Sec0_Data& data,Str_Loc* const,unsigned const args_size,const size_t lineno,const size_t colno,const char* const filename){
-        if(args_size!=0){
-            fprintf(stderr,"%zu:%zu - %s\n",lineno,colno,filename);
-            fprintf(stderr,"Warning: %%default_right does not expect any arguments!\n");
-        }
-        data.assoc0=Assoc::RIGHT;
-    }
+    YUKI_PG_META_ML0_ONE_PARAM(simple_token, data.sp_token=std::move(args->str); data.token_impl_type=Sec0_Data::Token_Impl_Type::SIMPLE;)
 
     template<Assoc assoc,bool continued>
     void right_or_left(Sec0_Data& data,Str_Loc* args,unsigned args_size,const size_t lineno,const size_t colno,const char* const filename){

@@ -12,8 +12,6 @@
 %term t
 %term u
 
-%lalr1
-
 %%
 X:
     a Y d
