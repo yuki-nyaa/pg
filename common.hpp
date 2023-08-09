@@ -388,6 +388,11 @@ template<std::unsigned_integral Token_Kind_t>
 size_t lookahead_count(const Lookaheads<Token_Kind_t>& l) {return l.size();}
 
 
+/// Provides the basic settings for the transitive-closure algorithm described in the famous paper
+/// "Efficient Computation of LALR(1) Look-Ahead Sets" by Frank DeRemer and Thomas Pennello (called "algorithm diagraph" in it),
+/// which, according to the authors, is an adaptation of the algorithm in the paper
+/// "On computing the transitive closure of a relation" by J. Eve and R. Kurki-Suonio.
+/// The algorithm used in this program is slightly modified. "tests/tc.cpp" contains the skeleton of the modified algorithm.
 template<std::unsigned_integral Token_Kind_t>
 struct TC_Context{
   protected:

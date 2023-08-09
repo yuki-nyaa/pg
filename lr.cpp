@@ -103,6 +103,36 @@ void print(FILE* const out,const Token_Datas& token_datas,const First_Table<Toke
 
 
 
+inline constexpr struct make_goal_rule_view_tag_t{} make_goal_rule_view_tag;
+
+template<std::unsigned_integral Token_Kind_t>
+struct Rule_View{
+    std::basic_string_view<Token_Kind_t> rights;
+    size_t num;
+    prec_t prec_sr;
+    prec_t prec_rr;
+    Token_Kind_t left;
+
+    constexpr Rule_View(make_goal_rule_view_tag_t) noexcept :
+        rights(),
+        num(0),
+        prec_sr(-1),
+        prec_rr(-1),
+        left(0)
+    {}
+
+    constexpr Rule_View(const Rule<Token_Kind_t>& rule) noexcept :
+        rights(rule.rights),
+        num(rule.num),
+        prec_sr(rule.prec_sr),
+        prec_rr(rule.prec_rr),
+        left(rule.left)
+    {}
+};
+
+
+
+
 struct One_Size{
   private:
     size_t s=0;
@@ -141,34 +171,6 @@ struct With_Size : private Size{
     constexpr void clear() {Size::clear();c=0;}
     constexpr void advance(const size_t cp,const size_t sp) {Size::advance(sp);c+=cp;}
 };
-
-inline constexpr struct make_goal_rule_view_tag_t{} make_goal_rule_view_tag;
-
-template<std::unsigned_integral Token_Kind_t>
-struct Rule_View{
-    std::basic_string_view<Token_Kind_t> rights;
-    size_t num;
-    prec_t prec_sr;
-    prec_t prec_rr;
-    Token_Kind_t left;
-
-    constexpr Rule_View(make_goal_rule_view_tag_t) noexcept :
-        rights(),
-        num(0),
-        prec_sr(-1),
-        prec_rr(-1),
-        left(0)
-    {}
-
-    constexpr Rule_View(const Rule<Token_Kind_t>& rule) noexcept :
-        rights(rule.rights),
-        num(rule.num),
-        prec_sr(rule.prec_sr),
-        prec_rr(rule.prec_rr),
-        left(rule.left)
-    {}
-};
-
 
 template<typename Item,typename Total_Size>
 struct Flat_Item_Set;
@@ -236,6 +238,7 @@ struct Item_Set : private Total_Size{
     void clear() {Total_Size::clear(); set_.clear(); reductions_size_.clear(); /*traits_.clear();*/}
 
     yuki::IB_Pair<const_iterator> emplace(const Rule_View<Token_Kind_t> rule,const Token_Kind_t c){
+        assert(set_.empty() || get_accessing_symbol(rule.rights,c)==accessing_symbol());
         const yuki::IB_Pair<const_iterator> result = set_.emplace_at({rule.rights,c},rule,c);
         if(result.has_inserted){
             Total_Size::advance(1);
@@ -247,6 +250,7 @@ struct Item_Set : private Total_Size{
 
     template<typename... L>
     yuki::IB_Pair<const_iterator> emplace(const Rule_View<Token_Kind_t> rule,const Token_Kind_t c,L&&... lookaheads){
+        assert(set_.empty() || get_accessing_symbol(rule.rights,c)==accessing_symbol());
         if constexpr(has_lookaheads<Item>){
             auto lookahead_count_this = [](const L&... args)->size_t {
                 if constexpr(std::is_same_v<Total_Size,One_Size>)
@@ -276,6 +280,7 @@ struct Item_Set : private Total_Size{
     void merge(IS&& src){
         typedef typename std::remove_cvref_t<IS>::item_type Item2;
         static_assert(std::is_same_v<Token_Kind_t,typename Item2::Token_Kind_t>);
+        assert(set_.empty() || src.empty() || src.accessing_symbol()==accessing_symbol());
         auto merger = [this](yuki::forward_like_type<IS&&,Item2> src1){
             struct Aux{
                 static yuki::IB_Pair<const_iterator> insert(set_type& set,yuki::forward_like_type<IS&&,Item2> src2){
@@ -340,12 +345,12 @@ struct Item_Set : private Total_Size{
 
     void substitute_dummy(const Lookaheads<Token_Kind_t>& lookaheads,dummy_lookahead_t){
         if constexpr(has_lookaheads<Item>){
-            auto f = [this,&lookaheads](const Item& item){
+            auto f = [this,&lookaheads](Item& item){
                 if(item.lookaheads.contains(dummy_lookahead)){
                     const size_t size_orig = item.lookaheads.size();
-                    yuki::as_non_const(item.lookaheads).pop_back();
-                    yuki::as_non_const(item.lookaheads).merge(lookaheads);
-                    yuki::as_non_const(item.lookaheads).insert(dummy_lookahead);
+                    item.lookaheads.pop_back();
+                    item.lookaheads.merge(lookaheads);
+                    item.lookaheads.insert(dummy_lookahead);
                     const size_t merged = item.lookaheads.size()-size_orig;
                     Total_Size::advance(merged);
                     if(item.cursor>=item.rule.rights.size())
@@ -516,12 +521,9 @@ struct RR_Conflict_Resolver{
         if(current.rule==incoming.rule)
             return;
         ++rr_conflicts;
-        bool result;
-        if(current.prec_rr==incoming.prec_rr){
-            result = current.rule>incoming.rule;
-        }else{
-            result = current.prec_rr<incoming.prec_rr;
-        }
+        const bool result = current.prec_rr==incoming.prec_rr
+            ? current.rule>incoming.rule
+            : current.prec_rr<incoming.prec_rr;
         if(out){
             fputs("RR-conflict in ",out);
             if(state)
@@ -557,15 +559,13 @@ struct RS_Conflict_Resolver{
     size_t& rs_conflicts;
     size_t state;
 
+    /// @pre `current.term` should be equal to the token number of `shift_token`.
     template<std::unsigned_integral Token_Kind_t>
     bool operator()(Reduction<Token_Kind_t>& current,const Token_Data& shift_token) const {
         ++rs_conflicts;
-        bool result;
-        if(current.prec_sr==shift_token.prec){
-            result = shift_token.assoc==Assoc::RIGHT;
-        }else{
-            result = current.prec_sr<shift_token.prec;
-        }
+        const bool result = current.prec_sr==shift_token.prec
+            ? shift_token.assoc==Assoc::RIGHT
+            : current.prec_sr<shift_token.prec;
         if(out){
             fprintf(out,
                 "RS-conflict at state %zu at - %s -. (rule=%zu,prec_sr=%u) (prec=%u,assoc=%s). Resolved to %s.\n",
@@ -864,8 +864,8 @@ struct Make_LR1_IAs : private Make_FT<Token_Kind_t>{
             lookahead_proplists[k].insert(b->rights);
         }
 
-        auto sd = [this,k](const Item_Set<LR1_IT_Item<Token_Kind_t>,No_Size>& item_set){
-            yuki::as_non_const(item_set).substitute_dummy(lookaheads_pending[k],dummy_lookahead);
+        auto sd = [this,k](Item_Set<LR1_IT_Item<Token_Kind_t>,No_Size>& item_set){
+            item_set.substitute_dummy(lookaheads_pending[k],dummy_lookahead);
         };
         immediate_actions[k].transitions.tree().recursive_traverse(sd);
 
@@ -1045,6 +1045,7 @@ struct IsoCore{
     static constexpr bool operator()(const Vec&) {return true;}
 };
 
+/// See "A Practical General Method for Constructing LR(k) Parsers" by David Pager.
 struct Weakly_Compatible{
     template<typename Item,typename Total_Size,typename Item2,typename Total_Size2>
     static bool operator()(const Flat_Item_Set<Item,Total_Size>& lhs,const Flat_Item_Set<Item2,Total_Size2>& rhs){
@@ -1213,13 +1214,13 @@ struct Set{
         typename item_set_type::const_iterator l;
         typename item_set_type::const_iterator r;
 
-        auto& operator*() const {return *l;}
-        typename item_set_type::const_iterator operator->() const {return l;}
+        auto& operator*() const {return yuki::as_non_const(*l);}
+        auto operator->() const {using yuki::const_kast; return const_kast(l);}
         Double_Item_Iterator& operator++() {++l;++r;return *this;}
 
         bool operator==(const Double_Item_Iterator other) const noexcept {return l==other.l;}
 
-        const Lookaheads<typename item_set_type::Token_Kind_t>& pending() const {return r->lookaheads;}
+        Lookaheads<typename item_set_type::Token_Kind_t>& pending() const {return yuki::as_non_const(r->lookaheads);}
     };
   public:
     size_t size() const {return tree_.size();}
@@ -1282,6 +1283,7 @@ void Merge_And_Propagate<Token_Kind_t>::doo(LALR1_State<Token_Kind_t>& state,It 
     const auto transitions_begin = transition;
     Token_Kind_t current_cursored=-1, next_cursored=0;
     bool current_cursored_direct_prop = false;
+    // Merge non-terminal-cursored items.
     while(1){
         if(item==reduc){
             if(current_cursored!=(Token_Kind_t)-1){
@@ -1333,23 +1335,23 @@ void Merge_And_Propagate<Token_Kind_t>::doo(LALR1_State<Token_Kind_t>& state,It 
         }
         if(item->tail_nullable){
             for(const Token_Kind_t t : item.pending()){
-                if(yuki::as_non_const(item->lookaheads).insert(t)){
+                if(item->lookaheads.insert(t)){
                     direct_propagate.force_insert(t);
                     nterm_propagate.insert(t);
                 }
             }
         }else{
             for(const Token_Kind_t t : item.pending()){
-                if(yuki::as_non_const(item->lookaheads).insert(t)){
+                if(item->lookaheads.insert(t)){
                     direct_propagate.force_insert(t);
                 }
             }
         }
-        yuki::as_non_const(item.pending()).clear();
+        item.pending().clear();
         if(!direct_propagate.empty()){
             current_cursored_direct_prop=true;
             if(!item->prop){
-                yuki::as_non_const(item->prop) = &(yuki::as_non_const((*transition)->item_set.find({item->rule.rights,item->cursor+1})->lookaheads_pending));
+                item->prop = &(yuki::as_non_const((*transition)->item_set.find({item->rule.rights,item->cursor+1})->lookaheads_pending));
             }
             if(!state.self_transition){
                 assert(item->prop->empty());
@@ -1358,11 +1360,11 @@ void Merge_And_Propagate<Token_Kind_t>::doo(LALR1_State<Token_Kind_t>& state,It 
                 direct_propagate_recipe.emplace_back(item->prop,direct_propagate);
             direct_propagate.clear();
             if((*transition)->index==0)
-                yuki::as_non_const(item->prop)=nullptr;
+                item->prop=nullptr;
         }
         ++item;
-    }
-    //
+    } // while(1)
+    // Merge terminal-cursored items.
     while(1){
         if(item==reduc){
             if(current_cursored!=(Token_Kind_t)-1){
@@ -1386,15 +1388,15 @@ void Merge_And_Propagate<Token_Kind_t>::doo(LALR1_State<Token_Kind_t>& state,It 
             current_cursored=next_cursored;
         }
         for(const Token_Kind_t t : item.pending()){
-            if(yuki::as_non_const(item->lookaheads).insert(t)){
+            if(item->lookaheads.insert(t)){
                 direct_propagate.force_insert(t);
             }
         }
-        yuki::as_non_const(item.pending()).clear();
+        item.pending().clear();
         if(!direct_propagate.empty()){
             current_cursored_direct_prop=true;
             if(!item->prop){
-                yuki::as_non_const(item->prop) = &(yuki::as_non_const((*transition)->item_set.find({item->rule.rights,item->cursor+1})->lookaheads_pending));
+                item->prop = &(yuki::as_non_const((*transition)->item_set.find({item->rule.rights,item->cursor+1})->lookaheads_pending));
             }
             if(!state.self_transition){
                 assert(item->prop->empty());
@@ -1403,10 +1405,10 @@ void Merge_And_Propagate<Token_Kind_t>::doo(LALR1_State<Token_Kind_t>& state,It 
                 direct_propagate_recipe.emplace_back(item->prop,direct_propagate);
             direct_propagate.clear();
             if((*transition)->index==0)
-                yuki::as_non_const(item->prop)=nullptr;
+                item->prop=nullptr;
         }
         ++item;
-    }
+    } // while(1)
     //
     merge_reductions:
     assert(item==reduc);
@@ -1415,16 +1417,16 @@ void Merge_And_Propagate<Token_Kind_t>::doo(LALR1_State<Token_Kind_t>& state,It 
     for(;item!=items_end;++item){
         Reduction<Token_Kind_t> reduc(0,item->rule);
         for(const Token_Kind_t t : item.pending()){
-            if(yuki::as_non_const(item->lookaheads).insert(t)){
+            if(item->lookaheads.insert(t)){
                 reduc.term=t;
                 state.reductions.insert(rrcr,reduc);
             }
         }
-        yuki::as_non_const(item.pending()).clear();
+        item.pending().clear();
     }
     if constexpr(std::is_same_v<It,Item_Iterator>)
         lalr1_items.clear();
-    //
+    // Perform out-of-place propagation.
     if(state.self_transition){
         while(!nterm_propagate_recipe.empty()){
             const Nterm_Propagate np = nterm_propagate_recipe.pop_back_v();
@@ -1443,7 +1445,7 @@ void Merge_And_Propagate<Token_Kind_t>::doo(LALR1_State<Token_Kind_t>& state,It 
     }
     //
     if(!propagate_ass.empty()){
-        {
+        { // Mark all transitions that have been propagated, so that `propagate_ass` can be reused in the recursive calls.
         transition = state.transitions.begin();
         typename Lookaheads<Token_Kind_t>::const_iterator pab = propagate_ass.begin();
         const typename Lookaheads<Token_Kind_t>::const_iterator pae = propagate_ass.end();
@@ -1463,6 +1465,7 @@ void Merge_And_Propagate<Token_Kind_t>::doo(LALR1_State<Token_Kind_t>& state,It 
         }
         propagate_ass.clear();
         }
+        // Merge and propagate the marked transitions.
         transition = state.transitions.begin();
         for(;transition!=transitions_end;++transition){
             if((*transition)->merge_pending){
@@ -1499,9 +1502,9 @@ void Merge_And_Propagate<Token_Kind_t>::doo(LALR1_State<Token_Kind_t>& state,It 
                     }
                     doo<Eq>(**transition,Item_Iterator{lalr1_items.begin()},Item_Iterator{lalr1_items.begin()+lalr1_items_reduc},Item_Iterator{lalr1_items.end()});
                 }
-            }
-        }
-    }
+            } // if((*transition)->merge_pending)
+        } // for(;transition!=transitions_end;++transition)
+    } // if(!propagate_ass.empty())
 }
 
 #define IND YUKI_PG_IND
@@ -1614,6 +1617,7 @@ size_t write_lalr1(
         typename decltype(current_actions.transitions)::const_iterator current_transitioned;
         merge_and_propagate.rrcr.state=current_state->index;
         merge_and_propagate.rrcr.occasion_str="";
+        // Process non-terminal-cursored items.
         while(1){
             if(current_item==reduction_item){
                 if(current_cursored!=(Token_Kind_t)-1){
@@ -1638,7 +1642,7 @@ size_t write_lalr1(
             yuki::as_non_const(*current_transitioned).emplace(current_item->rule,current_item->cursor+1,current_item->lookaheads);
             ++current_item;
         }
-        //
+        // Process terminal-cursored items.
         for(;current_item!=reduction_item;++current_item){
             if((next_cursored=get_cursored(current_item->rule.rights,current_item->cursor))!=current_cursored){
                 current_cursored=next_cursored;
@@ -1646,7 +1650,7 @@ size_t write_lalr1(
             }
             yuki::as_non_const(*current_transitioned).emplace(current_item->rule,current_item->cursor+1,current_item->lookaheads);
         }
-        //
+        // Process reduction items.
         yuki::as_non_const(current_state->reductions) = std::move(current_actions.empty_reductions);
         merge_and_propagate.rrcr.src=-1;
         for(;current_item!=items_end;++current_item){
@@ -1656,7 +1660,7 @@ size_t write_lalr1(
                 yuki::as_non_const(current_state->reductions).insert(merge_and_propagate.rrcr,reduc);
             }
         }
-        //
+        // Transform the transitioned item-sets to tentative states.
         current_actions.transitions.tree().recursive_popfront([&current_actions_linear](LALR1_Item_Set<Token_Kind_t>&& item_set){current_actions_linear.emplace_back(0,std::move(item_set));});
         Token_Kind_t self_transition_pending=-1;
         const Token_Kind_t current_state_as = current_state->item_set.accessing_symbol();
@@ -1665,7 +1669,7 @@ size_t write_lalr1(
                 self_transition_pending = current_state->transitions.size();
             yuki::as_non_const(current_state->transitions).emplace_back(&state);
         }
-        //
+        // Process the tentative states.
         if(self_transition_pending != (Token_Kind_t)-1){
             LALR1_State<Token_Kind_t>*& transition = yuki::as_non_const(current_state->transitions)[self_transition_pending];
             const yuki::IB_Pair<typename Set<LALR1_State<Token_Kind_t>>::const_iterator> ibp = states.template insert_and_merge<Eq,true>(std::move(transition->item_set),merge_and_propagate,transition,current_state);
@@ -1687,7 +1691,7 @@ size_t write_lalr1(
             }
         }
         current_actions_linear.clear();
-    }
+    } // while(!worklist.empty())
 
     first_table.free();
     delete[] lr1_ias;
@@ -1806,6 +1810,7 @@ size_t write_clr1(
         typename decltype(current_actions.transitions)::const_iterator current_transitioned;
         rrcr.state=current_state->index;
         rrcr.occasion_str="";
+        // Process non-terminal-cursored items.
         while(1){
             if(current_item==items_end || current_item->cursor>=current_item->rule.rights.size()){
                 if(current_cursored!=(Token_Kind_t)-1){
@@ -1830,7 +1835,7 @@ size_t write_clr1(
             yuki::as_non_const(*current_transitioned).emplace(current_item->rule,current_item->cursor+1,current_item->lookaheads);
             ++current_item;
         }
-        //
+        // Process terminal-cursored items.
         for(;current_item!=items_end && current_item->cursor<current_item->rule.rights.size(); ++current_item){
             if((next_cursored=get_cursored(current_item->rule.rights,current_item->cursor))!=current_cursored){
                 current_cursored=next_cursored;
@@ -1838,7 +1843,7 @@ size_t write_clr1(
             }
             yuki::as_non_const(*current_transitioned).emplace(current_item->rule,current_item->cursor+1,current_item->lookaheads);
         }
-        //
+        // Process reduction items.
         rrcr.src=-1;
         for(;current_item!=items_end;++current_item){
             Reduction<Token_Kind_t> reduc(0,current_item->rule);
@@ -1847,7 +1852,7 @@ size_t write_clr1(
                 current_actions.empty_reductions.insert(rrcr,reduc);
             }
         }
-        //
+        // Process the transitioned item-sets and write out.
         fprintf(fp_file,"case %zu: S%zu: switch(t_.kind()){\n",current_state->index,current_state->index);
         current_transitioned = current_actions.transitions.begin();
         const auto transitions_end = current_actions.transitions.end();
@@ -1880,7 +1885,7 @@ size_t write_clr1(
         fprintf(fp_file,IND "default: return {(size_t)-1,(size_t)-1};\n} // case %zu\n",current_state->index);
         //
         current_actions.clear();
-    }
+    } // while(!worklist.empty())
 
     first_table.free();
     delete[] lr1_ias;
