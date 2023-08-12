@@ -556,6 +556,7 @@ struct RR_Conflict_Resolver{
 
 struct RS_Conflict_Resolver{
     FILE* out;
+    const Token_Datas& token_datas;
     size_t& rs_conflicts;
     size_t state;
 
@@ -1558,7 +1559,7 @@ size_t write_lr1_initial_actions(
     for(;b!=e;++b){
         const Token_Kind_t current_token = b->accessing_symbol();
         const Token_Data& current_td = token_datas[current_token];
-        if(!current_actions.empty_reductions.resolve_rs_conflict({fp_log,rs_conflicts,0},current_token,current_td))
+        if(!current_actions.empty_reductions.resolve_rs_conflict({fp_log,token_datas,rs_conflicts,0},current_token,current_td))
             continue;
         const typename Set<State>::const_iterator inserted = states.force_insert(item_set_type(std::move(yuki::as_non_const(*b))));
         worklist.emplace_back(inserted);
@@ -1698,6 +1699,10 @@ size_t write_lalr1(
     delete[] lr1_ias;
     delete[] lookahead_proplists;
 
+    const size_t nterms_size = token_datas.nterms.size();
+
+    bool* const reducible = new bool[nterms_size]{};
+
     for(const typename Set<LALR1_State<Token_Kind_t>>::const_iterator state : states_linear){
         fprintf(fp_file,"case %zu: S%zu: switch(t_.kind()){\n",state->index,state->index);
         typename yuki::Vector<LALR1_State<Token_Kind_t>*>::const_iterator transition = state->transitions.begin();
@@ -1712,18 +1717,27 @@ size_t write_lalr1(
             ++transition;
         }
         for(;transition!=transitions_end;++transition){
-            if(!reduction_set.resolve_rs_conflict({fp_log,rs_conflicts,state->index},(*transition)->item_set.accessing_symbol(),token_datas[(*transition)->item_set.accessing_symbol()]))
+            if(!reduction_set.resolve_rs_conflict({fp_log,token_datas,rs_conflicts,state->index},(*transition)->item_set.accessing_symbol(),token_datas[(*transition)->item_set.accessing_symbol()]))
                 continue;
             fprintf(fp_file,IND "case %s: p_.SHIFT_(std::move(t_),%zu); t_=l_.lex(); goto S%zu;\n",token_datas[(*transition)->item_set.accessing_symbol()].name_or_alias().c_str(),(*transition)->index,(*transition)->index);
         }
         print_reductions:
         for(const Reduction<Token_Kind_t> reduction : reduction_set){
-            if(reduction.valid())
+            if(reduction.valid()){
                 fprintf(fp_file,IND "case %s: p_.SET_STATE(%zu); return {%s,%zu};\n",token_datas[reduction.term].name_or_alias().c_str(),reduction.rule,token_datas[reduction.term].name_or_alias().c_str(),reduction.rule);
+                if(reduction.left!=(Token_Kind_t)-1)
+                    reducible[token_datas.to_co(reduction.left).idx]=true;
+            }
         }
         yuki::as_non_const(*state).reset();
         fprintf(fp_file,IND "default: return {(size_t)-1,(size_t)-1};\n} // case %zu\n",state->index);
     }
+
+    for(size_t i=0;i<nterms_size;++i)
+        if(!reducible[i])
+            fprintf(fp_err,"Warning: Non-reducible non-terminal - %s - !\n",token_datas.nterms[i].name_or_alias().c_str());
+
+    delete[] reducible;
 
     merge_and_propagate.print_secondary_incompatibilities(fp_err);
 
@@ -1803,6 +1817,10 @@ size_t write_clr1(
 
     RR_Conflict_Resolver rrcr = {fp_log,token_datas,rr_conflicts,0,0};
 
+    const size_t nterms_size = token_datas.nterms.size();
+
+    bool* const reducible = new bool[nterms_size]{};
+
     while(!worklist.empty()){
         const typename Set<CLR1_State>::const_iterator current_state = worklist.pop_front_v();
         typename CLR1_Item_Set<Token_Kind_t>::const_iterator current_item = current_state->item_set.begin();
@@ -1870,7 +1888,7 @@ size_t write_clr1(
             ++current_transitioned;
         }
         for(;current_transitioned!=transitions_end;++current_transitioned){
-            if(!current_actions.empty_reductions.resolve_rs_conflict({fp_log,rs_conflicts,current_state->index},current_transitioned->accessing_symbol(),token_datas[current_transitioned->accessing_symbol()]))
+            if(!current_actions.empty_reductions.resolve_rs_conflict({fp_log,token_datas,rs_conflicts,current_state->index},current_transitioned->accessing_symbol(),token_datas[current_transitioned->accessing_symbol()]))
                 continue;
             const yuki::IB_Pair<typename Set<CLR1_State>::const_iterator> ibp = states.template insert<Equal>(CLR1_Item_Set<Token_Kind_t>(std::move(yuki::as_non_const(*current_transitioned))));
             if(ibp.has_inserted)
@@ -1880,8 +1898,11 @@ size_t write_clr1(
         }
         print_reductions:
         for(const Reduction<Token_Kind_t> reduction : current_actions.empty_reductions){
-            if(reduction.valid())
+            if(reduction.valid()){
                 fprintf(fp_file,IND "case %s: p_.SET_STATE(%zu); return {%s,%zu};\n",token_datas[reduction.term].name_or_alias().c_str(),reduction.rule,token_datas[reduction.term].name_or_alias().c_str(),reduction.rule);
+                if(reduction.left!=(Token_Kind_t)-1)
+                    reducible[token_datas.to_co(reduction.left).idx]=true;
+            }
         }
         fprintf(fp_file,IND "default: return {(size_t)-1,(size_t)-1};\n} // case %zu\n",current_state->index);
         //
@@ -1890,6 +1911,12 @@ size_t write_clr1(
 
     first_table.free();
     delete[] lr1_ias;
+
+    for(size_t i=0;i<nterms_size;++i)
+        if(!reducible[i])
+            fprintf(fp_err,"Warning: Non-reducible non-terminal - %s - !\n",token_datas.nterms[i].name_or_alias().c_str());
+
+    delete[] reducible;
 
     if(rs_conflicts || rr_conflicts)
         fprintf(fp_err,"%zu RS-conflict(s), %zu RR-conflict(s) in total. See log for details.\n",rs_conflicts,rr_conflicts);
