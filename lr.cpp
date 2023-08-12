@@ -1582,10 +1582,11 @@ size_t write_lr1_initial_actions(
 
 template<typename Eq,std::unsigned_integral Token_Kind_t>
 size_t write_lalr1(
+    FILE* const fp_file,FILE* const fp_err,FILE* const fp_log,
     const bool,
     const Token_Datas& token_datas,
     const typename Make_LR1_IAs<Token_Kind_t>::Ret lr1_ias_ret,
-    FILE* const fp_file,FILE* const fp_err,FILE* const fp_log)
+    yuki::Vector<std::basic_string<Token_Kind_t>>& admissible_terms)
 {
     assert(fp_file); assert(fp_err); // Log-out is optional.
 
@@ -1708,6 +1709,7 @@ size_t write_lalr1(
         typename yuki::Vector<LALR1_State<Token_Kind_t>*>::const_iterator transition = state->transitions.begin();
         const typename yuki::Vector<LALR1_State<Token_Kind_t>*>::const_iterator transitions_end = state->transitions.end();
         Reduction_Set<Token_Kind_t>& reduction_set = yuki::as_non_const(state->reductions);
+        std::basic_string<Token_Kind_t> current_admissible_terms;
         while(1){
             if(transition==transitions_end)
                 goto print_reductions;
@@ -1720,17 +1722,20 @@ size_t write_lalr1(
             if(!reduction_set.resolve_rs_conflict({fp_log,token_datas,rs_conflicts,state->index},(*transition)->item_set.accessing_symbol(),token_datas[(*transition)->item_set.accessing_symbol()]))
                 continue;
             fprintf(fp_file,IND "case %s: p_.SHIFT_(std::move(t_),%zu); t_=l_.lex(); goto S%zu;\n",token_datas[(*transition)->item_set.accessing_symbol()].name_or_alias().c_str(),(*transition)->index,(*transition)->index);
+            current_admissible_terms.push_back((*transition)->item_set.accessing_symbol());
         }
         print_reductions:
         for(const Reduction<Token_Kind_t> reduction : reduction_set){
             if(reduction.valid()){
                 fprintf(fp_file,IND "case %s: p_.SET_STATE(%zu); return {%s,%zu};\n",token_datas[reduction.term].name_or_alias().c_str(),reduction.rule,token_datas[reduction.term].name_or_alias().c_str(),reduction.rule);
+                current_admissible_terms.push_back(reduction.term);
                 if(reduction.left!=(Token_Kind_t)-1)
                     reducible[token_datas.to_co(reduction.left).idx]=true;
             }
         }
-        yuki::as_non_const(*state).reset();
         fprintf(fp_file,IND "default: return {(size_t)-1,(size_t)-1};\n} // case %zu\n",state->index);
+        yuki::as_non_const(*state).reset();
+        admissible_terms.emplace_back(std::move(current_admissible_terms));
     }
 
     for(size_t i=0;i<nterms_size;++i)
@@ -1786,10 +1791,11 @@ struct Equal{
 
 template<std::unsigned_integral Token_Kind_t>
 size_t write_clr1(
+    FILE* const fp_file,FILE* const fp_err,FILE* const fp_log,
     const bool,
     const Token_Datas& token_datas,
     const typename Make_LR1_IAs<Token_Kind_t>::Ret lr1_ias_ret,
-    FILE* const fp_file,FILE* const fp_err,FILE* const fp_log)
+    yuki::Vector<std::basic_string<Token_Kind_t>>& admissible_terms)
 {
     assert(fp_file); assert(fp_err); // Log-out is optional.
 
@@ -1875,6 +1881,7 @@ size_t write_clr1(
         fprintf(fp_file,"case %zu: S%zu: switch(t_.kind()){\n",current_state->index,current_state->index);
         current_transitioned = current_actions.transitions.begin();
         const auto transitions_end = current_actions.transitions.end();
+        std::basic_string<Token_Kind_t> current_admissible_terms;
         while(1){
             if(current_transitioned==transitions_end)
                 goto print_reductions;
@@ -1895,18 +1902,20 @@ size_t write_clr1(
                 worklist.emplace_back(ibp.iterator);
             fprintf(fp_file,IND "case %s: p_.SHIFT_(std::move(t_),%zu); t_=l_.lex(); goto S%zu;\n",token_datas[ibp.iterator->item_set.accessing_symbol()].name_or_alias().c_str(),ibp.iterator->index,ibp.iterator->index);
             if(fp_log) fprintf(fp_log,"GOTO(%zu,%s)=%zu\n",current_state->index,token_datas[ibp.iterator->item_set.accessing_symbol()].name_or_alias().c_str(),ibp.iterator->index);
+            current_admissible_terms.push_back(ibp.iterator->item_set.accessing_symbol());
         }
         print_reductions:
         for(const Reduction<Token_Kind_t> reduction : current_actions.empty_reductions){
             if(reduction.valid()){
                 fprintf(fp_file,IND "case %s: p_.SET_STATE(%zu); return {%s,%zu};\n",token_datas[reduction.term].name_or_alias().c_str(),reduction.rule,token_datas[reduction.term].name_or_alias().c_str(),reduction.rule);
+                current_admissible_terms.push_back(reduction.term);
                 if(reduction.left!=(Token_Kind_t)-1)
                     reducible[token_datas.to_co(reduction.left).idx]=true;
             }
         }
         fprintf(fp_file,IND "default: return {(size_t)-1,(size_t)-1};\n} // case %zu\n",current_state->index);
-        //
         current_actions.clear();
+        admissible_terms.emplace_back(std::move(current_admissible_terms));
     } // while(!worklist.empty())
 
     first_table.free();
@@ -2323,30 +2332,31 @@ void write(const Cmd_Data& cmd_data,const Sec0_Data& sec0_data,const Rule_Set<To
     }else{
         fprintf(out,"constinit %s::Action_Table %s::action_table = {\n",sec0_data.parser_tables.c_str(),sec0_data.parser_tables.c_str());
     }
+    yuki::Vector<std::basic_string<Token_Kind_t>> admissible_terms;
     size_t state_size=0;
     switch(sec0_data.alg_type){
         case Sec0_Data::Alg_Type::NIL:{
             switch(cmd_data.alg_type){
                 case Cmd_Data::Alg_Type::PLR1:
-                    state_size = lr::write_lalr1<Weakly_Compatible,Token_Kind_t>(is_switch,sec0_data.token_datas,lr1_ias_ret,cmd_data.fp_out_cpp,stderr,fp_log);
+                    state_size = lr::write_lalr1<Weakly_Compatible,Token_Kind_t>(cmd_data.fp_out_cpp,stderr,fp_log,is_switch,sec0_data.token_datas,lr1_ias_ret,admissible_terms);
                     break;
                 case Cmd_Data::Alg_Type::CLR1:
-                    state_size = lr::write_clr1<Token_Kind_t>(is_switch,sec0_data.token_datas,lr1_ias_ret,cmd_data.fp_out_cpp,stderr,fp_log);
+                    state_size = lr::write_clr1<Token_Kind_t>(cmd_data.fp_out_cpp,stderr,fp_log,is_switch,sec0_data.token_datas,lr1_ias_ret,admissible_terms);
                     break;
                 case Cmd_Data::Alg_Type::LALR1:
-                    state_size = lr::write_lalr1<IsoCore,Token_Kind_t>(is_switch,sec0_data.token_datas,lr1_ias_ret,cmd_data.fp_out_cpp,stderr,fp_log);
+                    state_size = lr::write_lalr1<IsoCore,Token_Kind_t>(cmd_data.fp_out_cpp,stderr,fp_log,is_switch,sec0_data.token_datas,lr1_ias_ret,admissible_terms);
                     break;
             }
             break;
         }
         case Sec0_Data::Alg_Type::PLR1:
-            state_size = lr::write_lalr1<Weakly_Compatible,Token_Kind_t>(is_switch,sec0_data.token_datas,lr1_ias_ret,cmd_data.fp_out_cpp,stderr,fp_log);
+            state_size = lr::write_lalr1<Weakly_Compatible,Token_Kind_t>(cmd_data.fp_out_cpp,stderr,fp_log,is_switch,sec0_data.token_datas,lr1_ias_ret,admissible_terms);
             break;
         case Sec0_Data::Alg_Type::CLR1:
-            state_size = lr::write_clr1<Token_Kind_t>(is_switch,sec0_data.token_datas,lr1_ias_ret,cmd_data.fp_out_cpp,stderr,fp_log);
+            state_size = lr::write_clr1<Token_Kind_t>(cmd_data.fp_out_cpp,stderr,fp_log,is_switch,sec0_data.token_datas,lr1_ias_ret,admissible_terms);
             break;
         case Sec0_Data::Alg_Type::LALR1:
-            state_size = lr::write_lalr1<IsoCore,Token_Kind_t>(is_switch,sec0_data.token_datas,lr1_ias_ret,cmd_data.fp_out_cpp,stderr,fp_log);
+            state_size = lr::write_lalr1<IsoCore,Token_Kind_t>(cmd_data.fp_out_cpp,stderr,fp_log,is_switch,sec0_data.token_datas,lr1_ias_ret,admissible_terms);
             break;
     }
     if(is_switch){
