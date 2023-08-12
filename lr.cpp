@@ -1509,6 +1509,12 @@ void Merge_And_Propagate<Token_Kind_t>::doo(LALR1_State<Token_Kind_t>& state,It 
     } // if(!propagate_ass.empty())
 }
 
+template<std::unsigned_integral Token_Kind_t>
+struct Reducible{
+    const Token_Kind_t left;
+    bool reducible=false;
+};
+
 #define IND YUKI_PG_IND
 #define IND2 IND IND
 #define IND3 IND IND IND
@@ -1523,7 +1529,8 @@ size_t write_lr1_initial_actions(
     FILE* const fp_file,FILE* const fp_log,
     LR1_ImmActions<Item,Total_Size>& current_actions,
     Set<State>& states,
-    yuki::RingQueue<typename Set<State>::const_iterator>& worklist)
+    yuki::RingQueue<typename Set<State>::const_iterator>& worklist,
+    Reducible<typename Item::Token_Kind_t>* const reducible)
 {
     typedef typename Item::Token_Kind_t Token_Kind_t;
     typedef decltype(State{}.item_set) item_set_type;
@@ -1566,9 +1573,12 @@ size_t write_lr1_initial_actions(
         fprintf(fp_file,IND "case %s: p_.SHIFT_(std::move(t_),%zu); t_=l_.lex(); goto S%zu;\n",current_td.name_or_alias().c_str(),states.size(),states.size());
         if(fp_log) fprintf(fp_log,"GOTO(0,%s)=%zu\n",current_td.name_or_alias().c_str(),states.size());
     }
-    for(const Reduction<Token_Kind_t> empty_reduction : current_actions.empty_reductions)
-        if(empty_reduction.valid())
+    for(const Reduction<Token_Kind_t> empty_reduction : current_actions.empty_reductions){
+        if(empty_reduction.valid()){
             fprintf(fp_file,IND "case %s: p_.SET_STATE(%zu); return {%s,%zu};\n",token_datas[empty_reduction.term].name_or_alias().c_str(),empty_reduction.rule,token_datas[empty_reduction.term].name_or_alias().c_str(),empty_reduction.rule);
+            reducible[empty_reduction.rule].reducible=true;
+        }
+    }
     current_actions.clear();
     fputs(IND "default: return {(size_t)-1,(size_t)-1};\n} // case 0\n",fp_file);
     if(ghost_goal_state!=0){
@@ -1586,6 +1596,7 @@ size_t write_lalr1(
     const bool,
     const Token_Datas& token_datas,
     const typename Make_LR1_IAs<Token_Kind_t>::Ret lr1_ias_ret,
+    Reducible<Token_Kind_t>* const reducible, const size_t total_rules,
     yuki::Vector<std::basic_string<Token_Kind_t>>& admissible_terms)
 {
     assert(fp_file); assert(fp_err); // Log-out is optional.
@@ -1602,7 +1613,7 @@ size_t write_lalr1(
     yuki::RingQueue<typename Set<LALR1_State<Token_Kind_t>>::const_iterator> worklist;
 
     current_actions.merge({nullptr,token_datas,rr_conflicts,0,0},lr1_ias[token_datas.goal],token_datas.eof()); // There shouldn't be any rr-conflicts during this merge.
-    size_t rs_conflicts=write_lr1_initial_actions(token_datas,fp_file,fp_log,current_actions,states,worklist);
+    size_t rs_conflicts=write_lr1_initial_actions(token_datas,fp_file,fp_log,current_actions,states,worklist,reducible);
     yuki::Vector<typename Set<LALR1_State<Token_Kind_t>>::const_iterator> states_linear;
     for(const typename Set<LALR1_State<Token_Kind_t>>::const_iterator it : worklist)
         states_linear.emplace_back(it);
@@ -1700,10 +1711,7 @@ size_t write_lalr1(
     delete[] lr1_ias;
     delete[] lookahead_proplists;
 
-    const size_t nterms_size = token_datas.nterms.size();
-
-    bool* const reducible = new bool[nterms_size]{};
-
+    admissible_terms.reserve(states_linear.size());
     for(const typename Set<LALR1_State<Token_Kind_t>>::const_iterator state : states_linear){
         fprintf(fp_file,"case %zu: S%zu: switch(t_.kind()){\n",state->index,state->index);
         typename yuki::Vector<LALR1_State<Token_Kind_t>*>::const_iterator transition = state->transitions.begin();
@@ -1728,9 +1736,8 @@ size_t write_lalr1(
         for(const Reduction<Token_Kind_t> reduction : reduction_set){
             if(reduction.valid()){
                 fprintf(fp_file,IND "case %s: p_.SET_STATE(%zu); return {%s,%zu};\n",token_datas[reduction.term].name_or_alias().c_str(),reduction.rule,token_datas[reduction.term].name_or_alias().c_str(),reduction.rule);
+                reducible[reduction.rule].reducible=true;
                 current_admissible_terms.push_back(reduction.term);
-                if(reduction.left!=(Token_Kind_t)-1)
-                    reducible[token_datas.to_co(reduction.left).idx]=true;
             }
         }
         fprintf(fp_file,IND "default: return {(size_t)-1,(size_t)-1};\n} // case %zu\n",state->index);
@@ -1738,11 +1745,9 @@ size_t write_lalr1(
         admissible_terms.emplace_back(std::move(current_admissible_terms));
     }
 
-    for(size_t i=0;i<nterms_size;++i)
-        if(!reducible[i])
-            fprintf(fp_err,"Warning: Non-reducible non-terminal - %s - !\n",token_datas.nterms[i].name_or_alias().c_str());
-
-    delete[] reducible;
+    for(size_t i=1;i<total_rules;++i)
+        if(!reducible[i].reducible)
+            fprintf(fp_err,"Warning: Non-reducible rule %zu (%s) !\n",i,token_datas[reducible[i].left].name_or_alias().c_str());
 
     merge_and_propagate.print_secondary_incompatibilities(fp_err);
 
@@ -1795,6 +1800,7 @@ size_t write_clr1(
     const bool,
     const Token_Datas& token_datas,
     const typename Make_LR1_IAs<Token_Kind_t>::Ret lr1_ias_ret,
+    Reducible<Token_Kind_t>* const reducible, const size_t total_rules,
     yuki::Vector<std::basic_string<Token_Kind_t>>& admissible_terms)
 {
     assert(fp_file); assert(fp_err); // Log-out is optional.
@@ -1817,15 +1823,11 @@ size_t write_clr1(
     yuki::RingQueue<typename Set<CLR1_State>::const_iterator> worklist;
 
     current_actions.merge({nullptr,token_datas,rr_conflicts,0,0},lr1_ias[token_datas.goal],token_datas.eof()); // There shouldn't be any rr-conflicts during this merge.
-    size_t rs_conflicts=write_lr1_initial_actions(token_datas,fp_file,fp_log,current_actions,states,worklist);
+    size_t rs_conflicts=write_lr1_initial_actions(token_datas,fp_file,fp_log,current_actions,states,worklist,reducible);
 
     Lookaheads<Token_Kind_t> nterm_lookaheads;
 
     RR_Conflict_Resolver rrcr = {fp_log,token_datas,rr_conflicts,0,0};
-
-    const size_t nterms_size = token_datas.nterms.size();
-
-    bool* const reducible = new bool[nterms_size]{};
 
     while(!worklist.empty()){
         const typename Set<CLR1_State>::const_iterator current_state = worklist.pop_front_v();
@@ -1908,9 +1910,8 @@ size_t write_clr1(
         for(const Reduction<Token_Kind_t> reduction : current_actions.empty_reductions){
             if(reduction.valid()){
                 fprintf(fp_file,IND "case %s: p_.SET_STATE(%zu); return {%s,%zu};\n",token_datas[reduction.term].name_or_alias().c_str(),reduction.rule,token_datas[reduction.term].name_or_alias().c_str(),reduction.rule);
+                reducible[reduction.rule].reducible=true;
                 current_admissible_terms.push_back(reduction.term);
-                if(reduction.left!=(Token_Kind_t)-1)
-                    reducible[token_datas.to_co(reduction.left).idx]=true;
             }
         }
         fprintf(fp_file,IND "default: return {(size_t)-1,(size_t)-1};\n} // case %zu\n",current_state->index);
@@ -1921,17 +1922,15 @@ size_t write_clr1(
     first_table.free();
     delete[] lr1_ias;
 
-    for(size_t i=0;i<nterms_size;++i)
-        if(!reducible[i])
-            fprintf(fp_err,"Warning: Non-reducible non-terminal - %s - !\n",token_datas.nterms[i].name_or_alias().c_str());
-
-    delete[] reducible;
+    for(size_t i=1;i<total_rules;++i)
+        if(!reducible[i].reducible)
+            fprintf(fp_err,"Warning: Non-reducible rule %zu (%s) !\n",i,token_datas[reducible[i].left].name_or_alias().c_str());
 
     if(rs_conflicts || rr_conflicts)
         fprintf(fp_err,"%zu RS-conflict(s), %zu RR-conflict(s) in total. See log for details.\n",rs_conflicts,rr_conflicts);
 
     return states.size()+1;
-}
+} // write_clr1
 
 
 
@@ -2332,33 +2331,37 @@ void write(const Cmd_Data& cmd_data,const Sec0_Data& sec0_data,const Rule_Set<To
     }else{
         fprintf(out,"constinit %s::Action_Table %s::action_table = {\n",sec0_data.parser_tables.c_str(),sec0_data.parser_tables.c_str());
     }
+    Reducible<Token_Kind_t>* const reducible = yuki::Allocator<Reducible<Token_Kind_t>>::allocate(rules.size());
+    rules.recursive_traverse([reducible](const Rule<Token_Kind_t>& rule){::new(reducible+rule.num) Reducible<Token_Kind_t>{rule.left};});
     yuki::Vector<std::basic_string<Token_Kind_t>> admissible_terms;
     size_t state_size=0;
     switch(sec0_data.alg_type){
         case Sec0_Data::Alg_Type::NIL:{
             switch(cmd_data.alg_type){
                 case Cmd_Data::Alg_Type::PLR1:
-                    state_size = lr::write_lalr1<Weakly_Compatible,Token_Kind_t>(cmd_data.fp_out_cpp,stderr,fp_log,is_switch,sec0_data.token_datas,lr1_ias_ret,admissible_terms);
+                    state_size = lr::write_lalr1<Weakly_Compatible,Token_Kind_t>(cmd_data.fp_out_cpp,stderr,fp_log,is_switch,sec0_data.token_datas,lr1_ias_ret,reducible,rules.size(),admissible_terms);
                     break;
                 case Cmd_Data::Alg_Type::CLR1:
-                    state_size = lr::write_clr1<Token_Kind_t>(cmd_data.fp_out_cpp,stderr,fp_log,is_switch,sec0_data.token_datas,lr1_ias_ret,admissible_terms);
+                    state_size = lr::write_clr1<Token_Kind_t>(cmd_data.fp_out_cpp,stderr,fp_log,is_switch,sec0_data.token_datas,lr1_ias_ret,reducible,rules.size(),admissible_terms);
                     break;
                 case Cmd_Data::Alg_Type::LALR1:
-                    state_size = lr::write_lalr1<IsoCore,Token_Kind_t>(cmd_data.fp_out_cpp,stderr,fp_log,is_switch,sec0_data.token_datas,lr1_ias_ret,admissible_terms);
+                    state_size = lr::write_lalr1<IsoCore,Token_Kind_t>(cmd_data.fp_out_cpp,stderr,fp_log,is_switch,sec0_data.token_datas,lr1_ias_ret,reducible,rules.size(),admissible_terms);
                     break;
             }
             break;
         }
         case Sec0_Data::Alg_Type::PLR1:
-            state_size = lr::write_lalr1<Weakly_Compatible,Token_Kind_t>(cmd_data.fp_out_cpp,stderr,fp_log,is_switch,sec0_data.token_datas,lr1_ias_ret,admissible_terms);
+            state_size = lr::write_lalr1<Weakly_Compatible,Token_Kind_t>(cmd_data.fp_out_cpp,stderr,fp_log,is_switch,sec0_data.token_datas,lr1_ias_ret,reducible,rules.size(),admissible_terms);
             break;
         case Sec0_Data::Alg_Type::CLR1:
-            state_size = lr::write_clr1<Token_Kind_t>(cmd_data.fp_out_cpp,stderr,fp_log,is_switch,sec0_data.token_datas,lr1_ias_ret,admissible_terms);
+            state_size = lr::write_clr1<Token_Kind_t>(cmd_data.fp_out_cpp,stderr,fp_log,is_switch,sec0_data.token_datas,lr1_ias_ret,reducible,rules.size(),admissible_terms);
             break;
         case Sec0_Data::Alg_Type::LALR1:
-            state_size = lr::write_lalr1<IsoCore,Token_Kind_t>(cmd_data.fp_out_cpp,stderr,fp_log,is_switch,sec0_data.token_datas,lr1_ias_ret,admissible_terms);
+            state_size = lr::write_lalr1<IsoCore,Token_Kind_t>(cmd_data.fp_out_cpp,stderr,fp_log,is_switch,sec0_data.token_datas,lr1_ias_ret,reducible,rules.size(),admissible_terms);
             break;
     }
+    static_assert(std::is_trivially_destructible_v<Reducible<Token_Kind_t>>);
+    yuki::Allocator<Reducible<Token_Kind_t>>::deallocate(reducible,rules.size());
     if(is_switch){
         fprintf(out,
             "default: return {(size_t)-1,(size_t)-1};\n"

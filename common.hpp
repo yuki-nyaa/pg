@@ -236,7 +236,6 @@ struct Rule_Set : private yuki::MultiSet<Rule<Token_Kind_t>,typename Rule<Token_
     using MultiSet_::empty;
     using MultiSet_::size;
 
-    using typename MultiSet_::non_const_iterator;
     using typename MultiSet_::const_iterator;
 
     using MultiSet_::begin;
@@ -244,6 +243,9 @@ struct Rule_Set : private yuki::MultiSet<Rule<Token_Kind_t>,typename Rule<Token_
 
     using MultiSet_::end;
     const_iterator end(Token_Kind_t token) const {return first_equiv_greater({++token,std::basic_string<Token_Kind_t>(1,0),0});}
+
+    template<typename F>
+    void recursive_traverse(F&& f) const {return MultiSet_::recursive_traverse(std::forward<F>(f));}
 
     using MultiSet_::min;
     using MultiSet_::max;
