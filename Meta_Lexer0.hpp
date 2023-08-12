@@ -72,7 +72,7 @@ namespace sec0_impl{
     void right_or_left(Sec0_Data& data,Str_Loc* args,unsigned args_size,const size_t lineno,const size_t colno,const char* const filename){
         if(args_size==0){
             fprintf(stderr,"%zu:%zu - %s\n",lineno,colno,filename);
-            fprintf(stderr,"Warning: Empty %%left/%%right declaration!\n");
+            fputs("Warning: Empty %left/%right declaration!\n",stderr);
         }
         if constexpr(!continued)
             ++data.current_prec;
@@ -99,7 +99,7 @@ namespace sec0_impl{
     void prec(Sec0_Data& data,Str_Loc* args,unsigned args_size,const size_t lineno,const size_t colno,const char* const filename){
         if(args_size==0){
             fprintf(stderr,"%zu:%zu - %s\n",lineno,colno,filename);
-            fprintf(stderr,"Warning: Empty %%prec declaration!\n");
+            fputs("Warning: Empty %prec declaration!\n",stderr);
         }
         if constexpr(!continued)
             ++data.current_prec;
@@ -172,7 +172,7 @@ namespace sec0_impl{
         switch(args_size){
             case 0:
                 fprintf(stderr,"%zu:%zu - %s\n",lineno,colno,filename);
-                fprintf(stderr,"Warning: %%(n)term requires at least 1 argument!\n");
+                fputs("Warning: %(n)term requires at least 1 argument!\n",stderr);
                 return;
             case 1:
                 redef_error(*args);
@@ -219,7 +219,7 @@ namespace sec0_impl{
             case 0:
             case 1:
                 fprintf(stderr,"%zu:%zu - %s\n",lineno,colno,filename);
-                fprintf(stderr,"Warning: Empty %%code directive!\n");
+                fputs("Warning: Empty %code directive!\n",stderr);
                 return;
             default:
                 for(Sec0_Data::Code& code : data.codes){
@@ -256,7 +256,7 @@ namespace sec0_impl{
     [[noreturn]]
     inline void eof_error(const size_t lineno,const size_t colno,const char* const filename){
         fprintf(stderr,"%zu:%zu - %s\n",lineno,colno,filename);
-        fprintf(stderr,"Fatal Error: EOF encountered while parsing section 0!\n");
+        fputs("Fatal Error: EOF encountered while parsing section 0!\n",stderr);
         exit(EXIT_FAILURE);
     }
 } // namespace sec0_impl
@@ -316,7 +316,7 @@ inline Sec0_Data parse_sec0(FILE* const in,const char* const filename){
                     sec0_impl::eof_error(data.input.lineno,0,filename);
                 case 0:
                     fprintf(stderr,"%zu:%zu - %s\n",data.input.lineno_orig,data.input.colno_orig,filename);
-                    fprintf(stderr,"Error: Section 0 does not begin with \'%\'!\n");
+                    fputs("Error: Section 0 does not begin with \'%\'!\n",stderr);
                     ++data.errors;
                     break;
                 case static_cast<unsigned char>('\n'):
@@ -327,7 +327,7 @@ inline Sec0_Data parse_sec0(FILE* const in,const char* const filename){
             break;
         default:
             fprintf(stderr,"%zu:%zu - %s\n",data.input.lineno_orig,data.input.colno_orig,filename);
-            fprintf(stderr,"Error: Section 0 does not begin with \'%\'!\n");
+            fputs("Error: Section 0 does not begin with \'%\'!\n",stderr);
             ++data.errors;
             break;
     }
@@ -429,7 +429,7 @@ inline Sec0_Data parse_sec0(FILE* const in,const char* const filename){
                 switch(brace_level){
                     case 0:
                         fprintf(stderr,"%zu:%zu - %s\n",data.input.lineno_orig,data.input.colno_orig,filename);
-                        fprintf(stderr,"Error: Unpaired closing brace!\n");
+                        fputs("Error: Unpaired closing brace!\n",stderr);
                         ++data.errors;
                         goto find_next_arg;
                     case 1:

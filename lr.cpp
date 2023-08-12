@@ -1962,7 +1962,7 @@ void print_rule_escaped(FILE* const fp,const Rule<Token_Kind_t>& r,const Token_D
         fprintf(fp,"%s ->",print_rule_buf.c_str());
         print_rule_buf.clear();
     }else
-        fprintf(fp,"Goal_ ->");
+        fputs("Goal_ ->",fp);
 
     for(const Token_Kind_t k : r.rights){
         const std::string_view noa = token_datas[k].name_or_alias();
@@ -2029,7 +2029,7 @@ void write_parse_array(FILE* const out,const Sec0_Data& sec0_data,const Rule_Set
                     if(rule.rights.size()!=0)
                         fprintf(out,"{stack_[start_].token.location_range().begin,stack_[start_+%zu].token.location_range().end}",rule.rights.size()-1);
                     else
-                        fprintf(out,"{}");
+                        fputs("{}",out);
                     fprintf(out,"%s%s);\n", rule.init.empty() ? "" : ",", rule.init.c_str());
                     if(!td.types.empty())
                         fprintf(out,IND6 "%s& token_target_ = token_target_complete_.get<%zu>();\n\n",td.types[0].c_str(),td.vtoken_index);
@@ -2047,7 +2047,7 @@ void write_parse_array(FILE* const out,const Sec0_Data& sec0_data,const Rule_Set
                     if(rule.rights.size()!=0)
                         fprintf(out,",{token0_.location_range.begin,token%zu_.location_range.end}};\n\n", rule.rights.size()-1);
                     else
-                        fprintf(out,"};\n\n");
+                        fputs("};\n\n",out);
                 }
                 break;
             }
@@ -2066,7 +2066,7 @@ void write_parse_array(FILE* const out,const Sec0_Data& sec0_data,const Rule_Set
                     if(rule.rights.size()!=0)
                         fprintf(out,"{stack_[start_].token.location_range().begin,stack_[start_+%zu].token.location_range().end};\n", rule.rights.size()-1);
                     else
-                        fprintf(out,"{};\n");
+                        fputs("{};\n",out);
                     fprintf(out,
                         IND6 "YUKI_CONSTRUCT_BRACE(p_token_target_,%s);\n"
                         IND6 "Token::%s& token_target_ = *p_token_target_;\n\n",
@@ -2115,7 +2115,7 @@ void write_parse_array(FILE* const out,const Sec0_Data& sec0_data,const Rule_Set
                 rule.num
             );
             print_rule(out,rule,sec0_data.token_datas);
-            fprintf(out,"\n");
+            fputc(static_cast<unsigned char>('\n'),out);
         }
     } // for(const Rule<Token_Kind_t>& rule : rules)
     fprintf(out,
@@ -2177,7 +2177,7 @@ void write_parse_switch(FILE* const out,const Sec0_Data& sec0_data,const Rule_Se
                     if(rule.rights.size()!=0)
                         fprintf(out,"{stack_[start_].token.location_range().begin,stack_[start_+%zu].token.location_range().end}",rule.rights.size()-1);
                     else
-                        fprintf(out,"{}");
+                        fputs("{}",out);
                     fprintf(out,"%s%s);\n", rule.init.empty() ? "" : ",", rule.init.c_str());
                     if(!td.types.empty())
                         fprintf(out,IND4 "%s& token_target_ = token_target_complete_.get<%zu>();\n\n",td.types[0].c_str(),td.vtoken_index);
@@ -2195,7 +2195,7 @@ void write_parse_switch(FILE* const out,const Sec0_Data& sec0_data,const Rule_Se
                     if(rule.rights.size()!=0)
                         fprintf(out,",{token0_.location_range.begin,token%zu_.location_range.end}};\n\n", rule.rights.size()-1);
                     else
-                        fprintf(out,"};\n\n");
+                        fputs("};\n\n",out);
                 }
                 break;
             }
@@ -2214,7 +2214,7 @@ void write_parse_switch(FILE* const out,const Sec0_Data& sec0_data,const Rule_Se
                     if(rule.rights.size()!=0)
                         fprintf(out,"{stack_[start_].token.location_range().begin,stack_[start_+%zu].token.location_range().end};\n", rule.rights.size()-1);
                     else
-                        fprintf(out,"{};\n");
+                        fputs("{};\n",out);
                     fprintf(out,
                         IND4 "YUKI_CONSTRUCT_BRACE(p_token_target_,%s);\n"
                         IND4 "Token::%s& token_target_ = *p_token_target_;\n\n",
@@ -2263,7 +2263,7 @@ void write_parse_switch(FILE* const out,const Sec0_Data& sec0_data,const Rule_Se
                 rule.num
             );
             print_rule(out,rule,sec0_data.token_datas);
-            fprintf(out,"\n");
+            fputc(static_cast<unsigned char>('\n'),out);
         }
     } // for(const Rule<Token_Kind_t>& rule : rules)
     fprintf(out,
@@ -2385,7 +2385,7 @@ void write(const Cmd_Data& cmd_data,const Sec0_Data& sec0_data,const Rule_Set<To
     is_switch ? write_parse_switch(out,sec0_data,rules) : write_parse_array(out,sec0_data,rules);
     if(!sec0_data.nspace.empty())
         fprintf(out,"} // namespace %s\n",sec0_data.nspace.c_str());
-    fprintf(out,"\n");
+    fputc(static_cast<unsigned char>('\n'),out);
     for(const Sec0_Data::Code& code : sec0_data.codes){
         if(code.qualifier=="SEC2_"){
             fprintf(out,"%s\n",code.contents.c_str());
@@ -2395,7 +2395,7 @@ void write(const Cmd_Data& cmd_data,const Sec0_Data& sec0_data,const Rule_Set<To
 
 
     FILE* const out_h = cmd_data.fp_out_h;
-    fprintf(out_h,"#pragma once\n");
+    fputs("#pragma once\n",out_h);
     for(const Sec0_Data::Code& code : sec0_data.codes){
         if(code.qualifier=="h_top"){
             fprintf(out_h,"%s\n",code.contents.c_str());

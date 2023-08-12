@@ -29,8 +29,8 @@ struct Cmd_Data{
 
 namespace cmd_impl{
     YUKI_CMD_ONE_PARAM_OPTION(i,Cmd_Data,
-        fprintf(stderr,"Warning: Empty input filepath.\n"),
-        fprintf(stderr,"Warning: Multiple inputs specified. (Note: Enclose the path in quotes if it contains spaces.)\n"),
+        fputs("Warning: Empty input filepath.\n",stderr),
+        fputs("Warning: Multiple inputs specified. (Note: Enclose the path in quotes if it contains spaces.)\n",stderr),
         cmd_data.fp_in = fopen(argv[0],"r");
         if(!cmd_data.fp_in)
             fprintf(stderr,"Error: The input file \"%s\" somehow cannot be opened!\n",argv[0]);
@@ -39,68 +39,68 @@ namespace cmd_impl{
     )
 
     YUKI_CMD_ONE_PARAM_OPTION(o,Cmd_Data,
-        fprintf(stderr,"Warning: Empty output filepath.\n"),
-        fprintf(stderr,"Warning: Multiple outputs specified. (Note: Enclose the path in quotes if it contains spaces.)\n"),
+        fputs("Warning: Empty output filepath.\n",stderr),
+        fputs("Warning: Multiple outputs specified. (Note: Enclose the path in quotes if it contains spaces.)\n",stderr),
         cmd_data.out_cpp = argv[0];
     )
 
     YUKI_CMD_ONE_PARAM_OPTION(h,Cmd_Data,
-        fprintf(stderr,"Warning: Empty output header filepath.\n"),
-        fprintf(stderr,"Warning: Multiple output headers specified. (Note: Enclose the path in quotes if it contains spaces.)\n");
+        fputs("Warning: Empty output header filepath.\n",stderr),
+        fputs("Warning: Multiple output headers specified. (Note: Enclose the path in quotes if it contains spaces.)\n",stderr);
         cmd_data.out_h = argv[0];
     )
 
     YUKI_CMD_ONE_PARAM_OPTION(t,Cmd_Data,
-        fprintf(stderr,"Warning: Empty output token def filepath.\n"),
-        fprintf(stderr,"Warning: Multiple output token def files specified. (Note: Enclose the path in quotes if it contains spaces.)\n"),
+        fputs("Warning: Empty output token def filepath.\n",stderr),
+        fputs("Warning: Multiple output token def files specified. (Note: Enclose the path in quotes if it contains spaces.)\n",stderr),
         cmd_data.out_token = argv[0];
     )
 
     YUKI_CMD_ONE_PARAM_OPTION(l,Cmd_Data,
         cmd_data.default_log=true,
-        fprintf(stderr,"Warning: Multiple log paths specified. (Note: Enclose the path in quotes if it contains spaces.)\n"),
+        fputs("Warning: Multiple log paths specified. (Note: Enclose the path in quotes if it contains spaces.)\n",stderr),
         cmd_data.fp_log = fopen(argv[0],"w");
         if(!cmd_data.fp_log)
             fprintf(stderr,"Error: The log file \"%s\" somehow cannot be opened!\n",argv[0]);
     )
 
-    inline void version(FILE* const out) {fprintf(out,"pg by Yuki, version 1.0\n");}
+    inline void version(FILE* const out) {fputs("pg by Yuki, version 1.0\n",out);}
     inline void version(Cmd_Data&,const char*const*,const size_t argc){
         if(argc>0)
-            fprintf(stderr,"Warning: \"--version\" should take no arguments!\n");
+            fputs("Warning: \"--version\" should take no arguments!\n",stderr);
         version(stderr);
         exit(EXIT_SUCCESS);
     }
 
     inline void plr1(Cmd_Data& cmd_data,const char*const*,const size_t argc){
         if(argc>0)
-            fprintf(stderr,"Warning: \"--plr1\" should take no arguments!\n");
+            fputs("Warning: \"--plr1\" should take no arguments!\n",stderr);
         cmd_data.alg_type=Cmd_Data::Alg_Type::PLR1;
     }
     inline void clr1(Cmd_Data& cmd_data,const char*const*,const size_t argc){
         if(argc>0)
-            fprintf(stderr,"Warning: \"--clr1\" should take no arguments!\n");
+            fputs("Warning: \"--clr1\" should take no arguments!\n",stderr);
         cmd_data.alg_type=Cmd_Data::Alg_Type::CLR1;
     }
     inline void lalr1(Cmd_Data& cmd_data,const char*const*,const size_t argc){
         if(argc>0)
-            fprintf(stderr,"Warning: \"--lalr1\" should take no arguments!\n");
+            fputs("Warning: \"--lalr1\" should take no arguments!\n",stderr);
         cmd_data.alg_type=Cmd_Data::Alg_Type::LALR1;
     }
 
     inline void ft(Cmd_Data& cmd_data,const char*const*,const size_t argc){
         if(argc>0)
-            fprintf(stderr,"Warning: \"--ft\" should take no arguments!\n");
+            fputs("Warning: \"--ft\" should take no arguments!\n",stderr);
         cmd_data.ft=true;
     }
     inline void lr0_its(Cmd_Data& cmd_data,const char*const*,const size_t argc){
         if(argc>0)
-            fprintf(stderr,"Warning: \"--lr0-its\" should take no arguments!\n");
+            fputs("Warning: \"--lr0-its\" should take no arguments!\n",stderr);
         cmd_data.lr0_its=true;
     }
     inline void lr1_ias(Cmd_Data& cmd_data,const char*const*,const size_t argc){
         if(argc>0)
-            fprintf(stderr,"Warning: \"--lr1-ias\" should take no arguments!\n");
+            fputs("Warning: \"--lr1-ias\" should take no arguments!\n",stderr);
         cmd_data.lr1_ias=true;
     }
 }
@@ -122,7 +122,7 @@ inline constexpr yuki::Cmd_Option<Cmd_Data> coarr[] = {
 
 inline bool Cmd_Data::post_process(){
     if(!fp_in){
-        fprintf(stderr,"Fatal Error: No input is specified! (Note: use \"-i\" to specify input file.)\n");
+        fputs("Fatal Error: No input is specified! (Note: use \"-i\" to specify input file.)\n",stderr);
         return false;
     }
 
@@ -130,7 +130,7 @@ inline bool Cmd_Data::post_process(){
     const auto [input_no_ext,input_ext] = yuki::vsplit_filename(in);
 
     if(input_ext=="cpp" || input_ext=="h" || input_ext=="hpp" || input_ext=="log"){
-        fprintf(stderr,"Fatal Error: The input file has extension \".cpp\", \".h\", \".hpp\", or \".log\", which might collide with the output files!\n");
+        fputs("Fatal Error: The input file has extension \".cpp\", \".h\", \".hpp\", or \".log\", which might collide with the output files!\n",stderr);
         return false;
     }
 

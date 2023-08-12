@@ -182,7 +182,7 @@ Goal_    {
 }
 
 \$\$    {
-    fprintf(stderr,"Error: Target token being referred to in the target token initializer!\n");
+    fputs("Error: Target token being referred to in the target token initializer!\n",stderr);
     ++sec0_data.errors;
     switch(sec0_data.token_impl_type){
         case Sec0_Data::Token_Impl_Type::VARIANT:{
@@ -239,7 +239,7 @@ Goal_    {
 }
 
 \$!\$    {
-    fprintf(stderr,"Error: Target token being referred to in the target token initializer!\n");
+    fputs("Error: Target token being referred to in the target token initializer!\n",stderr);
     ++sec0_data.errors;
     switch(sec0_data.token_impl_type){
         case Sec0_Data::Token_Impl_Type::VARIANT: str_temp0.append("(token_target_complete_.location_range())");break;
@@ -280,7 +280,7 @@ Goal_    {
 }
 
 \$\$    {
-    fprintf(stderr,"Error: Target token being referred to in the target token initializer!\n");
+    fputs("Error: Target token being referred to in the target token initializer!\n",stderr);
     ++sec0_data.errors;
     switch(sec0_data.token_impl_type){
         case Sec0_Data::Token_Impl_Type::VARIANT:{
@@ -337,7 +337,7 @@ Goal_    {
 }
 
 \$!\$    {
-    fprintf(stderr,"Error: Target token being referred to in the target token initializer!\n");
+    fputs("Error: Target token being referred to in the target token initializer!\n",stderr);
     ++sec0_data.errors;
     switch(sec0_data.token_impl_type){
         case Sec0_Data::Token_Impl_Type::VARIANT: str_temp0.append("(token_target_complete_.location_range())");break;
