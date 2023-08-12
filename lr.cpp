@@ -118,7 +118,7 @@ struct Rule_View{
         num(0),
         prec_sr(-1),
         prec_rr(-1),
-        left(0)
+        left(-1)
     {}
 
     constexpr Rule_View(const Rule<Token_Kind_t>& rule) noexcept :
@@ -238,7 +238,7 @@ struct Item_Set : private Total_Size{
     void clear() {Total_Size::clear(); set_.clear(); reductions_size_.clear(); /*traits_.clear();*/}
 
     yuki::IB_Pair<const_iterator> emplace(const Rule_View<Token_Kind_t> rule,const Token_Kind_t c){
-        assert(set_.empty() || get_accessing_symbol(rule.rights,c)==accessing_symbol());
+        assert(set_.empty() || rule.num==0 || get_accessing_symbol(rule.rights,c)==accessing_symbol());
         const yuki::IB_Pair<const_iterator> result = set_.emplace_at({rule.rights,c},rule,c);
         if(result.has_inserted){
             Total_Size::advance(1);
@@ -250,7 +250,7 @@ struct Item_Set : private Total_Size{
 
     template<typename... L>
     yuki::IB_Pair<const_iterator> emplace(const Rule_View<Token_Kind_t> rule,const Token_Kind_t c,L&&... lookaheads){
-        assert(set_.empty() || get_accessing_symbol(rule.rights,c)==accessing_symbol());
+        assert(set_.empty() || rule.num==0 || get_accessing_symbol(rule.rights,c)==accessing_symbol());
         if constexpr(has_lookaheads<Item>){
             auto lookahead_count_this = [](const L&... args)->size_t {
                 if constexpr(std::is_same_v<Total_Size,One_Size>)
@@ -568,9 +568,11 @@ struct RS_Conflict_Resolver{
             : current.prec_sr<shift_token.prec;
         if(out){
             fprintf(out,
-                "RS-conflict at state %zu at - %s -. (rule=%zu,prec_sr=%u) (prec=%u,assoc=%s). Resolved to %s.\n",
+                "RS-conflict at state %zu at - %s -. (rule=%zu(%s),prec_sr=%u) (prec=%u,assoc=%s). Resolved to %s.\n",
                 state,shift_token.name_or_alias().c_str(),
-                current.rule,current.prec_sr,
+                current.rule,
+                current.left==(Token_Kind_t)-1 ? "Goal_" : token_datas[current.left].name_or_alias().c_str(),
+                current.prec_sr,
                 shift_token.prec,shift_token.assoc==Assoc::LEFT?"LEFT":"RIGHT",
                 result ? "SHIFT" : "REDUCE"
             );
@@ -719,8 +721,7 @@ struct Lookahead_PropList{
             const auto item = (*transition)->item_set.find({rights,1});
             assert(item!=(*transition)->item_set.end());
             for(const Token_Kind_t t : src)
-                if(!item->lookaheads.contains(t))
-                    yuki::as_non_const(item->lookaheads_pending).insert(t);
+                yuki::as_non_const(item->lookaheads_pending).insert(t);
         }
     }
 };
