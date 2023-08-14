@@ -1747,7 +1747,7 @@ size_t write_lalr1(
 
     for(size_t i=1;i<total_rules;++i)
         if(!reducible[i].reducible)
-            fprintf(fp_err,"Warning: Non-reducible rule %zu (%s) !\n",i,token_datas[reducible[i].left].name_or_alias().c_str());
+            fprintf(fp_err,"Warning: Non-reducible production %zu (%s) !\n",i,token_datas[reducible[i].left].name_or_alias().c_str());
 
     merge_and_propagate.print_secondary_incompatibilities(fp_err);
 
@@ -1924,7 +1924,7 @@ size_t write_clr1(
 
     for(size_t i=1;i<total_rules;++i)
         if(!reducible[i].reducible)
-            fprintf(fp_err,"Warning: Non-reducible rule %zu (%s) !\n",i,token_datas[reducible[i].left].name_or_alias().c_str());
+            fprintf(fp_err,"Warning: Non-reducible production %zu (%s) !\n",i,token_datas[reducible[i].left].name_or_alias().c_str());
 
     if(rs_conflicts || rr_conflicts)
         fprintf(fp_err,"%zu RS-conflict(s), %zu RR-conflict(s) in total. See log for details.\n",rs_conflicts,rr_conflicts);
@@ -2378,8 +2378,6 @@ void write(const Cmd_Data& cmd_data,const Sec0_Data& sec0_data,const Rule_Set<To
         );
     }
     fprintf(out,"constinit %s::Goto_Table %s::goto_table = {\n",sec0_data.parser_tables.c_str(),sec0_data.parser_tables.c_str());
-    rewind(cmd_data.fp_goto);
-    yuki::concat_file(out,cmd_data.fp_goto);
     fprintf(out,
         "}; // constinit %s::Goto_Table %s::goto_table\n"
         "\n",

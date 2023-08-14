@@ -42,6 +42,7 @@ case 2: S2: switch(t_.kind()){
     case meta_char: p_.SET_STATE(11); return {meta_char,11};
     case basic_char_class: p_.SET_STATE(11); return {basic_char_class,11};
     case "(": p_.SET_STATE(11); return {"(",11};
+    case ")": p_.SET_STATE(11); return {")",11};
     case "[": p_.SET_STATE(11); return {"[",11};
     case "*": p_.SET_STATE(11); return {"*",11};
     case "+": p_.SET_STATE(11); return {"+",11};
@@ -58,6 +59,7 @@ case 3: S3: switch(t_.kind()){
     case meta_char: p_.SET_STATE(12); return {meta_char,12};
     case basic_char_class: p_.SET_STATE(12); return {basic_char_class,12};
     case "(": p_.SET_STATE(12); return {"(",12};
+    case ")": p_.SET_STATE(12); return {")",12};
     case "[": p_.SET_STATE(12); return {"[",12};
     case "*": p_.SET_STATE(12); return {"*",12};
     case "+": p_.SET_STATE(12); return {"+",12};
@@ -74,6 +76,7 @@ case 4: S4: switch(t_.kind()){
     case meta_char: p_.SET_STATE(13); return {meta_char,13};
     case basic_char_class: p_.SET_STATE(13); return {basic_char_class,13};
     case "(": p_.SET_STATE(13); return {"(",13};
+    case ")": p_.SET_STATE(13); return {")",13};
     case "[": p_.SET_STATE(13); return {"[",13};
     case "*": p_.SET_STATE(13); return {"*",13};
     case "+": p_.SET_STATE(13); return {"+",13};
@@ -90,12 +93,15 @@ case 5: S5: switch(t_.kind()){
     case meta_char: p_.SET_STATE(23); return {meta_char,23};
     case basic_char_class: p_.SET_STATE(23); return {basic_char_class,23};
     case "(": p_.SET_STATE(23); return {"(",23};
+    case ")": p_.SET_STATE(23); return {")",23};
     case "[": p_.SET_STATE(23); return {"[",23};
+    case "]": p_.SET_STATE(23); return {"]",23};
     case "*": p_.SET_STATE(23); return {"*",23};
     case "+": p_.SET_STATE(23); return {"+",23};
     case "?": p_.SET_STATE(23); return {"?",23};
     case "|": p_.SET_STATE(23); return {"|",23};
     case "^": p_.SET_STATE(23); return {"^",23};
+    case "-": p_.SET_STATE(23); return {"-",23};
     case esc_N: p_.SET_STATE(23); return {esc_N,23};
     case EOF_: p_.SET_STATE(23); return {EOF_,23};
     default: return {(size_t)-1,(size_t)-1};
@@ -184,6 +190,7 @@ case 11: S11: switch(t_.kind()){
     case meta_char: p_.SET_STATE(7); return {meta_char,7};
     case basic_char_class: p_.SET_STATE(7); return {basic_char_class,7};
     case "(": p_.SET_STATE(7); return {"(",7};
+    case ")": p_.SET_STATE(7); return {")",7};
     case "[": p_.SET_STATE(7); return {"[",7};
     case "*": p_.SET_STATE(7); return {"*",7};
     case "+": p_.SET_STATE(7); return {"+",7};
@@ -200,6 +207,7 @@ case 12: S12: switch(t_.kind()){
     case meta_char: p_.SET_STATE(4); return {meta_char,4};
     case basic_char_class: p_.SET_STATE(4); return {basic_char_class,4};
     case "(": p_.SET_STATE(4); return {"(",4};
+    case ")": p_.SET_STATE(4); return {")",4};
     case "[": p_.SET_STATE(4); return {"[",4};
     case "*": p_.SET_STATE(4); return {"*",4};
     case "+": p_.SET_STATE(4); return {"+",4};
@@ -216,6 +224,7 @@ case 13: S13: switch(t_.kind()){
     case meta_char: p_.SET_STATE(5); return {meta_char,5};
     case basic_char_class: p_.SET_STATE(5); return {basic_char_class,5};
     case "(": p_.SET_STATE(5); return {"(",5};
+    case ")": p_.SET_STATE(5); return {")",5};
     case "[": p_.SET_STATE(5); return {"[",5};
     case "*": p_.SET_STATE(5); return {"*",5};
     case "+": p_.SET_STATE(5); return {"+",5};
@@ -232,6 +241,7 @@ case 14: S14: switch(t_.kind()){
     case meta_char: p_.SET_STATE(6); return {meta_char,6};
     case basic_char_class: p_.SET_STATE(6); return {basic_char_class,6};
     case "(": p_.SET_STATE(6); return {"(",6};
+    case ")": p_.SET_STATE(6); return {")",6};
     case "[": p_.SET_STATE(6); return {"[",6};
     case "*": p_.SET_STATE(6); return {"*",6};
     case "+": p_.SET_STATE(6); return {"+",6};

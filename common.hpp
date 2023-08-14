@@ -52,9 +52,9 @@ struct Token_Datas{
 
     Token_Data& operator[](const Coordinate co) {return (co.is_term ? terms : nterms)[co.idx];}
     const Token_Data& operator[](const Coordinate co) const {return (co.is_term ? terms : nterms)[co.idx];}
-    Token_Data& operator[](const std::string& s) {return operator[](token_htable[s]);}
 
-    Coordinate at(const std::string& s) const noexcept(false) {return token_htable.at(s);}
+    Token_Data& at(const std::string& s) noexcept(false) {return operator[](token_htable.at(s));}
+    const Token_Data& at(const std::string& s) const noexcept(false) {return operator[](token_htable.at(s));}
 
     template<std::unsigned_integral Token_Kind_t>
     const Token_Data& operator[](const Token_Kind_t k) const {return operator[](to_co(k));}
@@ -143,14 +143,18 @@ struct Sec0_Data{
             return c;
         }
 
-        /// @return `0` if the next byte is not '/'; `EOF` if the next byte is '/' the skipping ends with `EOF`; `(unsigned char)'\n'` if the next byte is '/' the skipping ends with it.
+        /// @return `0` if the next byte is not '/'; `EOF` or `(unsigned char)'\n'` if the next byte is '/' and the last skipped byte (when this skipping is over) is it.
+        /// @note `lineno_orig` and `colno_orig` are not trakced during skipping since they're of no use in this case.
         int try_skip_comment(FILE* const in){
             if(const int peek=fgetc(in); peek==static_cast<unsigned char>('/')){
+                ++colno;
                 while(1){
-                    switch(const int peek1=fgetc(in); peek1){
-                        case EOF: return EOF;
-                        case static_cast<unsigned char>('\r'): fgetc(in); [[fallthrough]];
-                        case static_cast<unsigned char>('\n'): ++lineno; colno=1; return static_cast<unsigned char>('\n');
+                    using namespace yuki::literals;
+                    switch(const yuki::U8Char peek1(in); peek1.raw()){
+                        case yuki::EOF_U8.raw(): return EOF;
+                        case '\r'_u8.raw(): fgetc(in); [[fallthrough]];
+                        case '\n'_u8.raw(): ++lineno; colno=1; return static_cast<unsigned char>('\n');
+                        default: ++colno; break;
                     }
                 }
             }else{
@@ -184,118 +188,63 @@ struct Rule{
     std::string init;
     std::string code;
 
-    friend bool operator==(const Rule& lhs,const Rule& rhs) noexcept {
-        return lhs.left==rhs.left && lhs.rights==rhs.rights;
-    }
-
     void clear(){
         rights.clear();
-        num = 0;
-        prec_sr = 0;
-        prec_rr = 0;
+        prec_sr=0;
+        prec_rr=0;
+        init.clear();
+        code.clear();
     }
-
-    bool is_goal() const {return left==(Token_Kind_t)-1;}
 
     Token_Kind_t first() const {return rights.empty()? -1 : rights[0];}
-
-    struct Rough_Less;
 };
 
 template<std::unsigned_integral Token_Kind_t>
-struct Rule<Token_Kind_t>::Rough_Less{
-    static std::strong_ordering compare3(const Rule<Token_Kind_t>& lhs,const Rule<Token_Kind_t>& rhs){
-        if(std::strong_ordering cmp=lhs.left<=>rhs.left; cmp!=0) return cmp;
-        if(std::strong_ordering cmp=lhs.first()<=>rhs.first(); cmp!=0) return cmp;
-        if(std::strong_ordering cmp=lhs.rights.size()<=>rhs.rights.size(); cmp!=0) return cmp;
-        return std::strong_ordering::equal;
-    }
-
-    static bool operator()(const Rule<Token_Kind_t>& lhs,const Rule<Token_Kind_t>& rhs) {return compare3(lhs,rhs)<0;}
-};
-
-
-template<std::unsigned_integral Token_Kind_t>
-struct Rule_Set : private yuki::MultiSet<Rule<Token_Kind_t>,typename Rule<Token_Kind_t>::Rough_Less> {
+struct Rule_Set{
   private:
-    typedef yuki::MultiSet<Rule<Token_Kind_t>,typename Rule<Token_Kind_t>::Rough_Less> MultiSet_;
+    struct Rule_Less{
+        static std::strong_ordering compare3(const Rule<Token_Kind_t>& lhs,const Rule<Token_Kind_t>& rhs){
+            if(std::strong_ordering cmp=lhs.left<=>rhs.left; cmp!=0) return cmp;
+            if(std::strong_ordering cmp=lhs.first()<=>rhs.first(); cmp!=0) return cmp;
+            if(std::strong_ordering cmp=lhs.rights.size()<=>rhs.rights.size(); cmp!=0) return cmp;
+            return std::strong_ordering::equal;
+        }
+
+        static bool operator()(const Rule<Token_Kind_t>& lhs,const Rule<Token_Kind_t>& rhs) {return compare3(lhs,rhs)<0;}
+    };
+
+    yuki::MultiSet<Rule<Token_Kind_t>,Rule_Less> ms;
   public:
-    using typename MultiSet_::key_type;
-    using typename MultiSet_::value_type;
-    using typename MultiSet_::key_compare;
-    using typename MultiSet_::allocator_type;
-    using typename MultiSet_::pointer;
-    using typename MultiSet_::const_pointer;
-    using typename MultiSet_::size_type;
-    using typename MultiSet_::difference_type;
+    bool empty() const {return ms.empty();}
+    size_t size() const {return ms.size();}
 
-    using MultiSet_::MultiSet_;
-    friend void swap(Rule_Set& lhs,Rule_Set& rhs) noexcept {swap(static_cast<MultiSet_&>(lhs),static_cast<MultiSet_&>(rhs));}
+    typedef typename yuki::MultiSet<Rule<Token_Kind_t>,Rule_Less>::const_iterator const_iterator;
 
-    using MultiSet_::clear;
-    using MultiSet_::empty;
-    using MultiSet_::size;
+    const_iterator begin() const {return ms.begin();}
+    const_iterator begin(const Token_Kind_t token) const {return ms.first_equiv_greater({token,std::basic_string<Token_Kind_t>(1,0),0});}
 
-    using typename MultiSet_::const_iterator;
-
-    using MultiSet_::begin;
-    const_iterator begin(const Token_Kind_t token) const {return first_equiv_greater({token,std::basic_string<Token_Kind_t>(1,0),0});}
-
-    using MultiSet_::end;
-    const_iterator end(Token_Kind_t token) const {return first_equiv_greater({++token,std::basic_string<Token_Kind_t>(1,0),0});}
+    const_iterator end() const {return ms.end();}
+    const_iterator end(Token_Kind_t token) const {return ms.first_equiv_greater({++token,std::basic_string<Token_Kind_t>(1,0),0});}
 
     template<typename F>
-    void recursive_traverse(F&& f) const {return MultiSet_::recursive_traverse(std::forward<F>(f));}
+    void recursive_traverse(F&& f) const {ms.recursive_traverse(std::forward<F>(f));}
 
-    using MultiSet_::min;
-    using MultiSet_::max;
+    yuki::IB_Pair<const_iterator> insert_goal(Rule<Token_Kind_t>&& rule){
+        assert(rule.left==(Token_Kind_t)-1);
+        rule.num=0;
+        return ms.insert_unique(std::move(rule));
+    }
 
-    using MultiSet_::first_greater;
-    using MultiSet_::first_equiv_greater;
-
-    const_iterator find(const key_type& k) const {
-        const_iterator feg = first_equiv_greater(k);
-        const const_iterator fg = first_greater(k);
+    bool insert(Rule<Token_Kind_t>&& rule){
+        assert(rule.left!=(Token_Kind_t)-1);
+        const_iterator feg = ms.first_equiv_greater(rule);
+        const const_iterator fg = ms.first_greater(rule);
         for(;feg!=fg;++feg)
-            if(*feg==k)
-                return feg;
-        return end();
-    }
-
-    bool contains(const key_type& k) const {
-        const_iterator feg = first_equiv_greater(k);
-        const const_iterator fg = first_greater(k);
-        for(;feg!=fg;++feg)
-            if(*feg==k)
-                return true;
-        return false;
-    }
-
-    size_type count(const key_type& k) const {return contains(k) ? 1 : 0;}
-
-    template<typename... Args>
-    yuki::IB_Pair<const_iterator> emplace(Args&&... args){
-        const const_iterator i = MultiSet_::emplace(std::forward<Args>(args)...);
-        for(const_iterator feg = first_equiv_greater(*i);feg!=i;++feg){
-            if(*feg==*i){
-                MultiSet_::erase(feg);
-                return {i,false};
-            }
-        }
-        return {i,true};
-    }
-
-    // Used for debugging.
-    template<typename... Args>
-    yuki::IB_Pair<const_iterator> emplace(const Token_Kind_t left,std::basic_string<Token_Kind_t> rights,const size_t num,Args&&... others){
-        const const_iterator i = MultiSet_::emplace(left,std::move(rights),num,std::forward<Args>(others)...);
-        for(const_iterator feg = first_equiv_greater(*i);feg!=i;++feg){
-            if(*feg==*i){
-                MultiSet_::erase(feg);
-                return {i,false};
-            }
-        }
-        return {i,true};
+            if(feg->rights==rule.rights)
+                return false;
+        rule.num = size()+1;
+        ms.emplace(std::move(rule));
+        return true;
     }
 };
 } // namespace yuki::pg
@@ -541,3 +490,13 @@ struct Make_FT : protected TC_Context<Token_Kind_t>{
     }
 };
 } // namespace yuki::pg
+
+namespace yuki::pg{
+inline void print_loc(FILE* const out,const size_t lineno,const size_t colno,const char* const filename){
+    fprintf(out,"%zu:%zu - %s\n",lineno,colno,filename);
+}
+[[noreturn]] inline void eof_error(){
+    fputs("Fatal Error: No production was specified!\n",stderr);
+    exit(EXIT_FAILURE);
+}
+}

@@ -19,7 +19,7 @@ namespace sec0_impl{
     #define YUKI_PG_META_ML0_ZERO_PARAM(name,...) \
     inline void name(Sec0_Data& data,Str_Loc* const,unsigned const args_size,const size_t lineno,const size_t colno,const char* const filename){ \
         if(args_size!=0){ \
-            fprintf(stderr,"%zu:%zu - %s\n",lineno,colno,filename); \
+            print_loc(stderr,lineno,colno,filename); \
             fputs("Warning: %" #name " does not expect any arguments!\n",stderr); \
         } \
         __VA_ARGS__ \
@@ -46,11 +46,11 @@ namespace sec0_impl{
     inline void name(Sec0_Data& data,Str_Loc* const args,unsigned const args_size,const size_t lineno,const size_t colno,const char* const filename){ \
         switch(args_size){ \
             case 0: \
-                fprintf(stderr,"%zu:%zu - %s\n",lineno,colno,filename); \
+                print_loc(stderr,lineno,colno,filename); \
                 fputs("Warning: %" #name "without argument!\n",stderr); \
                 return; \
             default: \
-                fprintf(stderr,"%zu:%zu - %s\n",lineno,colno,filename); \
+                print_loc(stderr,lineno,colno,filename); \
                 fputs("Error: %" #name "with more than one arguments! (Note: Did you mistype some spaces?)\n",stderr); \
                 ++data.errors; \
                 [[fallthrough]]; \
@@ -71,16 +71,16 @@ namespace sec0_impl{
     template<Assoc assoc,bool continued>
     void right_or_left(Sec0_Data& data,Str_Loc* args,unsigned args_size,const size_t lineno,const size_t colno,const char* const filename){
         if(args_size==0){
-            fprintf(stderr,"%zu:%zu - %s\n",lineno,colno,filename);
+            print_loc(stderr,lineno,colno,filename);
             fputs("Warning: Empty %left/%right declaration!\n",stderr);
         }
         if constexpr(!continued)
             ++data.current_prec;
         for(;args_size!=0;++args,--args_size){
             try{
-                const Token_Datas::Coordinate co = data.token_datas.at(args->str);
+                const Token_Datas::Coordinate co = data.token_datas.token_htable.at(args->str);
                 if(!co.is_term){
-                    fprintf(stderr,"%zu:%zu - %s\n",args->lineno,args->colno,filename);
+                    print_loc(stderr,args->lineno,args->colno,filename);
                     fprintf(stderr,"Warning: %%left/%%right for non-terminals makes no sense: %s\n",args->str.c_str());
                 }else{
                     Token_Data& td = data.token_datas[co];
@@ -88,7 +88,7 @@ namespace sec0_impl{
                     td.assoc = assoc;
                 }
             }catch(const std::out_of_range&){
-                fprintf(stderr,"%zu:%zu - %s\n",args->lineno,args->colno,filename);
+                print_loc(stderr,args->lineno,args->colno,filename);
                 fprintf(stderr,"Error: Unknown token name encountered while parsing %%left/%%right declaration: %s\n",args->str.c_str());
                 ++data.errors;
             }
@@ -98,22 +98,22 @@ namespace sec0_impl{
     template<bool continued>
     void prec(Sec0_Data& data,Str_Loc* args,unsigned args_size,const size_t lineno,const size_t colno,const char* const filename){
         if(args_size==0){
-            fprintf(stderr,"%zu:%zu - %s\n",lineno,colno,filename);
+            print_loc(stderr,lineno,colno,filename);
             fputs("Warning: Empty %prec declaration!\n",stderr);
         }
         if constexpr(!continued)
             ++data.current_prec;
         for(;args_size!=0;++args,--args_size){
             try{
-                const Token_Datas::Coordinate co = data.token_datas.at(args->str);
+                const Token_Datas::Coordinate co = data.token_datas.token_htable.at(args->str);
                 if(!co.is_term){
-                    fprintf(stderr,"%zu:%zu - %s\n",args->lineno,args->colno,filename);
+                    print_loc(stderr,args->lineno,args->colno,filename);
                     fprintf(stderr,"Warning: %%prec for non-terminals makes no sense: %s\n",args->str.c_str());
                 }else{
                     data.token_datas[co].prec = data.current_prec;
                 }
             }catch(const std::out_of_range&){
-                fprintf(stderr,"%zu:%zu - %s\n",args->lineno,args->colno,filename);
+                print_loc(stderr,args->lineno,args->colno,filename);
                 fprintf(stderr,"Error: Unknown token name encountered while parsing %%prec declaration: %s\n",args->str.c_str());
                 ++data.errors;
             }
@@ -161,7 +161,7 @@ namespace sec0_impl{
 
         auto redef_error = [&data,filename,&terms](const Str_Loc& str_loc){
             if(!data.token_datas.token_htable.try_emplace(str_loc.str,is_term,terms.size()).second){
-                fprintf(stderr,"%zu:%zu - %s\n",str_loc.lineno,str_loc.colno,filename);
+                print_loc(stderr,str_loc.lineno,str_loc.colno,filename);
                 fprintf(stderr,"Error: Redefinition of token \"%s\"!\n",str_loc.str.c_str());
                 ++data.errors;
                 return;
@@ -171,7 +171,7 @@ namespace sec0_impl{
         // %(n)term accepts at most 4 arguments: (N)ame, (A)lias, (D)ef, a(L)loc.
         switch(args_size){
             case 0:
-                fprintf(stderr,"%zu:%zu - %s\n",lineno,colno,filename);
+                print_loc(stderr,lineno,colno,filename);
                 fputs("Warning: %(n)term requires at least 1 argument!\n",stderr);
                 return;
             case 1:
@@ -218,8 +218,8 @@ namespace sec0_impl{
         switch(args_size){
             case 0:
             case 1:
-                fprintf(stderr,"%zu:%zu - %s\n",lineno,colno,filename);
-                fputs("Warning: Empty %code directive!\n",stderr);
+                print_loc(stderr,lineno,colno,filename);
+                fprintf(stderr,"Warning: Empty %%code %s section! (Note: Single-line comments are ignored.)\n",args->str.c_str());
                 return;
             default:
                 for(Sec0_Data::Code& code : data.codes){
@@ -234,7 +234,7 @@ namespace sec0_impl{
                         return;
                     }
                 }
-                fprintf(stderr,"%zu:%zu - %s\n",args->lineno,args->colno,filename);
+                print_loc(stderr,args->lineno,args->colno,filename);
                 fprintf(stderr,"Error: Unknown code qualifier \"%s\"!\n",args->str.c_str());
                 return;
         }
@@ -252,13 +252,6 @@ namespace sec0_impl{
             static constexpr bool operator()(const Sec0_Entry se) {return !se.action;}
         };
     };
-
-    [[noreturn]]
-    inline void eof_error(const size_t lineno,const size_t colno,const char* const filename){
-        fprintf(stderr,"%zu:%zu - %s\n",lineno,colno,filename);
-        fputs("Fatal Error: EOF encountered while parsing section 0!\n",stderr);
-        exit(EXIT_FAILURE);
-    }
 } // namespace sec0_impl
 
 
@@ -309,13 +302,13 @@ inline Sec0_Data parse_sec0(FILE* const in,const char* const filename){
         u8c=data.input.get(in);
     switch(u8c.raw()){
         case yuki::EOF_U8.raw():
-            sec0_impl::eof_error(data.input.lineno,data.input.colno,filename);
+            eof_error();
         case '/'_u8.raw():
             switch(data.input.try_skip_comment(in)){
                 case EOF:
-                    sec0_impl::eof_error(data.input.lineno,0,filename);
+                    eof_error();
                 case 0:
-                    fprintf(stderr,"%zu:%zu - %s\n",data.input.lineno_orig,data.input.colno_orig,filename);
+                    print_loc(stderr,data.input.lineno_orig,data.input.colno_orig,filename);
                     fputs("Error: Section 0 does not begin with \'%\'!\n",stderr);
                     ++data.errors;
                     break;
@@ -326,7 +319,7 @@ inline Sec0_Data parse_sec0(FILE* const in,const char* const filename){
         case '%'_u8.raw():
             break;
         default:
-            fprintf(stderr,"%zu:%zu - %s\n",data.input.lineno_orig,data.input.colno_orig,filename);
+            print_loc(stderr,data.input.lineno_orig,data.input.colno_orig,filename);
             fputs("Error: Section 0 does not begin with \'%\'!\n",stderr);
             ++data.errors;
             break;
@@ -355,7 +348,7 @@ inline Sec0_Data parse_sec0(FILE* const in,const char* const filename){
             );
             arg_current=0;
         }else{
-            fprintf(stderr,"%zu:%zu - %s\n",args[0].lineno,args[0].colno,filename);
+            print_loc(stderr,args[0].lineno,args[0].colno,filename);
             fprintf(stderr,"Error: Unknown section 0 directive \"%s\"!\n",args[0].str.c_str());
             ++data.errors;
             arg_current=0;
@@ -371,10 +364,11 @@ inline Sec0_Data parse_sec0(FILE* const in,const char* const filename){
         u8c=data.input.get(in);
     switch(u8c.raw()){
         case yuki::EOF_U8.raw():
-            sec0_impl::eof_error(data.input.lineno,data.input.colno,filename);
+            eof_error();
         case '/'_u8.raw():
             switch(data.input.try_skip_comment(in)){
-                case EOF: sec0_impl::eof_error(data.input.lineno,0,filename);
+                case EOF: eof_error();
+                case 0: break;
                 case static_cast<unsigned char>('\n'): goto skip_spaces;
             }
             break;
@@ -384,9 +378,8 @@ inline Sec0_Data parse_sec0(FILE* const in,const char* const filename){
   parse:
     switch(u8c.raw()){
         case yuki::EOF_U8.raw():
-            args_eof:
             shipout(data,filename);
-            sec0_impl::eof_error(data.input.lineno,data.input.colno,filename);
+            eof_error();
         case '%'_u8.raw():
             if(!quote_mode && brace_level==0){
                 if(args[0].str.empty())
@@ -428,7 +421,7 @@ inline Sec0_Data parse_sec0(FILE* const in,const char* const filename){
             if(!quote_mode){
                 switch(brace_level){
                     case 0:
-                        fprintf(stderr,"%zu:%zu - %s\n",data.input.lineno_orig,data.input.colno_orig,filename);
+                        print_loc(stderr,data.input.lineno_orig,data.input.colno_orig,filename);
                         fputs("Error: Unpaired closing brace!\n",stderr);
                         ++data.errors;
                         goto find_next_arg;
@@ -443,7 +436,7 @@ inline Sec0_Data parse_sec0(FILE* const in,const char* const filename){
             goto write_to_args_and_continue;
         case '/'_u8.raw():
             switch(data.input.try_skip_comment(in)){
-                case EOF: goto args_eof;
+                case EOF: shipout(data,filename); eof_error();
                 case 0: goto write_to_args_and_continue;
                 case static_cast<unsigned char>('\n'): u8c=U'\n'; goto args_space;
             }
@@ -475,7 +468,7 @@ inline Sec0_Data parse_sec0(FILE* const in,const char* const filename){
             u8c.write_to(args[arg_current].str);
         }else{
             args_limit_error:
-            fprintf(stderr,"%zu:%zu - %s\n",data.input.lineno_orig,data.input.colno_orig,filename);
+            print_loc(stderr,data.input.lineno_orig,data.input.colno_orig,filename);
             fprintf(stderr,"Error: Argument number exceeds implementation limit %d!\n",YUKI_PG_SEC0_MAX_AGRS);
             ++data.errors;
             skip_mode=true;

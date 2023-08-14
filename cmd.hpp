@@ -22,8 +22,6 @@ struct Cmd_Data{
     FILE* fp_out_token = nullptr;
     FILE* fp_log = nullptr;
 
-    FILE* fp_goto = tmpfile();
-
     bool post_process();
 };
 

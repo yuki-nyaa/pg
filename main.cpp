@@ -1,7 +1,5 @@
 #include"cconfig"
-#include"cmd.hpp"
-#include"Meta_Lexer0.hpp"
-#include"Meta_Lexer1.h"
+#include"common.hpp"
 
 namespace yuki::pg{
 void write_traits_alloc(FILE* const out_token,const char* const ts_cstr,const yuki::Vector<Token_Data>& nterms,const yuki::Vector<Token_Data>& terms);
@@ -333,6 +331,7 @@ void write_traits_alloc(FILE* const out_token,const char* const ts_cstr,const yu
 
 
 
+#include"cmd.hpp"
 namespace yuki::pg::lr{
 template<std::unsigned_integral Token_Kind_t>
 void write(const Cmd_Data& cmd_data,const Sec0_Data& sec0_data,const Rule_Set<Token_Kind_t>& rules);
@@ -341,6 +340,9 @@ void write(const Cmd_Data& cmd_data,const Sec0_Data& sec0_data,const Rule_Set<To
 
 
 
+
+#include"Meta_Lexer0.hpp"
+#include"Meta_Lexer1.hpp"
 int main(const int argc,const char*const*const argv){
     if(argc<=1){
         yuki::pg::cmd_impl::version(stdout);
@@ -367,43 +369,24 @@ int main(const int argc,const char*const*const argv){
     fclose(cmd_data.fp_out_token);
     cmd_data.fp_out_token=nullptr;
 
-    unsigned total_errors=0;
-
-    try{
-        switch(yuki::uint_auto_f(sec0_data.token_datas.nterms.size()+sec0_data.token_datas.terms.size()+1)){
-            case yuki::uint_enum::UCHAR:{
-                yuki::pg::Meta_Lexer1<unsigned char> meta_lexer1(cmd_data.fp_in,std::move(sec0_data));
-                meta_lexer1.lex();
-                yuki::pg::lr::write<unsigned char>(cmd_data,meta_lexer1.sec0_data,meta_lexer1.rs);
-                total_errors=meta_lexer1.sec0_data.errors;
-                break;
-            }
-            case yuki::uint_enum::USHORT:{
-                yuki::pg::Meta_Lexer1<unsigned short> meta_lexer1(cmd_data.fp_in,std::move(sec0_data));
-                meta_lexer1.lex();
-                yuki::pg::lr::write<unsigned short>(cmd_data,meta_lexer1.sec0_data,meta_lexer1.rs);
-                total_errors=meta_lexer1.sec0_data.errors;
-                break;
-            }
-            case yuki::uint_enum::UINT:{
-                yuki::pg::Meta_Lexer1<unsigned> meta_lexer1(cmd_data.fp_in,std::move(sec0_data));
-                meta_lexer1.lex();
-                yuki::pg::lr::write<unsigned>(cmd_data,meta_lexer1.sec0_data,meta_lexer1.rs);
-                total_errors=meta_lexer1.sec0_data.errors;
-                break;
-            }
-            default:
-                fprintf(stderr,"Fatal Error: Token count exceeds implementation limit %u!\n",std::numeric_limits<unsigned>::max());
-                fprintf(stderr,"%u errors encountered.\n",sec0_data.errors+1);
-                return EXIT_FAILURE;
-        }
-        if(total_errors!=0){
-            fprintf(stderr,"%u errors encountered.\n",total_errors);
-            return EXIT_FAILURE;
-        }else
-            return EXIT_SUCCESS;
-    }catch(const std::runtime_error& e){
-        fprintf(stderr,"ICE: %s\n",e.what());
-        return EXIT_FAILURE;
+    switch(yuki::uint_auto_f(sec0_data.token_datas.nterms.size()+sec0_data.token_datas.terms.size()+1)){
+        case yuki::uint_enum::UCHAR:
+            yuki::pg::lr::write(cmd_data,sec0_data,parse_sec12<unsigned char>(sec0_data,cmd_data.fp_in,cmd_data.in.data()));
+            break;
+        case yuki::uint_enum::USHORT:
+            yuki::pg::lr::write(cmd_data,sec0_data,parse_sec12<unsigned short>(sec0_data,cmd_data.fp_in,cmd_data.in.data()));
+            break;
+        case yuki::uint_enum::UINT:
+            yuki::pg::lr::write(cmd_data,sec0_data,parse_sec12<unsigned>(sec0_data,cmd_data.fp_in,cmd_data.in.data()));
+            break;
+        default:
+            fprintf(stderr,"Fatal Error: Token count exceeds implementation limit %u!\n",std::numeric_limits<unsigned>::max());
+            ++sec0_data.errors;
+            break;
     }
+    if(sec0_data.errors!=0){
+        fprintf(stderr,"%u errors encountered.\n",sec0_data.errors);
+        return EXIT_FAILURE;
+    }else
+        return EXIT_SUCCESS;
 }
