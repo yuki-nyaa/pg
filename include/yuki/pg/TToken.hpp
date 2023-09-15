@@ -105,34 +105,32 @@ struct TToken: Semantics_Tuple_Impl_<std::make_index_sequence<sizeof...(Ts)>,Ts.
 static_assert(std::is_aggregate_v<TToken<unsigned,100,int,double,const char*,const int&>>,"You need C++17 or later to make `yuki::pg::Semantics_Tuple` an aggregate!");
 
 
-template<typename TS>
-struct Any_TToken{
+template<typename TS,typename Loc>
+struct Any_TToken : private Loc{
     typedef typename TS::Token_Kind_t Token_Kind_t;
 
     constexpr Token_Kind_t kind() const noexcept {return kind_;}
-    constexpr Location_Range location_range() const noexcept {return location_range_;}
     constexpr bool empty() const noexcept {return static_cast<bool>(p_base);}
+    constexpr Loc& location() {return *this;}
+    constexpr const Loc& location() const {return *this;}
 
     constexpr Any_TToken() noexcept = default;
 
     template<typename T> requires TS::template is_token_v<T>
-    explicit constexpr Any_TToken(T*& p_token_other,const Location_Range location_range_p={}) noexcept : kind_(T::kind_static),location_range_(location_range_p),p_base(p_token_other) {p_token_other=nullptr;}
-
-    template<typename T> requires TS::template is_token_v<T>
-    explicit constexpr Any_TToken(T*&& p_token_other,const Location_Range location_range_p={}) noexcept : kind_(T::kind_static),location_range_(location_range_p),p_base(p_token_other) {p_token_other=nullptr;}
+    explicit constexpr Any_TToken(T*& p_token_other,const Loc& loc={}) noexcept : Loc(loc), kind_(T::kind_static),p_base(p_token_other) {p_token_other=nullptr;}
 
     Any_TToken(const Any_TToken&) = delete;
-    constexpr Any_TToken(Any_TToken&& other) noexcept : kind_(other.kind_),location_range_(other.location_range_),p_base(other.p_base) {other.p_base=nullptr;}
+    constexpr Any_TToken(Any_TToken&& other) noexcept : Loc(static_cast<Loc&&>(other)),kind_(other.kind_),p_base(other.p_base) {other.p_base=nullptr;}
 
     Any_TToken& operator=(const Any_TToken&) = delete;
     Any_TToken& operator=(Any_TToken&& other) noexcept {
         if(this!=&other){
             if(p_base){
-                YUKI_PG_DBGO_ANY_TOKEN_MOVE_ASSIGN("`any_token` fallback destructor called in move assignment with kind {}.\n",kind_);
-                alloc.dynamic_destroy_deallocate(kind_,p_base);
+                YUKI_PG_DBGO_ANY_TTOKEN_MOVE_ASSIGN("`Any_TToken` fallback destructor called in move assignment with kind {}.\n",kind_);
+                TS::alloc.dynamic_destroy_deallocate(kind_,p_base);
             }
+            Loc::operator=(static_cast<Loc&&>(other));
             kind_=other.kind_;
-            location_range_=other.location_range_;
             p_base=other.p_base;
             other.p_base=nullptr;
         }
@@ -141,16 +139,16 @@ struct Any_TToken{
 
     ~Any_TToken() noexcept {
         if(p_base){
-            YUKI_PG_DBGO_ANY_TOKEN_DTOR("`any_token` fallback destructor called with kind {}.\n",kind_);
-            alloc.dynamic_destroy_deallocate(kind_,p_base);
+            YUKI_PG_DBGO_ANY_TTOKEN_DTOR("`Any_TToken` fallback destructor called with kind {}.\n",kind_);
+            TS::alloc.dynamic_destroy_deallocate(kind_,p_base);
         }
     }
 
     friend constexpr void swap(Any_TToken& lhs,Any_TToken& rhs) noexcept {
         using std::swap;
+        swap(static_cast<Loc&>(lhs),static_cast<Loc&>(rhs));
         swap(lhs.kind_,rhs.kind_);
         swap(lhs.p_base,rhs.p_base);
-        swap(lhs.location_range,rhs.location_range);
     }
 
     template<typename T> requires TS::template is_token_v<T>
@@ -159,7 +157,7 @@ struct Any_TToken{
         assert(p_base);
         if constexpr(!std::is_trivially_destructible_v<T>)
             static_cast<T*>(p_base)->~T();
-        alloc.template deallocate<T>(p_base);
+        TS::alloc.template deallocate<T>(p_base);
         p_base=nullptr;
     }
 
@@ -191,11 +189,5 @@ struct Any_TToken{
   private:
     Token_Kind_t kind_=-1;
     TToken_Base* p_base=nullptr;
-    Location_Range location_range_={};
-  public:
-    static typename TS::Allocator alloc;
 }; // struct Any_TToken
-
-template<typename TS>
-typename TS::Allocator Any_TToken<TS>::alloc{};
 } // namespace yuki::pg

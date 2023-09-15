@@ -13,6 +13,8 @@ struct Location_Range{
     Location_Point end={};
 };
 
+struct No_Location {};
+
 enum struct Token_Impl_Type : unsigned char {VARIANT,SIMPLE,TUPLE};
 
 template<typename TS>
