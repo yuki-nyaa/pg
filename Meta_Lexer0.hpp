@@ -32,9 +32,6 @@ namespace sec0_impl{
     YUKI_PG_META_ML0_ZERO_PARAM(clr1,data.alg_type=Sec0_Data::Alg_Type::CLR1;)
     YUKI_PG_META_ML0_ZERO_PARAM(lalr1,data.alg_type=Sec0_Data::Alg_Type::LALR1;)
 
-    YUKI_PG_META_ML0_ZERO_PARAM(action_switch,data.is_switch=true;)
-    YUKI_PG_META_ML0_ZERO_PARAM(action_array,data.is_switch=false;)
-
     YUKI_PG_META_ML0_ZERO_PARAM(no_final_function,data.no_final_function=true;)
     YUKI_PG_META_ML0_ZERO_PARAM(no_final_class,data.no_final_class=true;)
     YUKI_PG_META_ML0_ZERO_PARAM(no_default_ctor,data.no_default_ctor=true;)
@@ -62,9 +59,10 @@ namespace sec0_impl{
 
     YUKI_PG_META_ML0_ONE_PARAM(nspace,data.nspace=std::move(args->str);)
     YUKI_PG_META_ML0_ONE_PARAM(parser,data.parser=std::move(args->str);)
-    YUKI_PG_META_ML0_ONE_PARAM(ts,data.ts=std::move(args->str);)
+    YUKI_PG_META_ML0_ONE_PARAM(token_settings,data.ts=std::move(args->str);)
     YUKI_PG_META_ML0_ONE_PARAM(lexer,data.lexer=std::move(args->str);)
-    YUKI_PG_META_ML0_ONE_PARAM(pt,data.parser_tables=std::move(args->str);)
+    YUKI_PG_META_ML0_ONE_PARAM(parser_tables,data.parser_tables=std::move(args->str);)
+    YUKI_PG_META_ML0_ONE_PARAM(debug_prefix,data.debug_prefix=std::move(args->str);)
 
     YUKI_PG_META_ML0_ONE_PARAM(simple_token, data.sp_token=std::move(args->str); data.token_impl_type=Sec0_Data::Token_Impl_Type::SIMPLE;)
 
@@ -263,16 +261,15 @@ constexpr yuki::CHashTable_Str<sec0_impl::Sec0_Entry,sec0_impl::Sec0_Entry::SV,s
     {"lalr1",sec0_impl::lalr1},
     {"variant_token",sec0_impl::variant_token},
     {"tuple_token",sec0_impl::tuple_token},
-    {"action_switch",sec0_impl::action_switch},
-    {"action_array",sec0_impl::action_array},
     {"no_final_function",sec0_impl::no_final_function},
     {"no_final_class",sec0_impl::no_final_class},
     {"no_default_ctor",sec0_impl::no_default_ctor},
     {"namespace",sec0_impl::nspace},
     {"parser",sec0_impl::parser},
-    {"token_settings",sec0_impl::ts},
+    {"token_settings",sec0_impl::token_settings},
     {"lexer",sec0_impl::lexer},
-    {"parser_tables",sec0_impl::pt},
+    {"parser_tables",sec0_impl::parser_tables},
+    {"debug_prefix",sec0_impl::debug_prefix},
     {"simple_token",sec0_impl::simple_token},
     {"default_left",sec0_impl::default_left},
     {"default_right",sec0_impl::default_right},

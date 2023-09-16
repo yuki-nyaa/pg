@@ -83,6 +83,10 @@ struct Sec0_Data{
     std::string ts = "Token_Settings";
     std::string lexer = "Lexer";
     std::string parser_tables;
+    std::string debug_prefix;
+
+    std::string nspace_head;
+    std::string nspace_tail;
 
     std::string sp_token;
 
@@ -91,8 +95,6 @@ struct Sec0_Data{
     bool no_final_function = false;
     bool no_final_class = false;
     bool no_default_ctor = false;
-
-    bool is_switch = true;
 
     enum struct Alg_Type : unsigned char {NIL,PLR1,CLR1,LALR1} alg_type = Alg_Type::NIL;
 

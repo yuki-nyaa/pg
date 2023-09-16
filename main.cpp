@@ -32,10 +32,12 @@ void write_token(FILE* const out_token,Sec0_Data& sec0_data){
         case Sec0_Data::Token_Impl_Type::SIMPLE: fputs("#include<yuki/pg/SToken.hpp>\n\n",out_token);break;
         case Sec0_Data::Token_Impl_Type::TUPLE: fputs("#include<yuki/pg/TToken.hpp>\n#include<yuki/Allocator.hpp>\n\n",out_token);break;
     }
-    if(!sec0_data.nspace.empty())
-        fprintf(out_token,"namespace %s{\n",sec0_data.nspace.c_str());
-    fprintf(out_token,"struct %s{\n",sec0_data.ts.c_str());
-    fputs(IND "static constexpr yuki::pg::Token_Impl_Type token_impl_type = yuki::pg::Token_Impl_Type::",out_token);
+    fprintf(out_token,
+        "%s\n"
+        "struct %s{\n"
+        IND "static constexpr yuki::pg::Token_Impl_Type token_impl_type = yuki::pg::Token_Impl_Type::",
+        sec0_data.nspace_head.c_str(), sec0_data.ts.c_str()
+    );
     switch(token_impl_type){
         case Sec0_Data::Token_Impl_Type::VARIANT: fputs("VARIANT;\n\n",out_token);break;
         case Sec0_Data::Token_Impl_Type::SIMPLE: fputs("SIMPLE;\n\n",out_token);break;
@@ -43,13 +45,10 @@ void write_token(FILE* const out_token,Sec0_Data& sec0_data){
     }
     fprintf(out_token,
         IND "static constexpr size_t token_total = %zu;\n"
-        IND "typedef yuki::uint_auto_t<token_total> Token_Kind_t;\n",
-        nterms.size()+terms.size()
-    );
-    fputs(
+        IND "typedef yuki::uint_auto_t<token_total> Token_Kind_t;\n"
         IND "struct Token_Kind{\n"
         IND2 "enum enum_t : Token_Kind_t {",
-        out_token
+        nterms.size()+terms.size()
     );
     // Finalize `sec0_data` while printing token names.
     const Assoc assoc0 = sec0_data.assoc0;
@@ -117,13 +116,11 @@ void write_token(FILE* const out_token,Sec0_Data& sec0_data){
         IND "static constexpr Token_Kind_t terminal_first = Token_Kind::%s;\n"
         IND "static constexpr Token_Kind_t terminal_last = Token_Kind::EOF_;\n"
         IND "static constexpr Token_Kind_t eof_ = Token_Kind::EOF_;\n"
-        "\n",
-        nterms[0].name.c_str(), nterms.back().name.c_str(), terms[0].name.c_str()
-    );
-    fprintf(out_token,
+        "\n"
         IND "static constexpr size_t nterminal_total = %zu;\n"
         IND "static constexpr size_t terminal_total = %zu;\n"
         "\n",
+        nterms[0].name.c_str(), nterms.back().name.c_str(), terms[0].name.c_str(),
         nterms.size(), terms.size()
     );
     fputs(
@@ -193,24 +190,24 @@ void write_token(FILE* const out_token,Sec0_Data& sec0_data){
                 "%s"
                 IND "> Token_t;\n"
                 IND "typedef void Token;\n"
-                "}; // struct %s\n",
+                "}; // struct %s\n"
+                "%s\n",
                 token_count%YUKI_PG_VTOKEN_MAX_LINE_ITEM==0 ? "" : "\n",
-                sec0_data.ts.c_str()
+                sec0_data.ts.c_str(),
+                sec0_data.nspace_tail.c_str()
             );
-            if(!sec0_data.nspace.empty())
-                fprintf(out_token,"} // namespace %s\n",sec0_data.nspace.c_str());
             break;
         }
         case Sec0_Data::Token_Impl_Type::SIMPLE:{
             fprintf(out_token,
                 IND "typedef yuki::pg::SToken<Token_Kind_t,%s> Token_t;\n"
                 IND "typedef void Token;\n"
-                "}; // struct %s\n",
+                "}; // struct %s\n"
+                "%s\n",
                 sec0_data.sp_token.c_str(),
-                sec0_data.ts.c_str()
+                sec0_data.ts.c_str(),
+                sec0_data.nspace_tail.c_str()
             );
-            if(!sec0_data.nspace.empty())
-                fprintf(out_token,"} // namespace %s\n",sec0_data.nspace.c_str());
             break;
         }
         case Sec0_Data::Token_Impl_Type::TUPLE:{
@@ -236,8 +233,8 @@ void write_token(FILE* const out_token,Sec0_Data& sec0_data){
             }
             fputs(IND "}; // struct Token\n\n",out_token);
             write_traits_alloc(out_token,sec0_data.ts.c_str(),nterms,terms);
-            if(!sec0_data.nspace.empty())
-                fprintf(out_token,"} // namespace %s\n",sec0_data.nspace.c_str());
+            fputs(sec0_data.nspace_tail.c_str(),out_token);
+            fputc(static_cast<unsigned char>('\n'),out_token);
             break;
         }
     }
@@ -365,6 +362,13 @@ int main(const int argc,const char*const*const argv){
     sec0_data.token_datas.terms.back().assoc=yuki::pg::Assoc::LEFT;
     if(sec0_data.parser_tables.empty())
         (sec0_data.parser_tables=sec0_data.parser).append("_Tables");
+    if(sec0_data.debug_prefix.empty())
+        sec0_data.debug_prefix.append("YUKI_PG_").append(sec0_data.parser).append("_DBG");
+    if(!sec0_data.nspace.empty()){
+        sec0_data.nspace_head.append("namespace ").append(sec0_data.nspace).push_back('{');
+        sec0_data.nspace_tail.append("} // namespace ").append(sec0_data.nspace);
+    }
+
     yuki::pg::write_token(cmd_data.fp_out_token,sec0_data);
     fclose(cmd_data.fp_out_token);
     cmd_data.fp_out_token=nullptr;

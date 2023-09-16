@@ -1593,7 +1593,6 @@ size_t write_lr1_initial_actions(
 template<typename Eq,std::unsigned_integral Token_Kind_t>
 size_t write_lalr1(
     FILE* const fp_file,FILE* const fp_err,FILE* const fp_log,
-    const bool,
     const Token_Datas& token_datas,
     const typename Make_LR1_IAs<Token_Kind_t>::Ret lr1_ias_ret,
     Reducible<Token_Kind_t>* const reducible, const size_t total_rules,
@@ -1797,7 +1796,6 @@ struct Equal{
 template<std::unsigned_integral Token_Kind_t>
 size_t write_clr1(
     FILE* const fp_file,FILE* const fp_err,FILE* const fp_log,
-    const bool,
     const Token_Datas& token_datas,
     const typename Make_LR1_IAs<Token_Kind_t>::Ret lr1_ias_ret,
     Reducible<Token_Kind_t>* const reducible, const size_t total_rules,
@@ -1978,163 +1976,6 @@ void print_rule_escaped(FILE* const fp,const Rule<Token_Kind_t>& r,const Token_D
     }
 }
 
-template<std::unsigned_integral Token_Kind_t>
-void write_parse_array(FILE* const out,const Sec0_Data& sec0_data,const Rule_Set<Token_Kind_t>& rules){
-    fprintf(out,
-        "int %s::parse(%s& l_){\n"
-        IND "namespace ypg = yuki::pg;\n"
-        "\n"
-        IND "reset();\n"
-        IND "stack_.reserve(%zu);\n"
-        "\n"
-        IND "Token_t t_ = l_.lex();\n"
-        "\n"
-        IND "while(true){\n"
-        IND2 "switch(action_table(state_,t_.kind()).kind()){\n"
-        IND3 "case ypg::LR1_Action_Kind::S:{\n"
-        IND4 "state_ = action_table(state_,t_.kind()).state();\n"
-        IND4 "stack_.emplace_back(std::move(t_),state_);\n"
-        IND4 "t_ = l_.lex();\n"
-        IND4 "goto loop_end_;\n"
-        IND3 "}\n"
-        IND3 "case ypg::LR1_Action_Kind::R:{\n"
-        IND4 "switch(action_table(state_,t_.kind()).rule()){\n",
-        sec0_data.parser.c_str(), sec0_data.lexer.c_str(),
-        sec0_data.lr1_stack_reserve
-    );
-
-    for(const Rule<Token_Kind_t>& rule : rules){
-        fprintf(out, IND5 "case %zu:{ // ",rule.num);
-        print_rule(out,rule,sec0_data.token_datas);
-        fprintf(out,
-            "\n"
-            IND6 "assert(stack_.size()>=%zu);\n"
-            IND6 "const size_t start_ = stack_.size()-%zu;\n",
-            rule.rights.size(), rule.rights.size()
-        );
-        switch(sec0_data.token_impl_type){
-            case Sec0_Data::Token_Impl_Type::VARIANT:{
-                for(size_t i = 0;i<rule.rights.size();++i){
-                    const Token_Data& td = sec0_data.token_datas[rule.rights[i]];
-                    if(!td.types.empty())
-                        fprintf(out,
-                            IND6 "%s& token%zu_ = stack_[start_+%zu].token.get<%zu>();\n",
-                            td.types[0].c_str(),i,i,td.vtoken_index
-                        );
-                }
-                if(rule.left!=(Token_Kind_t)-1){
-                    const Token_Data& td = sec0_data.token_datas[rule.left];
-                    fprintf(out,IND6 "Token_t token_target_complete_(yuki::pg::in_place_kind<Token_Kind::%s>,",td.name.c_str());
-                    if(rule.rights.size()!=0)
-                        fprintf(out,"{stack_[start_].token.location_range().begin,stack_[start_+%zu].token.location_range().end}",rule.rights.size()-1);
-                    else
-                        fputs("{}",out);
-                    fprintf(out,"%s%s);\n", rule.init.empty() ? "" : ",", rule.init.c_str());
-                    if(!td.types.empty())
-                        fprintf(out,IND6 "%s& token_target_ = token_target_complete_.get<%zu>();\n\n",td.types[0].c_str(),td.vtoken_index);
-                }
-                break;
-            }
-            case Sec0_Data::Token_Impl_Type::SIMPLE:{
-                for(size_t i = 0;i<rule.rights.size();++i)
-                    fprintf(out,IND6 "Token_t& token%zu_ = stack_[start_+%zu].token;\n", i,i);
-                if(rule.left!=(Token_Kind_t)-1){
-                    fprintf(out,
-                        IND6 "Token_t token_target_{Token_Kind::%s,%s",
-                        sec0_data.token_datas[rule.left].name.c_str(),rule.init.c_str()
-                    );
-                    if(rule.rights.size()!=0)
-                        fprintf(out,",{token0_.location_range.begin,token%zu_.location_range.end}};\n\n", rule.rights.size()-1);
-                    else
-                        fputs("};\n\n",out);
-                }
-                break;
-            }
-            case Sec0_Data::Token_Impl_Type::TUPLE:{
-                for(size_t i = 0;i<rule.rights.size();++i)
-                    fprintf(out,
-                        IND6 "Token::%s& token%zu_ = stack_[start_+%zu].token.get<Token::%s>();\n",
-                        sec0_data.token_datas[rule.rights[i]].name.c_str(), i, i, sec0_data.token_datas[rule.rights[i]].name.c_str()
-                    );
-                if(rule.left!=(Token_Kind_t)-1){
-                    fprintf(out,
-                        IND6 "auto p_token_target_ = Token_t::alloc.template allocate<Token::%s>();\n"
-                        IND6 "yuki::pg::Location_Range loc_target_ = ",
-                        sec0_data.token_datas[rule.left].name.c_str()
-                    );
-                    if(rule.rights.size()!=0)
-                        fprintf(out,"{stack_[start_].token.location_range().begin,stack_[start_+%zu].token.location_range().end};\n", rule.rights.size()-1);
-                    else
-                        fputs("{};\n",out);
-                    fprintf(out,
-                        IND6 "YUKI_CONSTRUCT_BRACE(p_token_target_,%s);\n"
-                        IND6 "Token::%s& token_target_ = *p_token_target_;\n\n",
-                        rule.init.c_str(),  sec0_data.token_datas[rule.left].name.c_str()
-                    );
-                }
-                break;
-            }
-        }
-        fprintf(out,
-            IND6 "{%s\n"
-            IND6 "}\n"
-            "\n",
-            rule.code.c_str()
-        );
-        if(sec0_data.is_tuple()){
-            for(size_t i = rule.rights.size();i!=0;--i){
-                fprintf(out, IND6 "stack_[start_+%zu].token.static_destroy_deallocate<Token::%s>();\n",
-                    i-1, sec0_data.token_datas[rule.rights[i-1]].name.c_str()
-                );
-                fprintf(out,IND6 "stack_.pop_back();\n");
-            }
-        }else{
-            fprintf(out,IND6 "stack_.pop_back(%zu);\n",rule.rights.size());
-        }
-        if(rule.left==(Token_Kind_t)-1){
-            if(sec0_data.is_tuple())
-                fprintf(out,IND6 "t_.static_destroy_deallocate<Token::EOF_>();\n");
-            fprintf(out,IND6 "return 0;\n" IND5 "}\n");
-        }else{
-            fprintf(out,
-                IND6 "state_ = goto_table(stack_.empty() ? 0 : stack_.back().state,Token_Kind::%s);\n",
-                sec0_data.token_datas[rule.left].name.c_str()
-            );
-            switch(sec0_data.token_impl_type){
-                case Sec0_Data::Token_Impl_Type::VARIANT: fprintf(out,IND6 "stack_.emplace_back(std::move(token_target_complete_),state_);\n"); break;
-                case Sec0_Data::Token_Impl_Type::SIMPLE: fprintf(out,IND6 "stack_.emplace_back(std::move(token_target_),state_);\n"); break;
-                case Sec0_Data::Token_Impl_Type::TUPLE: fprintf(out,IND6 "stack_.emplace_back(Token_t(p_token_target_,loc_target_),state_);\n"); break;
-            }
-            fprintf(out,IND6 "YUKI_PG_DBGO(\"REDUCE ");
-            print_rule_escaped(out,rule,sec0_data.token_datas);
-            fprintf(out,
-                "\\n\");\n"
-                IND6 "break;\n"
-                IND5 "} // case %zu //",
-                rule.num
-            );
-            print_rule(out,rule,sec0_data.token_datas);
-            fputc(static_cast<unsigned char>('\n'),out);
-        }
-    } // for(const Rule<Token_Kind_t>& rule : rules)
-    fprintf(out,
-        IND5 "default:return 2;\n"
-        IND4 "} // switch(action_table(state_,t_.kind()).rule())\n"
-        IND3 "} // case ypg::LR1_Action_Kind::R\n"
-        IND3 "case ypg::LR1_Action_Kind::ERR:{\n"
-        IND4 "yuki::print_error(stderr,\"Syntax Error!\\n\");\n"
-        IND4 "reset();\n"
-        IND4 "yuki::print_error(stderr,\"Stack Clear!\\n\");\n"
-        IND4 "return 1;\n"
-        IND3 "}\n"
-        IND2 "} // switch(action_table(state_,t_.kind()).kind)\n"
-        IND2 "loop_end_:;\n"
-        IND "} // while(true)\n"
-        "} // int %s::parse(%s&)\n",
-        sec0_data.parser.c_str(),sec0_data.lexer.c_str()
-    );
-} // void write_parse_array
-
 
 template<std::unsigned_integral Token_Kind_t>
 void write_parse_switch(FILE* const out,const Sec0_Data& sec0_data,const Rule_Set<Token_Kind_t>& rules){
@@ -2285,7 +2126,6 @@ void write(const Cmd_Data& cmd_data,const Sec0_Data& sec0_data,const Rule_Set<To
 
     FILE* const out = cmd_data.fp_out_cpp;
     FILE* const fp_log = cmd_data.fp_log;
-    const bool is_switch = sec0_data.is_switch;
 
     const typename Make_LR1_IAs<Token_Kind_t>::Ret lr1_ias_ret = Make_LR1_IAs<Token_Kind_t>(sec0_data.token_datas.nterms.size(),rules,fp_log,sec0_data.token_datas).calc();
     if(fp_log){
@@ -2308,29 +2148,25 @@ void write(const Cmd_Data& cmd_data,const Sec0_Data& sec0_data,const Rule_Set<To
 
     for(const Sec0_Data::Code& code : sec0_data.codes){
         if(code.qualifier=="cpp_top"){
-            fprintf(out,"%s\n",code.contents.c_str());
+            fputs(code.contents.c_str(),out);
+            fputc(static_cast<unsigned char>('\n'),out);
             break;
         }
     }
     fprintf(out,
         "#include<yuki/print.hpp>\n"
         "#include<yuki/pg/lr1.hpp>\n"
-        "#include\"%s\"\n",
-        cmd_data.out_h.c_str()
+        "#include\"%s\"\n"
+        "\n"
+        "%s\n"
+        "yuki::pg::lr1_action_return_type %s::Action_Table::operator()(yuki::pg::AbsLR1Parser<%s>& p_,%s& l_){\n"
+        "using enum %s::Token_Kind::enum_t;\n"
+        "switch(p_.state()){\n",
+        cmd_data.out_h.c_str(),
+        sec0_data.nspace_head.c_str(),
+        sec0_data.parser_tables.c_str(),sec0_data.ts.c_str(),sec0_data.lexer.c_str(),
+        sec0_data.ts.c_str()
     );
-    if(!sec0_data.nspace.empty())
-        fprintf(out,"namespace %s{\n",sec0_data.nspace.c_str());
-    if(is_switch){
-        fprintf(out,
-            "yuki::pg::lr1_action_return_type %s::Action_Table::operator()(yuki::pg::AbsLR1Parser<%s>& p_,%s& l_){\n"
-            "using enum %s::Token_Kind::enum_t;\n"
-            "switch(p_.state()){\n",
-            sec0_data.parser_tables.c_str(),sec0_data.ts.c_str(),sec0_data.lexer.c_str(),
-            sec0_data.ts.c_str()
-        );
-    }else{
-        fprintf(out,"constinit %s::Action_Table %s::action_table = {\n",sec0_data.parser_tables.c_str(),sec0_data.parser_tables.c_str());
-    }
     Reducible<Token_Kind_t>* const reducible = yuki::Allocator<Reducible<Token_Kind_t>>::allocate(rules.size());
     rules.recursive_traverse([reducible](const Rule<Token_Kind_t>& rule){::new(reducible+rule.num) Reducible<Token_Kind_t>{rule.left};});
     yuki::Vector<std::basic_string<Token_Kind_t>> admissible_terms;
@@ -2339,54 +2175,47 @@ void write(const Cmd_Data& cmd_data,const Sec0_Data& sec0_data,const Rule_Set<To
         case Sec0_Data::Alg_Type::NIL:{
             switch(cmd_data.alg_type){
                 case Cmd_Data::Alg_Type::PLR1:
-                    state_size = lr::write_lalr1<Weakly_Compatible,Token_Kind_t>(cmd_data.fp_out_cpp,stderr,fp_log,is_switch,sec0_data.token_datas,lr1_ias_ret,reducible,rules.size(),admissible_terms);
+                    state_size = lr::write_lalr1<Weakly_Compatible,Token_Kind_t>(cmd_data.fp_out_cpp,stderr,fp_log,sec0_data.token_datas,lr1_ias_ret,reducible,rules.size(),admissible_terms);
                     break;
                 case Cmd_Data::Alg_Type::CLR1:
-                    state_size = lr::write_clr1<Token_Kind_t>(cmd_data.fp_out_cpp,stderr,fp_log,is_switch,sec0_data.token_datas,lr1_ias_ret,reducible,rules.size(),admissible_terms);
+                    state_size = lr::write_clr1<Token_Kind_t>(cmd_data.fp_out_cpp,stderr,fp_log,sec0_data.token_datas,lr1_ias_ret,reducible,rules.size(),admissible_terms);
                     break;
                 case Cmd_Data::Alg_Type::LALR1:
-                    state_size = lr::write_lalr1<IsoCore,Token_Kind_t>(cmd_data.fp_out_cpp,stderr,fp_log,is_switch,sec0_data.token_datas,lr1_ias_ret,reducible,rules.size(),admissible_terms);
+                    state_size = lr::write_lalr1<IsoCore,Token_Kind_t>(cmd_data.fp_out_cpp,stderr,fp_log,sec0_data.token_datas,lr1_ias_ret,reducible,rules.size(),admissible_terms);
                     break;
             }
             break;
         }
         case Sec0_Data::Alg_Type::PLR1:
-            state_size = lr::write_lalr1<Weakly_Compatible,Token_Kind_t>(cmd_data.fp_out_cpp,stderr,fp_log,is_switch,sec0_data.token_datas,lr1_ias_ret,reducible,rules.size(),admissible_terms);
+            state_size = lr::write_lalr1<Weakly_Compatible,Token_Kind_t>(cmd_data.fp_out_cpp,stderr,fp_log,sec0_data.token_datas,lr1_ias_ret,reducible,rules.size(),admissible_terms);
             break;
         case Sec0_Data::Alg_Type::CLR1:
-            state_size = lr::write_clr1<Token_Kind_t>(cmd_data.fp_out_cpp,stderr,fp_log,is_switch,sec0_data.token_datas,lr1_ias_ret,reducible,rules.size(),admissible_terms);
+            state_size = lr::write_clr1<Token_Kind_t>(cmd_data.fp_out_cpp,stderr,fp_log,sec0_data.token_datas,lr1_ias_ret,reducible,rules.size(),admissible_terms);
             break;
         case Sec0_Data::Alg_Type::LALR1:
-            state_size = lr::write_lalr1<IsoCore,Token_Kind_t>(cmd_data.fp_out_cpp,stderr,fp_log,is_switch,sec0_data.token_datas,lr1_ias_ret,reducible,rules.size(),admissible_terms);
+            state_size = lr::write_lalr1<IsoCore,Token_Kind_t>(cmd_data.fp_out_cpp,stderr,fp_log,sec0_data.token_datas,lr1_ias_ret,reducible,rules.size(),admissible_terms);
             break;
     }
     static_assert(std::is_trivially_destructible_v<Reducible<Token_Kind_t>>);
     yuki::Allocator<Reducible<Token_Kind_t>>::deallocate(reducible,rules.size());
-    if(is_switch){
-        fprintf(out,
-            "default: return {(size_t)-1,(size_t)-1};\n"
-            "} // switch(p_.state())\n"
-            "} // yuki::pg::lr1_action_return_type %s::Action_Table::operator()(yuki::pg::AbsLR1Parser<%s>& p_,%s& l_)\n"
-            "\n",
-            sec0_data.parser_tables.c_str(),sec0_data.ts.c_str(),sec0_data.lexer.c_str()
-        );
-    }else{
-        fprintf(out,
-            "}; // constinit %s::Action_Table %s::action_table\n"
-            "\n",
-            sec0_data.parser_tables.c_str(),sec0_data.parser_tables.c_str()
-        );
-    }
+    fprintf(out,
+        "default: return {(size_t)-1,(size_t)-1};\n"
+        "} // switch(p_.state())\n"
+        "} // yuki::pg::lr1_action_return_type %s::Action_Table::operator()(yuki::pg::AbsLR1Parser<%s>& p_,%s& l_)\n"
+        "\n"
+        "\n",
+        sec0_data.parser_tables.c_str(),sec0_data.ts.c_str(),sec0_data.lexer.c_str()
+    );
     fprintf(out,"constinit %s::Goto_Table %s::goto_table = {\n",sec0_data.parser_tables.c_str(),sec0_data.parser_tables.c_str());
     fprintf(out,
         "}; // constinit %s::Goto_Table %s::goto_table\n"
+        "\n"
         "\n",
         sec0_data.parser_tables.c_str(),sec0_data.parser_tables.c_str()
     );
-    is_switch ? write_parse_switch(out,sec0_data,rules) : write_parse_array(out,sec0_data,rules);
-    if(!sec0_data.nspace.empty())
-        fprintf(out,"} // namespace %s\n",sec0_data.nspace.c_str());
-    fputc(static_cast<unsigned char>('\n'),out);
+    write_parse_switch(out,sec0_data,rules);
+    fputs(sec0_data.nspace_tail.c_str(),out);
+    fputs("\n\n",out);
     for(const Sec0_Data::Code& code : sec0_data.codes){
         if(code.qualifier=="SEC2_"){
             fprintf(out,"%s\n",code.contents.c_str());
@@ -2399,90 +2228,91 @@ void write(const Cmd_Data& cmd_data,const Sec0_Data& sec0_data,const Rule_Set<To
     fputs("#pragma once\n",out_h);
     for(const Sec0_Data::Code& code : sec0_data.codes){
         if(code.qualifier=="h_top"){
-            fprintf(out_h,"%s\n",code.contents.c_str());
+            fputs(code.contents.c_str(),out_h);
+            fputc(static_cast<unsigned char>('\n'),out_h);
             break;
         }
     }
     fprintf(out_h,
         "#include<yuki/pg/lr1.hpp>\n"
-        "#include\"%s\"\n",
-        cmd_data.out_token.c_str()
+        "#include\"%s\"\n"
+        "\n"
+        "#ifdef %s\n"
+        "#include<yuki/print.hpp>\n"
+        "#ifndef %s_LOG\n"
+        "#define %s_LOG \"%s.log\"\n"
+        "#endif\n"
+        "%s\n"
+        "#ifndef %s_FP\n"
+        "inline FILE* const %s_fp_=fopen(%s_LOG,\"w\");\n"
+        "#define %s_FP %s::%s_fp_\n"
+        "#endif\n"
+        "%s\n"
+        "#define %sO(...) yuki::dbgout_base(fp_dbg_,\"%s\",__VA_ARGS__)\n"
+        "#define CONSTEXPR_%s // Debug output would render constexpr-functions non-constexpr.\n"
+        "#else\n"
+        "#define %sO(...)\n"
+        "#define CONSTEXPR_%s constexpr\n"
+        "#endif\n"
+        "\n",
+        cmd_data.out_token.c_str(),
+        sec0_data.debug_prefix.c_str(),
+        sec0_data.debug_prefix.c_str(),
+        sec0_data.debug_prefix.c_str(),sec0_data.debug_prefix.c_str(),
+        sec0_data.nspace_head.c_str(),
+        sec0_data.debug_prefix.c_str(),
+        sec0_data.debug_prefix.c_str(),sec0_data.debug_prefix.c_str(),
+        sec0_data.debug_prefix.c_str(),sec0_data.nspace.c_str(),sec0_data.debug_prefix.c_str(),
+        sec0_data.nspace_tail.c_str(),
+        sec0_data.debug_prefix.c_str(),sec0_data.debug_prefix.c_str(),
+        sec0_data.debug_prefix.c_str(),
+        sec0_data.debug_prefix.c_str(),
+        sec0_data.debug_prefix.c_str()
     );
-    if(!sec0_data.nspace.empty())
-        fprintf(out_h,"namespace %s{\n",sec0_data.nspace.c_str());
-    if(is_switch){
+    fprintf(out_h,
+        "%s\n"
+        "struct %s{\n"
+        IND "struct Action_Table{\n"
+        IND YUKI_PG_HIND "private:\n"
+        IND2 "%s::Token_t t_;\n"
+        IND YUKI_PG_HIND "public:\n"
+        IND2 "Action_Table(%s& l_) noexcept : t_(l_.lex()) {}\n"
+        IND2 "yuki::pg::lr1_action_return_type operator()(yuki::pg::AbsLR1Parser<%s>&,%s&);\n",
+        sec0_data.nspace_head.c_str(),
+        sec0_data.parser_tables.c_str(),
+        sec0_data.ts.c_str(),
+        sec0_data.lexer.c_str(),
+        sec0_data.ts.c_str(),sec0_data.lexer.c_str()
+    );
+    if(sec0_data.is_tuple())
         fprintf(out_h,
-            "struct %s{\n"
-            IND "struct Action_Table{\n"
-            IND YUKI_PG_HIND "private:\n"
-            IND2 "%s::Token_t t_;\n"
-            IND YUKI_PG_HIND "public:\n"
-            IND2 "Action_Table(%s& l_) noexcept : t_(l_.lex()) {}\n"
-            IND2 "yuki::pg::lr1_action_return_type operator()(yuki::pg::AbsLR1Parser<%s>&,%s&);\n",
-            sec0_data.parser_tables.c_str(),
-            sec0_data.ts.c_str(),
-            sec0_data.lexer.c_str(),
-            sec0_data.ts.c_str(),sec0_data.lexer.c_str()
-        );
-        if(sec0_data.is_tuple())
-            fprintf(out_h,
-                "\n"
-                IND2 "template<typename T> requires %s::is_token_v<T>\n"
-                IND "void static_destroy_deallocate() noexcept {t_.static_destroy_deallocate<T>();}\n",
-                sec0_data.ts.c_str()
-            );
-        fprintf(out_h,
-            IND "};\n"
-            IND "typedef yuki::pg::LR1_Goto_Table<%s,%zu> Goto_Table;\n"
-            IND "static constinit Goto_Table goto_table;\n"
-            "};\n"
-            "\n",
-            sec0_data.ts.c_str(), state_size
-        );
-        fprintf(out_h,
-            "struct %s %s: yuki::pg::AbsLR1Parser<%s>, private %s {\n"
-            IND "%s* lexer;\n"
             "\n"
-            IND "using %s::Action_Table;\n"
-            IND "using %s::Goto_Table;\n"
-            IND "using %s::goto_table;\n"
-            "\n",
-            sec0_data.parser.c_str(), sec0_data.no_final_class ? "" : "final ", sec0_data.ts.c_str(), sec0_data.parser_tables.c_str(),
-            sec0_data.lexer.c_str(),
-            sec0_data.parser_tables.c_str(),
-            sec0_data.parser_tables.c_str(),
-            sec0_data.parser_tables.c_str()
+            IND2 "template<typename T> requires %s::is_token_v<T>\n"
+            IND "void static_destroy_deallocate() noexcept {t_.static_destroy_deallocate<T>();}\n",
+            sec0_data.ts.c_str()
         );
-    }else{
-        fprintf(out_h,
-            "struct %s{\n"
-            IND "typedef yuki::pg::LR1_Action_Table<%s,%zu,%zu> Action_Table;\n"
-            IND "typedef yuki::pg::LR1_Goto_Table<%s,%zu> Goto_Table;\n"
-            IND "static constinit Action_Table action_table;\n"
-            IND "static constinit Goto_Table goto_table;\n"
-            "};\n"
-            "\n",
-            sec0_data.parser_tables.c_str(),
-            sec0_data.ts.c_str(), state_size, rules.size(),
-            sec0_data.ts.c_str(), state_size
-        );
-        fprintf(out_h,
-            "struct %s %s: yuki::pg::AbsLR1Parser<%s>, private %s {\n"
-            IND "%s* lexer;\n"
-            "\n"
-            IND "using %s::Action_Table;\n"
-            IND "using %s::Goto_Table;\n"
-            IND "using %s::action_table;\n"
-            IND "using %s::goto_table;\n"
-            "\n",
-            sec0_data.parser.c_str(), sec0_data.no_final_class ? "" : "final ", sec0_data.ts.c_str(), sec0_data.parser_tables.c_str(),
-            sec0_data.lexer.c_str(),
-            sec0_data.parser_tables.c_str(),
-            sec0_data.parser_tables.c_str(),
-            sec0_data.parser_tables.c_str(),
-            sec0_data.parser_tables.c_str()
-        );
-    }
+    fprintf(out_h,
+        IND "};\n"
+        IND "typedef yuki::pg::LR1_Goto_Table<%s,%zu> Goto_Table;\n"
+        IND "static constinit Goto_Table goto_table;\n"
+        "};\n"
+        "\n",
+        sec0_data.ts.c_str(), state_size
+    );
+    fprintf(out_h,
+        "struct %s %s: yuki::pg::AbsLR1Parser<%s>, private %s {\n"
+        IND "%s* lexer;\n"
+        "\n"
+        IND "using %s::Action_Table;\n"
+        IND "using %s::Goto_Table;\n"
+        IND "using %s::goto_table;\n"
+        "\n",
+        sec0_data.parser.c_str(), sec0_data.no_final_class ? "" : "final ", sec0_data.ts.c_str(), sec0_data.parser_tables.c_str(),
+        sec0_data.lexer.c_str(),
+        sec0_data.parser_tables.c_str(),
+        sec0_data.parser_tables.c_str(),
+        sec0_data.parser_tables.c_str()
+    );
     if(!sec0_data.no_default_ctor){
         fprintf(out_h,
             IND "constexpr %s() noexcept = default;\n"
@@ -2505,9 +2335,7 @@ void write(const Cmd_Data& cmd_data,const Sec0_Data& sec0_data,const Rule_Set<To
             break;
         }
     }
-    fprintf(out_h,"\n}; // struct %s\n",sec0_data.parser.c_str());
-    if(!sec0_data.nspace.empty())
-        fprintf(out_h,"} // namespace %s\n",sec0_data.nspace.c_str());
+    fprintf(out_h,"\n}; // struct %s\n%s\n",sec0_data.parser.c_str(),sec0_data.nspace_tail.c_str());
     for(const Sec0_Data::Code& code : sec0_data.codes){
         if(code.qualifier=="h_bottom"){
             fprintf(out_h,"%s\n",code.contents.c_str());
