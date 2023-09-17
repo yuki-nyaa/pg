@@ -360,8 +360,6 @@ int main(const int argc,const char*const*const argv){
     }
     sec0_data.token_datas.terms.emplace_back("EOF_");
     sec0_data.token_datas.terms.back().assoc=yuki::pg::Assoc::LEFT;
-    if(sec0_data.parser_tables.empty())
-        (sec0_data.parser_tables=sec0_data.parser).append("_Tables");
     if(sec0_data.debug_prefix.empty())
         sec0_data.debug_prefix.append("YUKI_PG_").append(sec0_data.parser).append("_DBG");
     if(!sec0_data.nspace.empty()){

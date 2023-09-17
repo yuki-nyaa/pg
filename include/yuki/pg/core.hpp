@@ -1,5 +1,6 @@
 #pragma once
 #include<cstddef>
+#include<yuki/Vector.hpp>
 
 namespace yuki::pg{
 
@@ -17,18 +18,12 @@ struct No_Location {};
 
 enum struct Token_Impl_Type : unsigned char {VARIANT,SIMPLE,TUPLE};
 
-template<typename TS>
-struct AbsParser{
-    typedef TS Token_Settings;
-
-    typedef typename TS::Token_Kind Token_Kind;
-    typedef typename TS::Token Token;
-
-    typedef typename TS::Token_Kind_t Token_Kind_t;
-    typedef typename TS::Token_t Token_t;
-
-    virtual ~AbsParser() noexcept = default;
-
-    virtual int parse() = 0;
+template<typename T>
+struct Token_State_Pair{
+    T token;
+    size_t state;
 };
+
+template<typename T>
+using stack_t = yuki::Vector<T>;
 } // namespace yuki::pg

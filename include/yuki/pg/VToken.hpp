@@ -52,7 +52,8 @@ struct VToken : private Loc{
             if(kind_==other.kind_){
                 yuki::visit_homogenous<void>(yuki::assign_visitor,*this,other);
             }else{
-                yuki::visit_homogenous<void>(yuki::destroy_visitor,*this);
+                if constexpr((... || (!std::is_trivially_destructible_v<Ts>)))
+                    yuki::visit_homogenous<void>(yuki::destroy_visitor,*this);
                 kind_=other.kind_;
                 yuki::visit_homogenous<void>(yuki::copy_visitor,*this,other);
             }
@@ -67,7 +68,8 @@ struct VToken : private Loc{
             if(kind_==other.kind_){
                 yuki::visit_homogenous<void>(yuki::assign_visitor,*this,std::move(other));
             }else{
-                yuki::visit_homogenous<void>(yuki::destroy_visitor,*this);
+                if constexpr((... || (!std::is_trivially_destructible_v<Ts>)))
+                    yuki::visit_homogenous<void>(yuki::destroy_visitor,*this);
                 kind_=other.kind_;
                 yuki::visit_homogenous<void>(yuki::copy_visitor,*this,std::move(other));
             }
@@ -82,10 +84,12 @@ struct VToken : private Loc{
             yuki::visit_homogenous<void>(yuki::swap_visitor,lhs,rhs);
         }else{
             VToken temp = std::move(lhs);
-            yuki::visit_homogenous<void>(yuki::destroy_visitor,lhs);
+            if constexpr((... || (!std::is_trivially_destructible_v<Ts>)))
+                yuki::visit_homogenous<void>(yuki::destroy_visitor,lhs);
             lhs.kind_=rhs.kind_;
             yuki::visit_homogenous<void>(yuki::copy_visitor,lhs,std::move(rhs));
-            yuki::visit_homogenous<void>(yuki::destroy_visitor,rhs);
+            if constexpr((... || (!std::is_trivially_destructible_v<Ts>)))
+                yuki::visit_homogenous<void>(yuki::destroy_visitor,rhs);
             rhs.kind_=temp.kind_;
             yuki::visit_homogenous<void>(yuki::copy_visitor,rhs,std::move(temp));
         }

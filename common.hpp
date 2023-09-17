@@ -82,7 +82,6 @@ struct Sec0_Data{
     std::string parser = "Parser";
     std::string ts = "Token_Settings";
     std::string lexer = "Lexer";
-    std::string parser_tables;
     std::string debug_prefix;
 
     std::string nspace_head;
@@ -92,8 +91,6 @@ struct Sec0_Data{
 
     size_t lr1_stack_reserve = 128;
 
-    bool no_final_function = false;
-    bool no_final_class = false;
     bool no_default_ctor = false;
 
     enum struct Alg_Type : unsigned char {NIL,PLR1,CLR1,LALR1} alg_type = Alg_Type::NIL;
@@ -500,5 +497,37 @@ inline void print_loc(FILE* const out,const size_t lineno,const size_t colno,con
 [[noreturn]] inline void eof_error(){
     fputs("Fatal Error: No production was specified!\n",stderr);
     exit(EXIT_FAILURE);
+}
+inline void print_escaped(FILE* out,std::string_view s){
+    if(s.empty())
+        return;
+    char back = 0;
+    if(s.front()=='\"' || s.front()=='\''){
+        fputc(static_cast<unsigned char>('\\'),out);
+        fputc(s.front(),out);
+        back=s.back();
+        s.remove_prefix(1);
+        s.remove_suffix(1);
+    }
+    for(const char c : s){
+        switch(c){
+            case '\'': fputs("\\\'",out); break;
+            case '\"': fputs("\\\"",out); break;
+            case '\?': fputs("\\\?",out); break;
+            case '\\': fputs("\\\\",out); break;
+            case '\a': fputs("\\a",out); break;
+            case '\b': fputs("\\b",out); break;
+            case '\f': fputs("\\f",out); break;
+            case '\n': fputs("\\n",out); break;
+            case '\r': fputs("\\r",out); break;
+            case '\t': fputs("\\t",out); break;
+            case '\v': fputs("\\v",out); break;
+            default: fputc(c,out); break;
+        }
+    }
+    if(back!=0){
+        fputc(static_cast<unsigned char>('\\'),out);
+        fputc(back,out);
+    }
 }
 }

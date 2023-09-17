@@ -55,16 +55,17 @@ Rule_Set<Token_Kind_t> parse_sec12(Sec0_Data& sec0_data,FILE* const in,const cha
     const size_t left_lineno = sec0_data.input.lineno_orig;
     const size_t left_colno = sec0_data.input.colno_orig;
     u8c.write_to(str_temp);
+    u8c=sec0_data.input.get(in);
 
-    for(u8c=sec0_data.input.get(in); !yuki::unicode::is_WSpace(u8c); u8c.write_to(str_temp),u8c=sec0_data.input.get(in)){
+    for(; !yuki::unicode::is_WSpace(u8c); u8c.write_to(str_temp),u8c=sec0_data.input.get(in)){
         if(u8c=='/'_u8){
             switch(sec0_data.input.try_skip_comment(in)){
-                case EOF: break;
+                case EOF: goto left_done;
                 case 0: break;
-                case static_cast<unsigned char>('\n'): u8c=sec0_data.input.get(in); goto left_done;
+                case static_cast<unsigned char>('\n'): goto left_done;
             }
         }else if(u8c==yuki::EOF_U8)
-            break;
+            goto left_done;
     }
   left_done:
     assert(!str_temp.empty());
@@ -94,13 +95,14 @@ Rule_Set<Token_Kind_t> parse_sec12(Sec0_Data& sec0_data,FILE* const in,const cha
     size_t first_right_lineno, first_right_colno;
     yuki::U8Char percent=yuki::EOF_U8;
     size_t percent_lineno, percent_colno;
-    while(yuki::unicode::is_WSpace(u8c))
+    do{
         u8c=sec0_data.input.get(in);
+    }while(yuki::unicode::is_WSpace(u8c));
     if(u8c=='/'_u8){
         switch(sec0_data.input.try_skip_comment(in)){
             case EOF: u8c=yuki::EOF_U8;goto shipout;
             case 0: break;
-            case static_cast<unsigned char>('\n'): u8c=sec0_data.input.get(in); goto skip_spaces0;
+            case static_cast<unsigned char>('\n'): goto skip_spaces0;
         }
     }else if(u8c==yuki::EOF_U8)
         goto shipout;
@@ -159,7 +161,7 @@ Rule_Set<Token_Kind_t> parse_sec12(Sec0_Data& sec0_data,FILE* const in,const cha
                 }
                 u8c=sec0_data.input.get(in);
             }
-            assert(false); std::unreachable();
+            assert(false);
           percent_arg_error:
             {
             char buf[5] = {};
@@ -341,7 +343,7 @@ Rule_Set<Token_Kind_t> parse_sec12(Sec0_Data& sec0_data,FILE* const in,const cha
                 }
             }
     } // switch(u8c.raw())
-    assert(false); std::unreachable();
+    assert(false);
   write_to_rights:
     assert(!str_temp.empty());
     if(percent!=yuki::EOF_U8) [[unlikely]] {
