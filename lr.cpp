@@ -2101,9 +2101,9 @@ void write_parse_switch(FILE* const out,const Sec0_Data& sec0_data,const Rule_Se
     } // for(const Rule<Token_Kind_t>& rule : rules)
     fprintf(out,
         "default:{\n"
-        IND "yuki::print_error(stderr,\"Syntax Error!\\n\");\n"
+        IND "fputs(\"Syntax Error!\\n\",stderr);\n"
         IND "reset();\n"
-        IND "yuki::print_error(stderr,\"Stack Clear!\\n\");\n"
+        IND "fputs(\"Stack Clear!\\n\",stderr);\n"
         IND "return 1;\n"
         "}\n"
         "} // switch(%s_term_action(...))\n"

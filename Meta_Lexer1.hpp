@@ -138,7 +138,7 @@ Rule_Set<Token_Kind_t> parse_sec12(Sec0_Data& sec0_data,FILE* const in,const cha
                     ++sec0_data.errors;
                     [[fallthrough]];
                 }
-                case 'e'_u8.raw(): percent=yuki::EOF_U8;
+                case 'e'_u8.raw(): percent=yuki::EOF_U8; break;
             }
             while(1){
                 switch(u8c.raw()){
@@ -156,7 +156,7 @@ Rule_Set<Token_Kind_t> parse_sec12(Sec0_Data& sec0_data,FILE* const in,const cha
                             goto skip_spaces1;
                         }else
                             break;
-                    case '{'_u8.raw():case '('_u8.raw():case '\"'_u8.raw():case '\''_u8.raw():case '%'_u8.raw(): goto right;
+                    case '{'_u8.raw():case '\"'_u8.raw():case '\''_u8.raw():case '%'_u8.raw(): goto right;
                     case '|'_u8.raw(): case ';'_u8.raw(): goto percent_arg_error;
                 }
                 u8c=sec0_data.input.get(in);
@@ -182,6 +182,7 @@ Rule_Set<Token_Kind_t> parse_sec12(Sec0_Data& sec0_data,FILE* const in,const cha
                         print_loc(stderr,sec0_data.input.lineno,sec0_data.input.colno,filename);
                         fputs("Error: Missing closing double quote!\n",stderr);
                         ++sec0_data.errors;
+                        str_temp.push_back('\"');
                         goto shipout;
                     case '\"'_u8.raw(): str_temp.push_back('\"'); u8c=sec0_data.input.get(in); goto write_to_rights;
                     default: u8c.write_to(str_temp); break;
@@ -197,6 +198,7 @@ Rule_Set<Token_Kind_t> parse_sec12(Sec0_Data& sec0_data,FILE* const in,const cha
                         print_loc(stderr,sec0_data.input.lineno,sec0_data.input.colno,filename);
                         fputs("Error: Missing closing single quote!\n",stderr);
                         ++sec0_data.errors;
+                        str_temp.push_back('\'');
                         goto shipout;
                     case '\''_u8.raw(): str_temp.push_back('\''); u8c=sec0_data.input.get(in); goto write_to_rights;
                     default: u8c.write_to(str_temp); break;
@@ -303,6 +305,7 @@ Rule_Set<Token_Kind_t> parse_sec12(Sec0_Data& sec0_data,FILE* const in,const cha
                 } // switch(u8c.raw())
             } // while(1)
           init_or_code_done:
+            target.resize(yuki::remove_trailing_u8(target.begin(),target.end(),yuki::unicode::is_WSpace<yuki::U8Char>));
             if(is_init){
                 if(rule.init.empty())
                     rule.init.push_back(' ');
@@ -338,7 +341,7 @@ Rule_Set<Token_Kind_t> parse_sec12(Sec0_Data& sec0_data,FILE* const in,const cha
                             goto write_to_rights;
                         }else
                             break;
-                    case '{'_u8.raw():case '('_u8.raw():case '\"'_u8.raw():case '\''_u8.raw():case '%'_u8.raw(): goto write_to_rights;
+                    case '{'_u8.raw():case '\"'_u8.raw():case '\''_u8.raw():case '%'_u8.raw(): goto write_to_rights;
                     case '|'_u8.raw(): case ';'_u8.raw(): goto shipout;
                 }
             }

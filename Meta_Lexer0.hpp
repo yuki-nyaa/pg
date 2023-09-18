@@ -238,6 +238,7 @@ namespace sec0_impl{
     struct Sec0_Entry{
         std::string_view key;
         void (*action)(Sec0_Data&,Str_Loc*,unsigned,size_t,size_t,const char*);
+        bool variadic=false;
 
         struct SV{
             static constexpr std::string_view operator()(const Sec0_Entry se) {return se.key;}
@@ -288,9 +289,9 @@ inline Sec0_Data parse_sec0(FILE* const in,const char* const filename){
     using namespace yuki::literals;
 
   skip_spaces_first:
-    u8c=data.input.get(in);
-    while(yuki::unicode::is_WSpace(u8c))
+    do{
         u8c=data.input.get(in);
+    }while(yuki::unicode::is_WSpace(u8c));
     switch(u8c.raw()){
         case yuki::EOF_U8.raw():
             eof_error();
@@ -324,6 +325,104 @@ inline Sec0_Data parse_sec0(FILE* const in,const char* const filename){
     unsigned arg_current=0;
 
     constexpr size_t args_total = 1+YUKI_PG_SEC0_MAX_AGRS;
+
+  head:
+    const size_t head_lineno = data.input.lineno_orig;
+    const size_t head_colno = data.input.colno_orig;
+    u8c=data.input.get(in);
+
+    for(; !yuki::unicode::is_WSpace(u8c); u8c.write_to(args->str),u8c=data.input.get(in)){
+        if(u8c=='/'_u8){
+            switch(data.input.try_skip_comment(in)){
+                case EOF: eof_error();
+                case 0: break;
+                case static_cast<unsigned char>('\n'): goto head_done;
+            }
+        }else if(u8c==yuki::EOF_U8)
+            eof_error();
+    }
+  head_done:
+    const sec0_impl::Sec0_Entry* se=sec0_actions.find(args->str);
+    if(!se){
+        print_loc(stderr,args->lineno,args->colno,filename);
+        fprintf(stderr,"Error: Unknown section 0 directive \"%s\"!\n",args->str.c_str());
+        ++data.errors;
+    }
+    args->str.clear();
+  skip_spaces:
+    do{
+        u8c=sec0_data.input.get(in);
+    }while(yuki::unicode::is_WSpace(u8c));
+    if(u8c=='/'_u8){
+        switch(data.input.try_skip_comment(in)){
+            case EOF: eof_error();
+            case 0: break;
+            case static_cast<unsigned char>('\n'): goto skip_spaces;
+        }
+    }else if(u8c==yuki::EOF_U8)
+        eof_error();
+  parse_arg:
+    args[arg_current].lineno = data.input.lineno_orig;
+    args[arg_current].colno = data.input.colno_orig;
+    switch(u8c.raw()){
+        case '\"'_u8.raw():
+        case '\''_u8.raw():
+        case '{'_u8.raw():
+        case '%'_u8.raw(): goto shipout;
+        default:
+            assert(args[arg_current].str.empty());
+            while(1){
+                u8c.write_to(args[arg_current].str);
+                u8c=sec0_data.input.get(in);
+                switch(u8c.raw()){
+                    case yuki::EOF_U8.raw(): eof_error();
+                    case '/'_u8.raw():
+                        switch(sec0_data.input.try_skip_comment(in)){
+                            case EOF: eof_error();
+                            case 0: break;
+                            case static_cast<unsigned char>('\n'): goto shipout_1_arg;
+                        }
+                        break;
+                    default:
+                        if(yuki::unicode::is_WSpace(u8c)){
+                            goto shipout_1_arg;
+                        }else
+                            break;
+                    case '{'_u8.raw():case '\"'_u8.raw():case '\''_u8.raw(): goto shipout_1_arg;
+                    case '%'_u8.raw(): goto shipout;
+                }
+            }
+    } // switch(u8c.raw())
+    assert(false);
+  shipout_1_arg:
+    if(se){
+        if(!se->variadic)
+            args[++arg_current].str.clear();
+        else{
+            assert(arg_current==0);
+            se->action(data,*args,1,head_lineno,head_colno,filename);
+        }
+    }
+    if(yuki::unicode::is_WSpace(u8c))
+        goto skip_spaces;
+    else
+        goto parse_arg;
+  shipout:
+    if(se)
+        se->action(
+            data,
+            args,
+            args[arg_current].str.empty()?arg_current:arg_current+1,
+            head_lineno,
+            head_colno,
+            filename
+        );
+    arg_current=0;
+    goto head;
+
+
+
+
 
     auto shipout = [&args,&arg_current](Sec0_Data& data,const char* const filename){
         assert(arg_current>0 || !args[0].str.empty());
