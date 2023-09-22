@@ -14,19 +14,17 @@ enum struct Assoc : unsigned char {DEFAULT,LEFT,RIGHT,};
 
 
 struct Token_Data{
-    // The following 3 members' order should not be changed.
     std::string name;
     std::string alias;
+    std::string type;
 
-    std::string alloc;
-    //< The preceding 3 members' order should not be changed.
     prec_t prec=0;
     Assoc assoc=Assoc::DEFAULT;
-
-    yuki::Vector<std::string,yuki::Allocator<std::string>,yuki::Default_EC<2,1,1>> types;
-    yuki::Vector<std::string,yuki::Allocator<std::string>,yuki::Default_EC<2,1,1>> names;
+    bool invalid=false;
 
     size_t vtoken_index = 0;
+
+    Token_Data(const std::string_view sv) noexcept : name(sv) {}
 
     std::string& name_or_alias() noexcept {return alias.empty() ? name : alias;}
     const std::string& name_or_alias() const noexcept {return alias.empty() ? name : alias;}
@@ -95,34 +93,51 @@ struct Sec0_Data{
 
     enum struct Alg_Type : unsigned char {NIL,PLR1,CLR1,LALR1} alg_type = Alg_Type::NIL;
 
-    enum struct Token_Impl_Type : unsigned char {VARIANT,SIMPLE,TUPLE} token_impl_type = Token_Impl_Type::VARIANT;
+    enum struct Token_Impl_Type : unsigned char {VARIANT,SIMPLE,/*TUPLE*/} token_impl_type = Token_Impl_Type::VARIANT;
 
     bool is_variant() const {return token_impl_type==Token_Impl_Type::VARIANT;}
     bool is_simple() const {return token_impl_type==Token_Impl_Type::SIMPLE;}
-    bool is_tuple() const {return token_impl_type==Token_Impl_Type::TUPLE;}
+    //bool is_tuple() const {return token_impl_type==Token_Impl_Type::TUPLE;}
 
     Assoc assoc0 = Assoc::LEFT;
-
+  //private:
     unsigned errors=0;
+//  public:
+//    unsigned errors() const {return errors_;}
+    void advance_errors(const unsigned limit){
+        if(++errors_>=limit){
+            fputs(
+                "Fatal Error: Too many errors! Job aborted!\n"
+                "--Note: Use \"--max-errors num\" in the command line to increase the error limit.\n",
+                stderr
+            );
+            fprintf(stderr,"%u errors encountered.\n",errors_);
+            exit(EXIT_FAILURE);
+        }
+    }
 
     Token_Datas token_datas;
 
-    struct Code{
+    enum Code_Cat {CLASS,CPP_TOP,H_TOP,TOKEN_TOP,SEC2_,TOKEN_BOTTOM,H_BOTTOM,NIL_};
+    struct QC_Pair{
         std::string_view qualifier;
-        std::string contents;
+        Code_Cat cat;
     };
-
-    Code codes[7]={
-        {"class"},
-        {"cpp_top"},
-        {"h_top"},
-        {"token_top"},
-        {"SEC2_"},
-        {"token_bottom"},
-        {"h_bottom"},
+    static constexpr QC_Pair code_qualifiers[] = {
+        {"class",Code_Cat::CLASS},
+        {"cpp_top",Code_Cat::CPP_TOP},
+        {"h_top",Code_Cat::H_TOP},
+        {"token_top",Code_Cat::TOKEN_TOP},
+        {"SEC2_",Code_Cat::SEC2_},
+        {"token_bottom",Code_Cat::TOKEN_BOTTOM},
+        {"h_bottom",Code_Cat::H_BOTTOM},
     };
+    std::string codes[sizeof(code_qualifiers)/sizeof(QC_Pair)];
 
+    // The following 3 variables are only used in parsing section 0.
+    Code_Cat current_code = Code_Cat::NIL_;
     prec_t current_prec=0;
+    bool term_valid=false;
 
     struct Input{
         size_t lineno_orig=1;
@@ -494,8 +509,9 @@ namespace yuki::pg{
 inline void print_loc(FILE* const out,const size_t lineno,const size_t colno,const char* const filename){
     fprintf(out,"%zu:%zu - %s\n",lineno,colno,filename);
 }
-[[noreturn]] inline void eof_error(){
+[[noreturn]] inline void eof_error(const unsigned errors){
     fputs("Fatal Error: No production was specified!\n",stderr);
+    fprintf(stderr,"%u errors encountered.\n",errors);
     exit(EXIT_FAILURE);
 }
 inline void print_escaped(FILE* out,std::string_view s){

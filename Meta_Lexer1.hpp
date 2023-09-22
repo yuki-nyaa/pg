@@ -17,40 +17,31 @@ Rule_Set<Token_Kind_t> parse_sec12(Sec0_Data& sec0_data,FILE* const in,const cha
     yuki::U8Char u8c;
     std::string str_temp;
 
-    #define YUKI_PG_META_ML1_SEC1_EOF_ERROR_IF(condition,ret) \
-        do{ \
-            if(condition) \
-                eof_error(); \
-            else \
-                ret \
-        }while(0)
-
   skip_spaces_before_left:
     do{
         u8c=sec0_data.input.get(in);
     }while(yuki::unicode::is_WSpace(u8c));
     switch(u8c.raw()){
         case yuki::EOF_U8.raw():
-            YUKI_PG_META_ML1_SEC1_EOF_ERROR_IF(rs.empty(),return rs;);
+            return rs;
         case '/'_u8.raw():
             switch(sec0_data.input.try_skip_comment(in)){
-                case EOF: YUKI_PG_META_ML1_SEC1_EOF_ERROR_IF(rs.empty(),return rs;);
+                case EOF: return rs;
                 case 0: break;
                 case static_cast<unsigned char>('\n'): goto skip_spaces_before_left;
             }
             break;
         case '%'_u8.raw():
-            Sec0_Data::Code* code = sec0_data.codes;
-            Sec0_Data::Code* const codes_end = std::end(sec0_data.codes);
-            for(;code!=codes_end;++code)
-                if(code->qualifier=="SEC2_")
-                    break;
-            sec0_data.input.get(in);
-            for(int i=fgetc(in); i!=EOF; i=fgetc(in))
-                code->contents.push_back(static_cast<unsigned char>(i));
-            return rs;
+            for(const Sec0_Data::QC_Pair pair : sec0_data.code_qualifiers){
+                if(pair.qualifier=="SEC2_"){
+                    std::string& code = sec0_data.codes[pair.cat];
+                    sec0_data.input.get(in);
+                    for(int i=fgetc(in); i!=EOF; i=fgetc(in))
+                        code.push_back(static_cast<unsigned char>(i));
+                    return rs;
+                }
+            }
     }
-    #undef YUKI_PG_META_ML1_SEC1_EOF_ERROR_IF
   left:
     const size_t left_lineno = sec0_data.input.lineno_orig;
     const size_t left_colno = sec0_data.input.colno_orig;
@@ -305,7 +296,7 @@ Rule_Set<Token_Kind_t> parse_sec12(Sec0_Data& sec0_data,FILE* const in,const cha
                 } // switch(u8c.raw())
             } // while(1)
           init_or_code_done:
-            target.resize(yuki::remove_trailing_u8(target.begin(),target.end(),yuki::unicode::is_WSpace<yuki::U8Char>));
+            //target.resize(yuki::remove_trailing_u8(target.begin(),target.end(),yuki::unicode::is_WSpace<yuki::U8Char>));
             if(is_init){
                 if(rule.init.empty())
                     rule.init.push_back(' ');

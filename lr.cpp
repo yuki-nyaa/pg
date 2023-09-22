@@ -1987,10 +1987,10 @@ void write_parse_switch(FILE* const out,const Sec0_Data& sec0_data,const Rule_Se
             case Sec0_Data::Token_Impl_Type::VARIANT:{
                 for(size_t i = 0;i<rule.rights.size();++i){
                     const Token_Data& td = sec0_data.token_datas[rule.rights[i]];
-                    if(!td.types.empty())
+                    if(!td.type.empty())
                         fprintf(out,
                             IND "%s& token%zu_ = stack_[start_+%zu].token.get<%zu>();\n",
-                            td.types[0].c_str(),i,i,td.vtoken_index
+                            td.type.c_str(),i,i,td.vtoken_index
                         );
                 }
                 if(rule.left!=(Token_Kind_t)-1){
@@ -2001,8 +2001,8 @@ void write_parse_switch(FILE* const out,const Sec0_Data& sec0_data,const Rule_Se
                     else
                         fputs("{}",out);
                     fprintf(out,"%s%s);\n", rule.init.empty() ? "" : ",", rule.init.c_str());
-                    if(!td.types.empty())
-                        fprintf(out,IND "%s& token_target_ = token_target_complete_.get<%zu>();\n\n",td.types[0].c_str(),td.vtoken_index);
+                    if(!td.type.empty())
+                        fprintf(out,IND "%s& token_target_ = token_target_complete_.get<%zu>();\n\n",td.type.c_str(),td.vtoken_index);
                 }
                 break;
             }
@@ -2021,30 +2021,30 @@ void write_parse_switch(FILE* const out,const Sec0_Data& sec0_data,const Rule_Se
                 }
                 break;
             }
-            case Sec0_Data::Token_Impl_Type::TUPLE:{
-                for(size_t i = 0;i<rule.rights.size();++i)
-                    fprintf(out,
-                        IND "Token::%s& token%zu_ = stack_[start_+%zu].token.get<Token::%s>();\n",
-                        sec0_data.token_datas[rule.rights[i]].name.c_str(), i, i, sec0_data.token_datas[rule.rights[i]].name.c_str()
-                    );
-                if(rule.left!=(Token_Kind_t)-1){
-                    fprintf(out,
-                        IND "auto p_token_target_ = Token_t::alloc.template allocate<Token::%s>();\n"
-                        IND "yuki::pg::Location_Range loc_target_ = ",
-                        sec0_data.token_datas[rule.left].name.c_str()
-                    );
-                    if(rule.rights.size()!=0)
-                        fprintf(out,"{stack_[start_].token.location_range().begin,stack_[start_+%zu].token.location_range().end};\n", rule.rights.size()-1);
-                    else
-                        fputs("{};\n",out);
-                    fprintf(out,
-                        IND "YUKI_CONSTRUCT_BRACE(p_token_target_,%s);\n"
-                        IND "Token::%s& token_target_ = *p_token_target_;\n\n",
-                        rule.init.c_str(),  sec0_data.token_datas[rule.left].name.c_str()
-                    );
-                }
-                break;
-            }
+            //case Sec0_Data::Token_Impl_Type::TUPLE:{
+            //    for(size_t i = 0;i<rule.rights.size();++i)
+            //        fprintf(out,
+            //            IND "Token::%s& token%zu_ = stack_[start_+%zu].token.get<Token::%s>();\n",
+            //            sec0_data.token_datas[rule.rights[i]].name.c_str(), i, i, sec0_data.token_datas[rule.rights[i]].name.c_str()
+            //        );
+            //    if(rule.left!=(Token_Kind_t)-1){
+            //        fprintf(out,
+            //            IND "auto p_token_target_ = Token_t::alloc.template allocate<Token::%s>();\n"
+            //            IND "yuki::pg::Location_Range loc_target_ = ",
+            //            sec0_data.token_datas[rule.left].name.c_str()
+            //        );
+            //        if(rule.rights.size()!=0)
+            //            fprintf(out,"{stack_[start_].token.location_range().begin,stack_[start_+%zu].token.location_range().end};\n", rule.rights.size()-1);
+            //        else
+            //            fputs("{};\n",out);
+            //        fprintf(out,
+            //            IND "YUKI_CONSTRUCT_BRACE(p_token_target_,%s);\n"
+            //            IND "Token::%s& token_target_ = *p_token_target_;\n\n",
+            //            rule.init.c_str(),  sec0_data.token_datas[rule.left].name.c_str()
+            //        );
+            //    }
+            //    break;
+            //}
         }
         fprintf(out,
             IND "{\n"
@@ -2053,19 +2053,19 @@ void write_parse_switch(FILE* const out,const Sec0_Data& sec0_data,const Rule_Se
             "\n",
             rule.code.c_str()
         );
-        if(sec0_data.is_tuple()){
-            for(size_t i = rule.rights.size();i!=0;--i){
-                fprintf(out, IND "stack_[start_+%zu].token.static_destroy_deallocate<Token::%s>();\n",
-                    i-1, sec0_data.token_datas[rule.rights[i-1]].name.c_str()
-                );
-                fprintf(out,IND "stack_.pop_back();\n");
-            }
-        }else{
+        //if(sec0_data.is_tuple()){
+        //    for(size_t i = rule.rights.size();i!=0;--i){
+        //        fprintf(out, IND "stack_[start_+%zu].token.static_destroy_deallocate<Token::%s>();\n",
+        //            i-1, sec0_data.token_datas[rule.rights[i-1]].name.c_str()
+        //        );
+        //        fprintf(out,IND "stack_.pop_back();\n");
+        //    }
+        //}else{
             fprintf(out,IND "stack_.pop_back(%zu);\n",rule.rights.size());
-        }
+        //}
         if(rule.left==(Token_Kind_t)-1){
-            if(sec0_data.is_tuple())
-                fprintf(out,IND "action_table.static_destroy_deallocate<Token::EOF_>();\n");
+            //if(sec0_data.is_tuple())
+            //    fprintf(out,IND "action_table.static_destroy_deallocate<Token::EOF_>();\n");
             fprintf(out,IND "return 0;\n" IND "}\n");
         }else{
             fprintf(out,
@@ -2076,7 +2076,7 @@ void write_parse_switch(FILE* const out,const Sec0_Data& sec0_data,const Rule_Se
             switch(sec0_data.token_impl_type){
                 case Sec0_Data::Token_Impl_Type::VARIANT: fprintf(out,IND "stack_.emplace_back(std::move(token_target_complete_),s_);\n"); break;
                 case Sec0_Data::Token_Impl_Type::SIMPLE: fprintf(out,IND "stack_.emplace_back(std::move(token_target_),s_);\n"); break;
-                case Sec0_Data::Token_Impl_Type::TUPLE: fprintf(out,IND "stack_.emplace_back(Token_t(p_token_target_,loc_target_),s_);\n"); break;
+                //case Sec0_Data::Token_Impl_Type::TUPLE: fprintf(out,IND "stack_.emplace_back(Token_t(p_token_target_,loc_target_),s_);\n"); break;
             }
             fprintf(out,IND "YUKI_PG_DBGO(\"REDUCE ");
             if(rule.left==(Token_Kind_t)-1)
@@ -2140,13 +2140,9 @@ void write(const Cmd_Data& cmd_data,const Sec0_Data& sec0_data,const Rule_Set<To
         fputs("\n\n\n\n",fp_log);
     }
 
-    for(const Sec0_Data::Code& code : sec0_data.codes){
-        if(code.qualifier=="cpp_top"){
-            fputs(code.contents.c_str(),out);
-            fputc(static_cast<unsigned char>('\n'),out);
-            break;
-        }
-    }
+    fputs(sec0_data.codes[Sec0_Data::Code_Cat::CPP_TOP].c_str(),out);
+    fputc(static_cast<unsigned char>('\n'),out);
+    fputc(static_cast<unsigned char>('\n'),out);
     fprintf(out,
         "#include<yuki/print.hpp>\n"
         "#include\"%s\"\n"
@@ -2266,24 +2262,15 @@ void write(const Cmd_Data& cmd_data,const Sec0_Data& sec0_data,const Rule_Set<To
         sec0_data.parser.c_str(), sec0_data.lexer.c_str(), sec0_data.lexer.c_str(),
         sec0_data.nspace_tail.c_str()
     );
-    for(const Sec0_Data::Code& code : sec0_data.codes){
-        if(code.qualifier=="SEC2_"){
-            fputs(code.contents.c_str(),out);
-            fputc(static_cast<unsigned char>('\n'),out);
-            break;
-        }
-    }
+    fputs(sec0_data.codes[Sec0_Data::Code_Cat::SEC2_].c_str(),out);
+    fputc(static_cast<unsigned char>('\n'),out);
 
 
     FILE* const out_h = cmd_data.fp_out_h;
-    fputs("#pragma once\n",out_h);
-    for(const Sec0_Data::Code& code : sec0_data.codes){
-        if(code.qualifier=="h_top"){
-            fputs(code.contents.c_str(),out_h);
-            fputc(static_cast<unsigned char>('\n'),out_h);
-            break;
-        }
-    }
+    fputs("#pragma once\n\n",out_h);
+    fputs(sec0_data.codes[Sec0_Data::Code_Cat::H_TOP].c_str(),out);
+    fputc(static_cast<unsigned char>('\n'),out);
+    fputc(static_cast<unsigned char>('\n'),out);
     fprintf(out_h,
         "#include\"%s\"\n"
         "\n"
@@ -2334,19 +2321,11 @@ void write(const Cmd_Data& cmd_data,const Sec0_Data& sec0_data,const Rule_Set<To
         sec0_data.parser.c_str(), sec0_data.ts.c_str(),
         sec0_data.debug_prefix.c_str(), sec0_data.debug_prefix.c_str()
     );
-    for(const Sec0_Data::Code& code : sec0_data.codes){
-        if(code.qualifier=="class"){
-            fprintf(out_h,"%s\n",code.contents.c_str());
-            break;
-        }
-    }
+    fputs(sec0_data.codes[Sec0_Data::Code_Cat::CLASS].c_str(),out);
+    fputc(static_cast<unsigned char>('\n'),out);
     fprintf(out_h,"\n}; // struct %s\n%s\n",sec0_data.parser.c_str(),sec0_data.nspace_tail.c_str());
-    for(const Sec0_Data::Code& code : sec0_data.codes){
-        if(code.qualifier=="h_bottom"){
-            fprintf(out_h,"%s\n",code.contents.c_str());
-            break;
-        }
-    }
+    fputs(sec0_data.codes[Sec0_Data::Code_Cat::H_BOTTOM].c_str(),out);
+    fputc(static_cast<unsigned char>('\n'),out);
 } // write
 
 
