@@ -1,7 +1,6 @@
-%nterm List {std::list<size_t>:;}
-%nterm Pair {size_t:;}
-%term LB "("
-%term RB ")"
+%nterm List {std::list<size_t/**/>}
+%nterm Pair size_t
+%terms LB"("RB/*blah*/")"
 
 %namespace xxx
 
@@ -19,14 +18,17 @@
 
 %%
 List
-    List Pair    %prec "("   %rr 5
+    List Pair    %s "("   %r 5 %empty
     {}
     {
-        $$.merge($0);
+        // }
+        $$.merge(/*}*/$0);
+        fputs("}",stdout);
+        fputc(static_cast<unsigned char>('}'),stdout);
         $$.push_back($1);
         $$.push_back(2);
     }
-    ;
+    |
     Pair    %prec 100
     {}
     {
@@ -45,7 +47,7 @@ Pair
     {};
 
 Goal_
-    List {} {
+    List {/**/} {
         printf("(");
         for(const size_t e : $0)
             printf("%d ",e);

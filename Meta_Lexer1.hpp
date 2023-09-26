@@ -28,7 +28,7 @@ Rule_Set<Token_Kind_t> parse_sec12(Sec0_Data& sec0_data,FILE* const in,const cha
             switch(sec0_data.input.try_skip_comment(in)){
                 case EOF: return rs;
                 case 0: break;
-                case static_cast<unsigned char>('\n'): goto skip_spaces_before_left;
+                default: goto skip_spaces_before_left;
             }
             break;
         case '%'_u8.raw():
@@ -53,7 +53,7 @@ Rule_Set<Token_Kind_t> parse_sec12(Sec0_Data& sec0_data,FILE* const in,const cha
             switch(sec0_data.input.try_skip_comment(in)){
                 case EOF: goto left_done;
                 case 0: break;
-                case static_cast<unsigned char>('\n'): goto left_done;
+                default: goto left_done;
             }
         }else if(u8c==yuki::EOF_U8)
             goto left_done;
@@ -93,7 +93,7 @@ Rule_Set<Token_Kind_t> parse_sec12(Sec0_Data& sec0_data,FILE* const in,const cha
         switch(sec0_data.input.try_skip_comment(in)){
             case EOF: u8c=yuki::EOF_U8;goto shipout;
             case 0: break;
-            case static_cast<unsigned char>('\n'): goto skip_spaces0;
+            default: goto skip_spaces0;
         }
     }else if(u8c==yuki::EOF_U8)
         goto shipout;
@@ -106,7 +106,7 @@ Rule_Set<Token_Kind_t> parse_sec12(Sec0_Data& sec0_data,FILE* const in,const cha
         switch(sec0_data.input.try_skip_comment(in)){
             case EOF: rs.empty(),u8c=yuki::EOF_U8;goto shipout;
             case 0: break;
-            case static_cast<unsigned char>('\n'): u8c=sec0_data.input.get(in); goto skip_spaces1;
+            default: u8c=sec0_data.input.get(in); goto skip_spaces1;
         }
     }else if(u8c==yuki::EOF_U8)
         goto shipout;
@@ -138,7 +138,7 @@ Rule_Set<Token_Kind_t> parse_sec12(Sec0_Data& sec0_data,FILE* const in,const cha
                         switch(sec0_data.input.try_skip_comment(in)){
                             case EOF: u8c=yuki::EOF_U8;goto percent_arg_error;
                             case 0: break;
-                            case static_cast<unsigned char>('\n'): u8c=sec0_data.input.get(in); goto skip_spaces1;
+                            default: u8c=sec0_data.input.get(in); goto skip_spaces1;
                         }
                         break;
                     default:
@@ -164,12 +164,14 @@ Rule_Set<Token_Kind_t> parse_sec12(Sec0_Data& sec0_data,FILE* const in,const cha
             percent=yuki::EOF_U8;
             goto shipout;
         case '\"'_u8.raw():
+            assert(str_temp.empty());
             switch(sec0_data.input.parse_quoted<'\"'>(in,str_temp,filename)){
                 case EOF: sec0_data.advance_errors(); str_temp.push_back('\"'); goto shipout;
                 case '\"'_uc: u8c=sec0_data.input.get(in); goto write_to_rights;
                 default: assert(false); std::unreachable();
             }
         case '\''_u8.raw():
+            assert(str_temp.empty());
             switch(sec0_data.input.parse_quoted<'\''>(in,str_temp,filename)){
                 case EOF: sec0_data.advance_errors(); str_temp.push_back('\''); goto shipout;
                 case '\''_uc: u8c=sec0_data.input.get(in); goto write_to_rights;
@@ -190,13 +192,40 @@ Rule_Set<Token_Kind_t> parse_sec12(Sec0_Data& sec0_data,FILE* const in,const cha
                         sec0_data.advance_errors();
                         goto shipout;
                     case '}'_u8.raw():
+                        u8c=sec0_data.input.get(in);
                         if(--brace_level==0)
                             goto init_or_code_done;
                         else{
                             target.push_back('}');
-                            u8c=sec0_data.input.get(in);
                             break;
                         }
+                    case '/'_u8.raw():
+                        switch(sec0_data.input.try_skip_comment(in)){
+                            case EOF:
+                                print_loc(stderr,sec0_data.input.lineno,sec0_data.input.colno,filename);
+                                fputs("Error: Missing closing brace!\n",stderr);
+                                sec0_data.advance_errors();
+                                goto shipout;
+                            case 0: target.push_back('/'); break;
+                            case static_cast<unsigned char>('\n'): target.push_back('\n'); break;
+                            case static_cast<unsigned char>('/'): target.push_back(' '); break;
+                        }
+                        u8c=sec0_data.input.get(in);
+                        break;
+                    case '\"'_u8.raw():
+                        switch(sec0_data.input.parse_quoted<'\"'>(in,target,filename)){
+                            case EOF: sec0_data.advance_errors(); target.push_back('\"'); goto shipout;
+                            case '\"'_uc: u8c=sec0_data.input.get(in); break;
+                            default: assert(false); std::unreachable();
+                        }
+                        break;
+                    case '\''_u8.raw():
+                        switch(sec0_data.input.parse_quoted<'\''>(in,target,filename)){
+                            case EOF: sec0_data.advance_errors(); target.push_back('\''); goto shipout;
+                            case '\''_uc: u8c=sec0_data.input.get(in); break;
+                            default: assert(false); std::unreachable();
+                        }
+                        break;
                     case '$'_u8.raw():{
                         const size_t dollar_lineno = sec0_data.input.lineno_orig;
                         const size_t dollar_colno = sec0_data.input.colno_orig;
@@ -275,6 +304,7 @@ Rule_Set<Token_Kind_t> parse_sec12(Sec0_Data& sec0_data,FILE* const in,const cha
                         break;
                 } // switch(u8c.raw())
             } // while(1)
+            assert(false);
           init_or_code_done:
             //target.resize(yuki::remove_trailing_u8(target.begin(),target.end(),yuki::unicode::is_WSpace<yuki::U8Char>));
             if(is_init){
@@ -288,7 +318,6 @@ Rule_Set<Token_Kind_t> parse_sec12(Sec0_Data& sec0_data,FILE* const in,const cha
                     rule.init.push_back(' ');
                 }
             }
-            u8c=sec0_data.input.get(in);
             goto skip_spaces1;
         } // case '{'_u8
         case '|'_u8.raw():case ';'_u8.raw(): goto shipout;
@@ -303,7 +332,7 @@ Rule_Set<Token_Kind_t> parse_sec12(Sec0_Data& sec0_data,FILE* const in,const cha
                         switch(sec0_data.input.try_skip_comment(in)){
                             case EOF: u8c=yuki::EOF_U8;goto shipout;
                             case 0: break;
-                            case static_cast<unsigned char>('\n'): u8c=sec0_data.input.get(in); goto write_to_rights;
+                            default: u8c=sec0_data.input.get(in); goto write_to_rights;
                         }
                         break;
                     default:

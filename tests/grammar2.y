@@ -1,19 +1,8 @@
-%nterm X
-%nterm Y
-%nterm Z
-%nterm T
-%nterm W
-%nterm V
-%term a
-%term b
-%term c
-%term d
-%term e
-%term t
-%term u
+%nterms X Y z T W V
+%terms a b c d e t u
 
 %%
-X:
+X
     a Y d
     |
     a Z c
@@ -26,21 +15,21 @@ X:
     |
     b T
     ;
-Y:
+Y
     t W
     |
     u X
     ;
-Z:
+Z
     t u
     ;
-T:
+T
     u X a
     ;
-W:
+W
     u V
     ;
-V:
+V
     %empty
     ;
 %%

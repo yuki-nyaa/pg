@@ -364,7 +364,7 @@ inline Sec0_Data parse_sec0(FILE* const in,const char* const filename,const unsi
                     fputs("Error: Section 0 does not begin with \'%\'!\n",stderr);
                     data.advance_errors();
                     break;
-                case static_cast<unsigned char>('\n'):
+                default:
                     goto skip_spaces_first;
             }
             break;
@@ -390,7 +390,7 @@ inline Sec0_Data parse_sec0(FILE* const in,const char* const filename,const unsi
             switch(data.input.try_skip_comment(in)){
                 case EOF: eof_error(data.errors()+1);
                 case 0: break;
-                case static_cast<unsigned char>('\n'): goto head_done;
+                default: goto head_done;
             }
         }else if(u8c==yuki::EOF_U8)
             eof_error(data.errors()+1);
@@ -413,7 +413,7 @@ inline Sec0_Data parse_sec0(FILE* const in,const char* const filename,const unsi
         switch(data.input.try_skip_comment(in)){
             case EOF: eof_error(data.errors()+1);
             case 0: break;
-            case static_cast<unsigned char>('\n'): goto skip_spaces;
+            default: goto skip_spaces;
         }
     }else if(u8c==yuki::EOF_U8)
         eof_error(data.errors()+1);
@@ -422,12 +422,14 @@ inline Sec0_Data parse_sec0(FILE* const in,const char* const filename,const unsi
     const size_t colno = data.input.colno_orig;
     switch(u8c.raw()){
         case '\"'_u8.raw():
+            assert(arg.empty());
             switch(data.input.parse_quoted<'\"'>(in,arg,filename)){
                 case EOF: data.advance_errors(); eof_error(data.errors()+1);
                 case '\"'_uc: u8c=data.input.get(in); goto shipout_1_arg;
                 default: assert(false); std::unreachable();
             }
         case '\''_u8.raw():
+            assert(arg.empty());
             switch(data.input.parse_quoted<'\''>(in,arg,filename)){
                 case EOF: data.advance_errors(); eof_error(data.errors()+1);
                 case '\''_uc: u8c=data.input.get(in); goto shipout_1_arg;
@@ -452,6 +454,32 @@ inline Sec0_Data parse_sec0(FILE* const in,const char* const filename,const unsi
                             arg.push_back('}');
                             break;
                         }
+                    case '/'_u8.raw():
+                        switch(data.input.try_skip_comment(in)){
+                            case EOF:
+                                print_loc(stderr,data.input.lineno,data.input.colno,filename);
+                                fputs("Error: Missing closing brace!\n",stderr);
+                                eof_error(data.errors()+1);
+                            case 0: arg.push_back('/'); break;
+                            case static_cast<unsigned char>('\n'): arg.push_back('\n'); break;
+                            case static_cast<unsigned char>('/'): arg.push_back(' '); break;
+                        }
+                        u8c=data.input.get(in);
+                        break;
+                    case '\"'_u8.raw():
+                        switch(data.input.parse_quoted<'\"'>(in,arg,filename)){
+                            case EOF: eof_error(data.errors()+1);
+                            case '\"'_uc: u8c=data.input.get(in); break;
+                            default: assert(false); std::unreachable();
+                        }
+                        break;
+                    case '\''_u8.raw():
+                        switch(data.input.parse_quoted<'\''>(in,arg,filename)){
+                            case EOF: eof_error(data.errors()+1);
+                            case '\''_uc: u8c=data.input.get(in); break;
+                            default: assert(false); std::unreachable();
+                        }
+                        break;
                     default:
                         u8c.write_to(arg);
                         u8c=data.input.get(in);
@@ -471,7 +499,7 @@ inline Sec0_Data parse_sec0(FILE* const in,const char* const filename,const unsi
                         switch(data.input.try_skip_comment(in)){
                             case EOF: eof_error(data.errors()+1);
                             case 0: break;
-                            case static_cast<unsigned char>('\n'): goto shipout_1_arg;
+                            default: goto shipout_1_arg;
                         }
                         break;
                     default:

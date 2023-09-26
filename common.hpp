@@ -163,7 +163,7 @@ struct Sec0_Data{
             return c;
         }
 
-        /// @return `0` if the next byte is neither '/' nor '*'; `EOF` if the comment ends with `EOF`; `(unsigned char)'\n'` if the comment ends normally, i.e. ends with `\n` for "//" and "*/" for "/*".
+        /// @return `0` if the next byte is neither '/' nor '*'; `EOF` if the comment ends with `EOF`; `(unsigned char)'\n'` or `(unsigned char)'/'` if the comment end normally.
         /// @note `lineno_orig` and `colno_orig` are not trakced during skipping since they're of no use in this case.
         int try_skip_comment(FILE* const in){
             if(const int peek=fgetc(in); peek==static_cast<unsigned char>('/')){
@@ -187,7 +187,7 @@ struct Sec0_Data{
                             ++colno;
                             if(const int peek2=fgetc(in); peek2==static_cast<unsigned char>('/')){
                                 ++colno;
-                                return static_cast<unsigned char>('\n');
+                                return static_cast<unsigned char>('/');
                             }else{
                                 ungetc(peek2,in);
                                 break;
@@ -204,7 +204,6 @@ struct Sec0_Data{
         /// @return `EOF` if the quoted section ends with `EOF` (without a matching closing quote); `quote` (as the unsigned value) if the quoted section ends normally.
         template<char quote>
         int parse_quoted(FILE* const in,std::string& str,const char* const filename){
-            assert(str.empty());
             str.push_back(quote);
             yuki::U8Char u8c;
             while(1){

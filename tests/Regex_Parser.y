@@ -1,11 +1,11 @@
-%nterm Regex {FSM:;}
-%nterm Char_Class {yuki::IntegralCIs_OV<char32_t>:;}
-%nterm Char_Interval {yuki::CInterval<char32_t>:;}
-%nterm Char_Intervals {yuki::IntegralCIs_OV<char32_t>:;}
-%term amount {Amount:;}
-%term character {char32_t:;}
-%term meta_char {int:;}
-%term basic_char_class {yuki::IntegralCIs_OV<char32_t>:;}
+%nterm Regex {FSM}
+%nterm Char_Class {yuki::IntegralCIs_OV<char32_t>}
+%nterm Char_Interval {yuki::CInterval<char32_t>}
+%nterm Char_Intervals {yuki::IntegralCIs_OV<char32_t>}
+%term amount {Amount}
+%term character {char32_t}
+%term meta_char {int}
+%term basic_char_class {yuki::IntegralCIs_OV<char32_t>}
 %term paren_l "("
 %term paren_r ")"
 %term sqparen_l "["
@@ -81,7 +81,7 @@
 }
 
 %%
-Goal_:
+Goal_
     Regex
         {}
         {
@@ -97,7 +97,7 @@ Goal_:
         }
     ;
 
-Regex:
+Regex
     Regex Regex
         {ff.make_seq($0,$1)}
         {}
@@ -165,7 +165,7 @@ Regex:
         {}
     ;
 
-//Alts:
+//Alts
 //    Alts "|" Regex
 //        {($0.emplace_back($2),std::move($0))}
 //        {}
@@ -175,7 +175,7 @@ Regex:
 //        {}
 //    ;
 
-Char_Class:
+Char_Class
     "[" Char_Interval "]"
         {$1}
         {}
@@ -209,7 +209,7 @@ Char_Class:
         {}
     ;
 
-Char_Intervals:
+Char_Intervals
     Char_Intervals Char_Interval
     {std::move(($0.insert($1),$0))}
     {}
@@ -219,7 +219,7 @@ Char_Intervals:
     {}
     ;
 
-Char_Interval:
+Char_Interval
     character "-" character
     {$0,$2}
     {}

@@ -1,22 +1,18 @@
-%nterm X
-%nterm Y
-%nterm Z
-%term a
-%term c
-%term d
+%nterms X Y Z
+%terms a c d
 
 %%
-X:
+X
     Y
     |
     a
     ;
-Y:
+Y
     c
     |
     %empty
     ;
-Z:
+Z
     X Y Z
     |
     d
