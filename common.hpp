@@ -225,13 +225,6 @@ struct Sec0_Data{
         }
     } input;
 }; // Sec0_Data
-
-
-struct Str_Loc{
-    size_t lineno;
-    size_t colno;
-    std::string str;
-};
 } // namespace yuki::pg
 
 
@@ -551,43 +544,3 @@ struct Make_FT : protected TC_Context<Token_Kind_t>{
     }
 };
 } // namespace yuki::pg
-
-namespace yuki::pg{
-[[noreturn]] inline void eof_error(const unsigned errors){
-    fputs("Fatal Error: No production was specified!\n",stderr);
-    fprintf(stderr,"%u errors encountered.\n",errors);
-    exit(EXIT_FAILURE);
-}
-inline void print_escaped(FILE* out,std::string_view s){
-    if(s.empty())
-        return;
-    char back = 0;
-    if(s.front()=='\"' || s.front()=='\''){
-        fputc(static_cast<unsigned char>('\\'),out);
-        fputc(s.front(),out);
-        back=s.back();
-        s.remove_prefix(1);
-        s.remove_suffix(1);
-    }
-    for(const char c : s){
-        switch(c){
-            case '\'': fputs("\\\'",out); break;
-            case '\"': fputs("\\\"",out); break;
-            case '\?': fputs("\\\?",out); break;
-            case '\\': fputs("\\\\",out); break;
-            case '\a': fputs("\\a",out); break;
-            case '\b': fputs("\\b",out); break;
-            case '\f': fputs("\\f",out); break;
-            case '\n': fputs("\\n",out); break;
-            case '\r': fputs("\\r",out); break;
-            case '\t': fputs("\\t",out); break;
-            case '\v': fputs("\\v",out); break;
-            default: fputc(c,out); break;
-        }
-    }
-    if(back!=0){
-        fputc(static_cast<unsigned char>('\\'),out);
-        fputc(back,out);
-    }
-}
-}

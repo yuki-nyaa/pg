@@ -1950,6 +1950,40 @@ void print(FILE* const fp,const Token_Datas& token_datas,const Rule<Token_Kind_t
 }
 
 
+void print_escaped(FILE* out,std::string_view s){
+    if(s.empty())
+        return;
+    char back = 0;
+    if(s.front()=='\"' || s.front()=='\''){
+        fputc(static_cast<unsigned char>('\\'),out);
+        fputc(s.front(),out);
+        back=s.back();
+        s.remove_prefix(1);
+        s.remove_suffix(1);
+    }
+    for(const char c : s){
+        switch(c){
+            case '\'': fputs("\\\'",out); break;
+            case '\"': fputs("\\\"",out); break;
+            case '\?': fputs("\\\?",out); break;
+            case '\\': fputs("\\\\",out); break;
+            case '\a': fputs("\\a",out); break;
+            case '\b': fputs("\\b",out); break;
+            case '\f': fputs("\\f",out); break;
+            case '\n': fputs("\\n",out); break;
+            case '\r': fputs("\\r",out); break;
+            case '\t': fputs("\\t",out); break;
+            case '\v': fputs("\\v",out); break;
+            default: fputc(c,out); break;
+        }
+    }
+    if(back!=0){
+        fputc(static_cast<unsigned char>('\\'),out);
+        fputc(back,out);
+    }
+}
+
+
 template<std::unsigned_integral Token_Kind_t>
 void write_parse_switch(FILE* const out,const Sec0_Data& sec0_data,const Rule_Set<Token_Kind_t>& rules){
     fprintf(out,
