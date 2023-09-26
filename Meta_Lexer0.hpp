@@ -70,7 +70,7 @@ namespace sec0_impl{
         }else{
             print_loc(stderr,lineno,colno,filename);
             fprintf(stderr,"Error: Unknown token name encountered while parsing %%left/%%right declaration: %s\n",arg.data());
-            ++data.errors;
+            data.advance_errors();
         }
     }
 
@@ -88,7 +88,7 @@ namespace sec0_impl{
         }else{
             print_loc(stderr,lineno,colno,filename);
             fprintf(stderr,"Error: Unknown token name encountered while parsing %%prec declaration: %s\n",arg.data());
-            ++data.errors;
+            data.advance_errors();
         }
     }
 
@@ -144,7 +144,7 @@ namespace sec0_impl{
                 }else{
                     print_loc(stderr,lineno,colno,filename);
                     fprintf(stderr,"Error: Redefinition of token: %s\n",arg.data());
-                    ++data.errors;
+                    data.advance_errors();
                     data.term_valid=false;
                 }
                 return;
@@ -160,7 +160,7 @@ namespace sec0_impl{
                             print_loc(stderr,lineno,colno,filename);
                             fprintf(stderr,"Error: Duplicate token alias %s!\n",arg.data());
                             fprintf(stderr,"--Note: The alias is already used by: %s\n",data.token_datas[it->second].name.c_str());
-                            ++data.errors;
+                            data.advance_errors();
                         }
                     }else{
                         const auto it = data.token_datas.token_htable.find(arg);
@@ -168,7 +168,7 @@ namespace sec0_impl{
                             print_loc(stderr,lineno,colno,filename);
                             fprintf(stderr,"Error: Duplicate token alias %s!\n",arg.data());
                             fprintf(stderr,"--Note: The alias is already used by: %s\n",data.token_datas[it->second].name.c_str());
-                            ++data.errors;
+                            data.advance_errors();
                         }
                     }
                 }else{
@@ -192,7 +192,7 @@ namespace sec0_impl{
                         print_loc(stderr,lineno,colno,filename);
                         fprintf(stderr,"Error: Token value type redeclared for token: %s\n",terms.back().name.c_str());
                         fprintf(stderr,"--Note: Previously declared type: %s . Currently declared type: %s\n",terms.back().type.c_str(),arg.data());
-                        ++data.errors;
+                        data.advance_errors();
                     }
                 }
                 return;
@@ -222,13 +222,13 @@ namespace sec0_impl{
                         print_loc(stderr,lineno,colno,filename);
                         fprintf(stderr,"Error: Token alias redeclared for token: %s\n",terms.back().name.c_str());
                         fprintf(stderr,"--Note: Previously declared alias: %s. Currently declared alias: %s.\n",terms.back().alias.c_str(),arg.data());
-                        ++data.errors;
+                        data.advance_errors();
                     }
                 }else{
                     print_loc(stderr,lineno,colno,filename);
                     fprintf(stderr,"Error: Duplicate token alias %s!\n",arg.data());
                     fprintf(stderr,"--Note: The alias is already used by: %s\n",data.token_datas[it->second].name.c_str());
-                    ++data.errors;
+                    data.advance_errors();
                 }
             }else{
                 const auto it = data.token_datas.token_htable.find(arg);
@@ -236,7 +236,7 @@ namespace sec0_impl{
                     print_loc(stderr,lineno,colno,filename);
                     fprintf(stderr,"Error: Duplicate token alias %s!\n",arg.data());
                     fprintf(stderr,"--Note: The alias is already used by: %s\n",data.token_datas[it->second].name.c_str());
-                    ++data.errors;
+                    data.advance_errors();
                 }
             }
         }else{
@@ -248,7 +248,7 @@ namespace sec0_impl{
             }else{
                 print_loc(stderr,lineno,colno,filename);
                 fprintf(stderr,"Error: Redefinition of token: %s\n",arg.data());
-                ++data.errors;
+                data.advance_errors();
                 data.term_valid=false;
             }
         }
@@ -266,7 +266,7 @@ namespace sec0_impl{
                 data.current_code=Sec0_Data::Code_Cat::NIL_;
                 print_loc(stderr,lineno,colno,filename);
                 fputs("Error: Unknown code qualifier",stderr);
-                ++data.errors;
+                data.advance_errors();
                 if(arg.size()<=32){
                     fputc(static_cast<unsigned char>('\"'),stderr);
                     fputs(arg.data(),stderr);
@@ -281,7 +281,7 @@ namespace sec0_impl{
                 }else{
                     print_loc(stderr,lineno,colno,filename);
                     fputs("Error: Missing code qualifier!\n",stderr);
-                    ++data.errors;
+                    data.advance_errors();
                 }
                 if(arg.empty()){
                     print_loc(stderr,lineno,colno,filename);
@@ -340,8 +340,9 @@ constexpr yuki::CHashTable_Str<sec0_impl::Sec0_Entry,sec0_impl::Sec0_Entry::SV,s
 };
 
 
-inline Sec0_Data parse_sec0(FILE* const in,const char* const filename){
+inline Sec0_Data parse_sec0(FILE* const in,const char* const filename,const unsigned max_errors){
     Sec0_Data data;
+    data.max_errors=max_errors;
 
     yuki::U8Char u8c;
 
@@ -353,15 +354,15 @@ inline Sec0_Data parse_sec0(FILE* const in,const char* const filename){
     }while(yuki::unicode::is_WSpace(u8c));
     switch(u8c.raw()){
         case yuki::EOF_U8.raw():
-            eof_error(data.errors+1);
+            eof_error(data.errors()+1);
         case '/'_u8.raw():
             switch(data.input.try_skip_comment(in)){
                 case EOF:
-                    eof_error(data.errors+1);
+                    eof_error(data.errors()+1);
                 case 0:
                     print_loc(stderr,data.input.lineno_orig,data.input.colno_orig,filename);
                     fputs("Error: Section 0 does not begin with \'%\'!\n",stderr);
-                    ++data.errors;
+                    data.advance_errors();
                     break;
                 case static_cast<unsigned char>('\n'):
                     goto skip_spaces_first;
@@ -372,7 +373,7 @@ inline Sec0_Data parse_sec0(FILE* const in,const char* const filename){
         default:
             print_loc(stderr,data.input.lineno_orig,data.input.colno_orig,filename);
             fputs("Error: Section 0 does not begin with \'%\'!\n",stderr);
-            ++data.errors;
+            data.advance_errors();
             break;
     }
 
@@ -387,12 +388,12 @@ inline Sec0_Data parse_sec0(FILE* const in,const char* const filename){
     for(; !yuki::unicode::is_WSpace(u8c); u8c.write_to(arg),u8c=data.input.get(in)){
         if(u8c=='/'_u8){
             switch(data.input.try_skip_comment(in)){
-                case EOF: eof_error(data.errors+1);
+                case EOF: eof_error(data.errors()+1);
                 case 0: break;
                 case static_cast<unsigned char>('\n'): goto head_done;
             }
         }else if(u8c==yuki::EOF_U8)
-            eof_error(data.errors+1);
+            eof_error(data.errors()+1);
     }
   head_done:
     const sec0_impl::Sec0_Entry* const sep=sec0_actions.find(arg);
@@ -400,7 +401,7 @@ inline Sec0_Data parse_sec0(FILE* const in,const char* const filename){
     if(!sep){
         print_loc(stderr,head_lineno,head_colno,filename);
         fprintf(stderr,"Error: Unknown section 0 directive \"%s\"!\n",arg.c_str());
-        ++data.errors;
+        data.advance_errors();
     }
     arg.clear();
     size_t arg_current=0;
@@ -410,12 +411,12 @@ inline Sec0_Data parse_sec0(FILE* const in,const char* const filename){
     }while(yuki::unicode::is_WSpace(u8c));
     if(u8c=='/'_u8){
         switch(data.input.try_skip_comment(in)){
-            case EOF: eof_error(data.errors+1);
+            case EOF: eof_error(data.errors()+1);
             case 0: break;
             case static_cast<unsigned char>('\n'): goto skip_spaces;
         }
     }else if(u8c==yuki::EOF_U8)
-        eof_error(data.errors+1);
+        eof_error(data.errors()+1);
   parse_arg:
     const size_t lineno = data.input.lineno_orig;
     const size_t colno = data.input.colno_orig;
@@ -429,9 +430,14 @@ inline Sec0_Data parse_sec0(FILE* const in,const char* const filename){
                     case yuki::EOF_U8.raw():
                         print_loc(stderr,data.input.lineno,data.input.colno,filename);
                         fputs("Error: Missing closing double quote!\n",stderr);
-                        ++data.errors;
-                        eof_error(data.errors+1);
+                        data.advance_errors();
+                        eof_error(data.errors()+1);
                     case '\"'_u8.raw(): arg.push_back('\"'); u8c=data.input.get(in); goto shipout_1_arg;
+                    case '\n'_u8.raw():
+                        print_loc(stderr,data.input.lineno_orig,data.input.colno_orig,filename);
+                        fputs("Warning: Quoted name across lines!\n",stderr);
+                        arg.push_back('\n');
+                        break;
                     default: u8c.write_to(arg); break;
                 }
             }
@@ -444,9 +450,14 @@ inline Sec0_Data parse_sec0(FILE* const in,const char* const filename){
                     case yuki::EOF_U8.raw():
                         print_loc(stderr,data.input.lineno,data.input.colno,filename);
                         fputs("Error: Missing closing single quote!\n",stderr);
-                        ++data.errors;
-                        eof_error(data.errors+1);
+                        data.advance_errors();
+                        eof_error(data.errors()+1);
                     case '\''_u8.raw(): arg.push_back('\''); u8c=data.input.get(in); goto shipout_1_arg;
+                    case '\n'_u8.raw():
+                        print_loc(stderr,data.input.lineno_orig,data.input.colno_orig,filename);
+                        fputs("Warning: Quoted name across lines!\n",stderr);
+                        arg.push_back('\n');
+                        break;
                     default: u8c.write_to(arg); break;
                 }
             }
@@ -460,7 +471,7 @@ inline Sec0_Data parse_sec0(FILE* const in,const char* const filename){
                     case yuki::EOF_U8.raw():
                         print_loc(stderr,data.input.lineno,data.input.colno,filename);
                         fputs("Error: Missing closing brace!\n",stderr);
-                        eof_error(data.errors+1);
+                        eof_error(data.errors()+1);
                     case '}'_u8.raw():
                         u8c=data.input.get(in);
                         if(--brace_level==0)
@@ -483,10 +494,10 @@ inline Sec0_Data parse_sec0(FILE* const in,const char* const filename){
                 u8c.write_to(arg);
                 u8c=data.input.get(in);
                 switch(u8c.raw()){
-                    case yuki::EOF_U8.raw(): eof_error(data.errors+1);
+                    case yuki::EOF_U8.raw(): eof_error(data.errors()+1);
                     case '/'_u8.raw():
                         switch(data.input.try_skip_comment(in)){
-                            case EOF: eof_error(data.errors+1);
+                            case EOF: eof_error(data.errors()+1);
                             case 0: break;
                             case static_cast<unsigned char>('\n'): goto shipout_1_arg;
                         }

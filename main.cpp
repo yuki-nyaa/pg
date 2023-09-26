@@ -345,10 +345,10 @@ int main(const int argc,const char*const*const argv){
     if(!cmd_data.post_process())
         exit(EXIT_FAILURE);
 
-    yuki::pg::Sec0_Data sec0_data = yuki::pg::parse_sec0(cmd_data.fp_in,cmd_data.in.data());
+    yuki::pg::Sec0_Data sec0_data = yuki::pg::parse_sec0(cmd_data.fp_in,cmd_data.in.data(),cmd_data.max_errors);
     if(sec0_data.token_datas.nterms.empty()){
         fputs("Fatal Error: No non-terminals are declared!\n",stderr);
-        fprintf(stderr,"%u errors encountered.\n",sec0_data.errors+1);
+        fprintf(stderr,"%u errors encountered.\n",sec0_data.errors()+1);
         return EXIT_FAILURE;
     }
     sec0_data.token_datas.terms.emplace_back("EOF_");
@@ -368,31 +368,31 @@ int main(const int argc,const char*const*const argv){
         case yuki::uint_enum::UCHAR:{
             const yuki::pg::Rule_Set<unsigned char> rs = parse_sec12<unsigned char>(sec0_data,cmd_data.fp_in,cmd_data.in.data());
             if(rs.empty())
-                yuki::pg::eof_error(sec0_data.errors+1);
+                yuki::pg::eof_error(sec0_data.errors()+1);
             yuki::pg::lr::write(cmd_data,sec0_data,rs);
             break;
         }
         case yuki::uint_enum::USHORT:{
             const yuki::pg::Rule_Set<unsigned short> rs = parse_sec12<unsigned short>(sec0_data,cmd_data.fp_in,cmd_data.in.data());
             if(rs.empty())
-                yuki::pg::eof_error(sec0_data.errors+1);
+                yuki::pg::eof_error(sec0_data.errors()+1);
             yuki::pg::lr::write(cmd_data,sec0_data,rs);
             break;
         }
         case yuki::uint_enum::UINT:{
             const yuki::pg::Rule_Set<unsigned> rs = parse_sec12<unsigned>(sec0_data,cmd_data.fp_in,cmd_data.in.data());
             if(rs.empty())
-                yuki::pg::eof_error(sec0_data.errors+1);
+                yuki::pg::eof_error(sec0_data.errors()+1);
             yuki::pg::lr::write(cmd_data,sec0_data,rs);
             break;
         }
         default:
             fprintf(stderr,"Fatal Error: Token count exceeds implementation limit %u!\n",std::numeric_limits<unsigned>::max());
-            ++sec0_data.errors;
+            sec0_data.advance_errors();
             break;
     }
-    if(sec0_data.errors!=0){
-        fprintf(stderr,"%u errors encountered.\n",sec0_data.errors);
+    if(sec0_data.errors()!=0){
+        fprintf(stderr,"%u errors encountered.\n",sec0_data.errors());
         return EXIT_FAILURE;
     }else
         return EXIT_SUCCESS;

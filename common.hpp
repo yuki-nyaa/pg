@@ -100,12 +100,14 @@ struct Sec0_Data{
     //bool is_tuple() const {return token_impl_type==Token_Impl_Type::TUPLE;}
 
     Assoc assoc0 = Assoc::LEFT;
-  //private:
-    unsigned errors=0;
-//  public:
-//    unsigned errors() const {return errors_;}
-    void advance_errors(const unsigned limit){
-        if(++errors_>=limit){
+
+    unsigned max_errors=0;
+  private:
+    unsigned errors_=0;
+  public:
+    unsigned errors() const {return errors_;}
+    void advance_errors(){
+        if(++errors_>=max_errors){
             fputs(
                 "Fatal Error: Too many errors! Job aborted!\n"
                 "--Note: Use \"--max-errors num\" in the command line to increase the error limit.\n",
@@ -157,7 +159,7 @@ struct Sec0_Data{
             return c;
         }
 
-        /// @return `0` if the next byte is not '/'; `EOF` or `(unsigned char)'\n'` if the next byte is '/' and the last skipped byte (when this skipping is over) is it.
+        /// @return `0` if the next byte is neither '/' nor '*'; `EOF` if the comment ends with EOF; `(unsigned char)'\n'` if the comment ends normally, i.e. ends with `\n` for "//" and "*/" for "/*".
         /// @note `lineno_orig` and `colno_orig` are not trakced during skipping since they're of no use in this case.
         int try_skip_comment(FILE* const in){
             if(const int peek=fgetc(in); peek==static_cast<unsigned char>('/')){
@@ -168,6 +170,24 @@ struct Sec0_Data{
                         case yuki::EOF_U8.raw(): return EOF;
                         case '\r'_u8.raw(): fgetc(in); [[fallthrough]];
                         case '\n'_u8.raw(): ++lineno; colno=1; return static_cast<unsigned char>('\n');
+                        default: ++colno; break;
+                    }
+                }
+            }else if(peek==static_cast<unsigned char>('*')){
+                ++colno;
+                while(1){
+                    using namespace yuki::literals;
+                    switch(const yuki::U8Char peek1(in); peek1.raw()){
+                        case yuki::EOF_U8.raw(): return EOF;
+                        case '*'_u8.raw():
+                            ++colno;
+                            if(const int peek2=fgetc(in); peek2==static_cast<unsigned char>('/')){
+                                ++colno;
+                                return static_cast<unsigned char>('\n');
+                            }else{
+                                ungetc(peek2,in);
+                                break;
+                            }
                         default: ++colno; break;
                     }
                 }

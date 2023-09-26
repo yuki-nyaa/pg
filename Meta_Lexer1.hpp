@@ -69,7 +69,7 @@ Rule_Set<Token_Kind_t> parse_sec12(Sec0_Data& sec0_data,FILE* const in,const cha
             if(co.is_term){
                 print_loc(stderr,left_lineno,left_colno,filename);
                 fprintf(stderr,"Error: Terminal name on the lhs of a production: %s\n",str_temp.c_str());
-                ++sec0_data.errors;
+                sec0_data.advance_errors();
                 rule_invalid=true;
             }else{
                 rule.left = sec0_data.token_datas.to_num<Token_Kind_t>(co);
@@ -77,7 +77,7 @@ Rule_Set<Token_Kind_t> parse_sec12(Sec0_Data& sec0_data,FILE* const in,const cha
         }catch(const std::out_of_range&){
             print_loc(stderr,left_lineno,left_colno,filename);
             fprintf(stderr,"Error: Unknown token name on the lhs of a production: %s\n",str_temp.c_str());
-            ++sec0_data.errors;
+            sec0_data.advance_errors();
             rule_invalid=true;
         }
     }
@@ -126,7 +126,7 @@ Rule_Set<Token_Kind_t> parse_sec12(Sec0_Data& sec0_data,FILE* const in,const cha
                     percent.write_to(buf);
                     print_loc(stderr,percent_lineno,percent_colno,filename);
                     fprintf(stderr,"Error: %%%s... directive is unknown!\n",buf);
-                    ++sec0_data.errors;
+                    sec0_data.advance_errors();
                     [[fallthrough]];
                 }
                 case 'e'_u8.raw(): percent=yuki::EOF_U8; break;
@@ -159,7 +159,7 @@ Rule_Set<Token_Kind_t> parse_sec12(Sec0_Data& sec0_data,FILE* const in,const cha
             percent.write_to(buf);
             print_loc(stderr,sec0_data.input.lineno_orig,sec0_data.input.colno_orig,filename);
             fprintf(stderr,"Error: %%%s expects an argument but none was given!\n",buf);
-            ++sec0_data.errors;
+            sec0_data.advance_errors();
             }
             percent=yuki::EOF_U8;
             goto shipout;
@@ -172,10 +172,15 @@ Rule_Set<Token_Kind_t> parse_sec12(Sec0_Data& sec0_data,FILE* const in,const cha
                     case yuki::EOF_U8.raw():
                         print_loc(stderr,sec0_data.input.lineno,sec0_data.input.colno,filename);
                         fputs("Error: Missing closing double quote!\n",stderr);
-                        ++sec0_data.errors;
+                        sec0_data.advance_errors();
                         str_temp.push_back('\"');
                         goto shipout;
                     case '\"'_u8.raw(): str_temp.push_back('\"'); u8c=sec0_data.input.get(in); goto write_to_rights;
+                    case '\n'_u8.raw():
+                        print_loc(stderr,sec0_data.input.lineno_orig,sec0_data.input.colno_orig,filename);
+                        fputs("Warning: Quoted name across lines!\n",stderr);
+                        str_temp.push_back('\n');
+                        break;
                     default: u8c.write_to(str_temp); break;
                 }
             }
@@ -188,10 +193,15 @@ Rule_Set<Token_Kind_t> parse_sec12(Sec0_Data& sec0_data,FILE* const in,const cha
                     case yuki::EOF_U8.raw():
                         print_loc(stderr,sec0_data.input.lineno,sec0_data.input.colno,filename);
                         fputs("Error: Missing closing single quote!\n",stderr);
-                        ++sec0_data.errors;
+                        sec0_data.advance_errors();
                         str_temp.push_back('\'');
                         goto shipout;
                     case '\''_u8.raw(): str_temp.push_back('\''); u8c=sec0_data.input.get(in); goto write_to_rights;
+                    case '\n'_u8.raw():
+                        print_loc(stderr,sec0_data.input.lineno_orig,sec0_data.input.colno_orig,filename);
+                        fputs("Warning: Quoted name across lines!\n",stderr);
+                        str_temp.push_back('\n');
+                        break;
                     default: u8c.write_to(str_temp); break;
                 }
             }
@@ -207,7 +217,7 @@ Rule_Set<Token_Kind_t> parse_sec12(Sec0_Data& sec0_data,FILE* const in,const cha
                     case yuki::EOF_U8.raw():
                         print_loc(stderr,sec0_data.input.lineno,sec0_data.input.colno,filename);
                         fputs("Error: Missing closing brace!\n",stderr);
-                        ++sec0_data.errors;
+                        sec0_data.advance_errors();
                         goto shipout;
                     case '}'_u8.raw():
                         if(--brace_level==0)
@@ -225,14 +235,14 @@ Rule_Set<Token_Kind_t> parse_sec12(Sec0_Data& sec0_data,FILE* const in,const cha
                                 target.push_back('$');
                                 print_loc(stderr,sec0_data.input.lineno,sec0_data.input.colno,filename);
                                 fputs("Error: Missing closing brace!\n",stderr);
-                                ++sec0_data.errors;
+                                sec0_data.advance_errors();
                                 goto shipout;
                             //case '{'_uc:
                             case '$'_u8.raw():
                                 if(rule.left==(Token_Kind_t)-1){
                                     print_loc(stderr,dollar_lineno,dollar_colno,filename);
                                     fputs("Error: $$ in goal production!\n",stderr);
-                                    ++sec0_data.errors;
+                                    sec0_data.advance_errors();
                                     target.push_back('0');
                                 }else{
                                     target.append("/*target*/");
@@ -275,7 +285,7 @@ Rule_Set<Token_Kind_t> parse_sec12(Sec0_Data& sec0_data,FILE* const in,const cha
                                 if(num>=rule.rights.size()){
                                     print_loc(stderr,dollar_lineno,dollar_colno,filename);
                                     fprintf(stderr,"Error: Token index out of range! (Note: rights.size()=%zu, given=%zu.)\n",rule.rights.size(),num);
-                                    ++sec0_data.errors;
+                                    sec0_data.advance_errors();
                                     num=0;
                                 }
                                 target.append("/*rights[").append(std::to_string(num)).append("]*/");
@@ -303,7 +313,7 @@ Rule_Set<Token_Kind_t> parse_sec12(Sec0_Data& sec0_data,FILE* const in,const cha
                 else if(rule.left==(Token_Kind_t)-1){
                     print_loc(stderr,current_right_lineno,current_right_colno,filename);
                     fputs("Error: The init clause for goal production should be empty!\n",stderr);
-                    ++sec0_data.errors;
+                    sec0_data.advance_errors();
                     rule.init.clear();
                     rule.init.push_back(' ');
                 }
@@ -359,7 +369,7 @@ Rule_Set<Token_Kind_t> parse_sec12(Sec0_Data& sec0_data,FILE* const in,const cha
             percent.write_to(buf);
             print_loc(stderr,current_right_lineno,current_right_colno,filename);
             fprintf(stderr,"Error: Unknown token name - %s - for the argument of %%%s!\n",str_temp.c_str(),buf);
-            ++sec0_data.errors;
+            sec0_data.advance_errors();
         }
         percent=yuki::EOF_U8;
     }else{
@@ -368,7 +378,7 @@ Rule_Set<Token_Kind_t> parse_sec12(Sec0_Data& sec0_data,FILE* const in,const cha
         }catch(const std::out_of_range&){
             print_loc(stderr,current_right_lineno,current_right_colno,filename);
             fprintf(stderr,"Error: Unknown token name on the rhs of a production: %s\n",str_temp.c_str());
-            ++sec0_data.errors;
+            sec0_data.advance_errors();
         }
     }
     str_temp.clear();
@@ -383,14 +393,14 @@ Rule_Set<Token_Kind_t> parse_sec12(Sec0_Data& sec0_data,FILE* const in,const cha
                 case 0:
                     print_loc(stderr,first_right_lineno,first_right_colno,filename);
                     fputs("Error: Empty goal production!\n",stderr);
-                    ++sec0_data.errors;
+                    sec0_data.advance_errors();
                     goto rule_clear;
                 case 1:
                     break;
                 default:
                     print_loc(stderr,first_right_lineno,first_right_colno,filename);
                     fputs("Error: Goal production with more than 1 token on the rhs!\n",stderr);
-                    ++sec0_data.errors;
+                    sec0_data.advance_errors();
                     rule.rights.resize(1);
                     break;
             }
@@ -398,14 +408,14 @@ Rule_Set<Token_Kind_t> parse_sec12(Sec0_Data& sec0_data,FILE* const in,const cha
             if(!ibp.has_inserted){
                 print_loc(stderr,first_right_lineno,first_right_colno,filename);
                 fprintf(stderr,"Error: Redeclaration of goal symbol! (Note: Previously declared - %s -. Current declared - %s -.)\n",sec0_data.token_datas[ibp.iterator->rights.front()].name_or_alias().c_str(),sec0_data.token_datas[rule.rights.front()].name_or_alias().c_str());
-                ++sec0_data.errors;
+                sec0_data.advance_errors();
             }else
                 sec0_data.token_datas.goal = ibp.iterator->rights.front();
         }else{
             if(!rs.insert(std::move(rule))){
                 print_loc(stderr,first_right_lineno,first_right_colno,filename);
                 fprintf(stderr,"Error: Duplicate production, with lhs - %s -!\n",rule.left==(Token_Kind_t)-1 ? "Goal_" : sec0_data.token_datas[rule.left].name_or_alias().c_str());
-                ++sec0_data.errors;
+                sec0_data.advance_errors();
             }
         }
     }

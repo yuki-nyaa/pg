@@ -14,6 +14,7 @@ struct Cmd_Data{
     bool ft=false;
     bool lr0_its=false;
     bool lr1_ias=false;
+    unsigned max_errors=64;
 
     // Members for later process.
     FILE* fp_in = nullptr;
@@ -27,39 +28,50 @@ struct Cmd_Data{
 
 namespace cmd_impl{
     YUKI_CMD_ONE_PARAM_OPTION(i,Cmd_Data,
-        fputs("Warning: Empty input filepath.\n",stderr),
-        fputs("Warning: Multiple inputs specified. (Note: Enclose the path in quotes if it contains spaces.)\n",stderr),
-        cmd_data.fp_in = fopen(argv[0],"r");
+        fputs("Warning: Empty input filepath!\n",stderr),
+        fputs("Warning: Multiple inputs specified! (Note: Enclose the path in quotes if it contains spaces.)\n",stderr),
+        cmd_data.fp_in = fopen(*argv,"r");
         if(!cmd_data.fp_in)
-            fprintf(stderr,"Error: The input file \"%s\" somehow cannot be opened!\n",argv[0]);
+            fprintf(stderr,"Error: The input file \"%s\" somehow cannot be opened!\n",*argv);
         else
-            cmd_data.in = argv[0];
+            cmd_data.in = *argv;
     )
 
     YUKI_CMD_ONE_PARAM_OPTION(o,Cmd_Data,
-        fputs("Warning: Empty output filepath.\n",stderr),
-        fputs("Warning: Multiple outputs specified. (Note: Enclose the path in quotes if it contains spaces.)\n",stderr),
-        cmd_data.out_cpp = argv[0];
+        fputs("Warning: Empty output filepath!\n",stderr),
+        fputs("Warning: Multiple outputs specified! (Note: Enclose the path in quotes if it contains spaces.)\n",stderr),
+        cmd_data.out_cpp = *argv;
     )
 
     YUKI_CMD_ONE_PARAM_OPTION(h,Cmd_Data,
-        fputs("Warning: Empty output header filepath.\n",stderr),
-        fputs("Warning: Multiple output headers specified. (Note: Enclose the path in quotes if it contains spaces.)\n",stderr);
-        cmd_data.out_h = argv[0];
+        fputs("Warning: Empty output header filepath!\n",stderr),
+        fputs("Warning: Multiple output headers specified! (Note: Enclose the path in quotes if it contains spaces.)\n",stderr),
+        cmd_data.out_h = *argv;
     )
 
     YUKI_CMD_ONE_PARAM_OPTION(t,Cmd_Data,
-        fputs("Warning: Empty output token def filepath.\n",stderr),
-        fputs("Warning: Multiple output token def files specified. (Note: Enclose the path in quotes if it contains spaces.)\n",stderr),
-        cmd_data.out_token = argv[0];
+        fputs("Warning: Empty output token def filepath!\n",stderr),
+        fputs("Warning: Multiple output token def files specified! (Note: Enclose the path in quotes if it contains spaces.)\n",stderr),
+        cmd_data.out_token = *argv;
     )
 
     YUKI_CMD_ONE_PARAM_OPTION(l,Cmd_Data,
         cmd_data.default_log=true,
-        fputs("Warning: Multiple log paths specified. (Note: Enclose the path in quotes if it contains spaces.)\n",stderr),
-        cmd_data.fp_log = fopen(argv[0],"w");
+        fputs("Warning: Multiple log paths specified! (Note: Enclose the path in quotes if it contains spaces.)\n",stderr),
+        cmd_data.fp_log = fopen(*argv,"w");
         if(!cmd_data.fp_log)
-            fprintf(stderr,"Error: The log file \"%s\" somehow cannot be opened!\n",argv[0]);
+            fprintf(stderr,"Error: The log file \"%s\" somehow cannot be opened!\n",*argv);
+    )
+
+    YUKI_CMD_ONE_PARAM_OPTION(max_errors,Cmd_Data,
+        fputs("Warning: No argument to \"--max-errors\"!\n",stderr),
+        fputs("Warning: Multiple arguments to \"--max-errors\"!\n",stderr),
+        const unsigned long long num = strtoull(*argv,nullptr,0);
+        if(errno==ERANGE || num>(std::numeric_limits<unsigned>::max()-1)){
+            fputs("Warning: The argument to \"--max-errors\" is too big!\n",stderr);
+            cmd_data.max_errors = (std::numeric_limits<unsigned>::max()-1);
+        }else
+            cmd_data.max_errors = num;
     )
 
     inline void version(FILE* const out) {fputs("pg by Yuki, version 1.0\n",out);}
@@ -116,6 +128,7 @@ inline constexpr yuki::Cmd_Option<Cmd_Data> coarr[] = {
     {"ft",0,cmd_impl::ft,"Print the first table to log."},
     {"lr0-its",0,cmd_impl::lr0_its,"Print the LR0-Immediate-Transitions to log."},
     {"lr1-ias",0,cmd_impl::lr1_ias,"Print the LR1-Immediate-Actions to log."},
+    {"max-errors",0,cmd_impl::max_errors,"Set the maximum error count."},
 };
 
 inline bool Cmd_Data::post_process(){
