@@ -164,46 +164,16 @@ Rule_Set<Token_Kind_t> parse_sec12(Sec0_Data& sec0_data,FILE* const in,const cha
             percent=yuki::EOF_U8;
             goto shipout;
         case '\"'_u8.raw():
-            assert(str_temp.empty());
-            str_temp.push_back('\"');
-            while(1){
-                u8c=sec0_data.input.get(in);
-                switch(u8c.raw()){
-                    case yuki::EOF_U8.raw():
-                        print_loc(stderr,sec0_data.input.lineno,sec0_data.input.colno,filename);
-                        fputs("Error: Missing closing double quote!\n",stderr);
-                        sec0_data.advance_errors();
-                        str_temp.push_back('\"');
-                        goto shipout;
-                    case '\"'_u8.raw(): str_temp.push_back('\"'); u8c=sec0_data.input.get(in); goto write_to_rights;
-                    case '\n'_u8.raw():
-                        print_loc(stderr,sec0_data.input.lineno_orig,sec0_data.input.colno_orig,filename);
-                        fputs("Warning: Quoted name across lines!\n",stderr);
-                        str_temp.push_back('\n');
-                        break;
-                    default: u8c.write_to(str_temp); break;
-                }
+            switch(sec0_data.input.parse_quoted<'\"'>(in,str_temp,filename)){
+                case EOF: sec0_data.advance_errors(); str_temp.push_back('\"'); goto shipout;
+                case '\"'_uc: u8c=sec0_data.input.get(in); goto write_to_rights;
+                default: assert(false); std::unreachable();
             }
         case '\''_u8.raw():
-            assert(str_temp.empty());
-            str_temp.push_back('\'');
-            while(1){
-                u8c=sec0_data.input.get(in);
-                switch(u8c.raw()){
-                    case yuki::EOF_U8.raw():
-                        print_loc(stderr,sec0_data.input.lineno,sec0_data.input.colno,filename);
-                        fputs("Error: Missing closing single quote!\n",stderr);
-                        sec0_data.advance_errors();
-                        str_temp.push_back('\'');
-                        goto shipout;
-                    case '\''_u8.raw(): str_temp.push_back('\''); u8c=sec0_data.input.get(in); goto write_to_rights;
-                    case '\n'_u8.raw():
-                        print_loc(stderr,sec0_data.input.lineno_orig,sec0_data.input.colno_orig,filename);
-                        fputs("Warning: Quoted name across lines!\n",stderr);
-                        str_temp.push_back('\n');
-                        break;
-                    default: u8c.write_to(str_temp); break;
-                }
+            switch(sec0_data.input.parse_quoted<'\''>(in,str_temp,filename)){
+                case EOF: sec0_data.advance_errors(); str_temp.push_back('\''); goto shipout;
+                case '\''_uc: u8c=sec0_data.input.get(in); goto write_to_rights;
+                default: assert(false); std::unreachable();
             }
         case '{'_u8.raw():{
             unsigned brace_level=1;

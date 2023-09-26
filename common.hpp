@@ -75,6 +75,10 @@ struct Token_Datas{
 };
 
 
+inline void print_loc(FILE* const out,const size_t lineno,const size_t colno,const char* const filename){
+    fprintf(out,"%zu:%zu - %s\n",lineno,colno,filename);
+}
+
 struct Sec0_Data{
     std::string nspace;
     std::string parser = "Parser";
@@ -159,7 +163,7 @@ struct Sec0_Data{
             return c;
         }
 
-        /// @return `0` if the next byte is neither '/' nor '*'; `EOF` if the comment ends with EOF; `(unsigned char)'\n'` if the comment ends normally, i.e. ends with `\n` for "//" and "*/" for "/*".
+        /// @return `0` if the next byte is neither '/' nor '*'; `EOF` if the comment ends with `EOF`; `(unsigned char)'\n'` if the comment ends normally, i.e. ends with `\n` for "//" and "*/" for "/*".
         /// @note `lineno_orig` and `colno_orig` are not trakced during skipping since they're of no use in this case.
         int try_skip_comment(FILE* const in){
             if(const int peek=fgetc(in); peek==static_cast<unsigned char>('/')){
@@ -194,6 +198,30 @@ struct Sec0_Data{
             }else{
                 ungetc(peek,in);
                 return 0;
+            }
+        }
+
+        /// @return `EOF` if the quoted section ends with `EOF` (without a matching closing quote); `quote` (as the unsigned value) if the quoted section ends normally.
+        template<char quote>
+        int parse_quoted(FILE* const in,std::string& str,const char* const filename){
+            assert(str.empty());
+            str.push_back(quote);
+            yuki::U8Char u8c;
+            while(1){
+                u8c=get(in);
+                switch(u8c.raw()){
+                    case yuki::EOF_U8.raw():
+                        print_loc(stderr,lineno,colno,filename);
+                        fputs("Error: Missing closing double quote!\n",stderr);
+                        return EOF;
+                    case yuki::U8Char(static_cast<unsigned char>(quote)).raw(): str.push_back(quote); return static_cast<unsigned char>(quote);
+                    case yuki::U8Char(static_cast<unsigned char>('\n')).raw():
+                        print_loc(stderr,lineno_orig,colno_orig,filename);
+                        fputs("Warning: Quoted name across lines!\n",stderr);
+                        str.push_back('\n');
+                        break;
+                    default: u8c.write_to(str); break;
+                }
             }
         }
     } input;
@@ -526,9 +554,6 @@ struct Make_FT : protected TC_Context<Token_Kind_t>{
 } // namespace yuki::pg
 
 namespace yuki::pg{
-inline void print_loc(FILE* const out,const size_t lineno,const size_t colno,const char* const filename){
-    fprintf(out,"%zu:%zu - %s\n",lineno,colno,filename);
-}
 [[noreturn]] inline void eof_error(const unsigned errors){
     fputs("Fatal Error: No production was specified!\n",stderr);
     fprintf(stderr,"%u errors encountered.\n",errors);
