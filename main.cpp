@@ -1071,14 +1071,30 @@ void write_token(FILE* const out_token,Sec0_Data& sec0_data){
     for(const Token_Data& td : nterms){
         if(td.alias.empty())
             fprintf(out_token,"\"%s\",",td.name.c_str());
-        else
-            fprintf(out_token,"%s,",td.alias.c_str());
+        else{
+            std::string_view alias = td.alias;
+            if((alias.front()=='\"' || alias.front()=='\'') && alias.size()>1) [[likely]] {
+                alias.remove_prefix(1);
+                alias.remove_suffix(1);
+            }
+            fputc(static_cast<unsigned char>('\"'),out_token);
+            print_escaped(out_token,alias);
+            fputs("\", ",out_token);
+        }
     }
     for(const Token_Data& td : terms){
         if(td.alias.empty())
             fprintf(out_token,"\"%s\",",td.name.c_str());
-        else
-            fprintf(out_token,"%s,",td.alias.c_str());
+        else{
+            std::string_view alias = td.alias;
+            if((alias.front()=='\"' || alias.front()=='\'') && alias.size()>1) [[likely]] {
+                alias.remove_prefix(1);
+                alias.remove_suffix(1);
+            }
+            fputc(static_cast<unsigned char>('\"'),out_token);
+            print_escaped(out_token,alias);
+            fputs("\", ",out_token);
+        }
     }
     fputs("};\n\n",out_token);
     fprintf(out_token,

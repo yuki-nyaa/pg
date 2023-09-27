@@ -17,7 +17,7 @@ struct Token_Settings{
     struct Token_Kind{
         enum enum_t : Token_Kind_t {List,Pair,LB,RB,foo,foo2,EOF_,};
     };
-    static constexpr const char* token_name[token_total] = {"List","Pair","(",")","\"","\'//","EOF_",};
+    static constexpr const char* token_name[token_total] = {"List","Pair","(", ")", "\"", "\\\'//", "EOF_",};
 
     static constexpr Token_Kind_t nterminal_first = Token_Kind::List;
     static constexpr Token_Kind_t nterminal_last = Token_Kind::Pair;
@@ -42,7 +42,7 @@ struct Token_Settings{
     }
 
     static constexpr Token_Kind_t token_index_table[7] = {
-        1, 2, 0, 0, 3, 4, 0,
+        1, 2, 0, 0, 3, 4, 0, 
     }; // token_index_table
 
     typedef yuki::pg::VToken<Token_Kind_t,token_index_table

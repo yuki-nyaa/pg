@@ -558,17 +558,7 @@ struct Make_FT : protected TC_Context<Token_Kind_t>{
 
 
 namespace yuki::pg{
-inline void print_escaped(FILE* out,std::string_view s){
-    if(s.empty())
-        return;
-    char back = 0;
-    if(s.front()=='\"' || s.front()=='\''){
-        fputc(static_cast<unsigned char>('\\'),out);
-        fputc(s.front(),out);
-        back=s.back();
-        s.remove_prefix(1);
-        s.remove_suffix(1);
-    }
+inline void print_escaped(FILE* out,const std::string_view s){
     for(const char c : s){
         switch(c){
             case '\'': fputs("\\\'",out); break;
@@ -584,10 +574,6 @@ inline void print_escaped(FILE* out,std::string_view s){
             case '\v': fputs("\\v",out); break;
             default: fputc(c,out); break;
         }
-    }
-    if(back!=0){
-        fputc(static_cast<unsigned char>('\\'),out);
-        fputc(back,out);
     }
 }
 }
