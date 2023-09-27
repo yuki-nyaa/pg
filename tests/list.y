@@ -2,7 +2,7 @@
 %nterm Pair size_t
 %terms LB"("RB/*blah*/")"
 %term foo "\"" {decltype('\'')}
-%term foo2 "\'" {decltype('\"')}
+%term foo2 "\'//" {decltype('\"//')}
 
 %namespace xxx
 
@@ -20,7 +20,7 @@
 
 %%
 List
-    List Pair    %s "("   %r 5 %empty
+    List/**/Pair    %s "("   %r 5 %empty
     {}
     {
         // }
@@ -40,7 +40,7 @@ List
 
 
 Pair
-    "(" Pair ")"
+    "(" Pair ")"//
     {$1+1}
     {$!$.end.column;}
     |

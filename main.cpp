@@ -497,15 +497,20 @@ Sec0_Data parse_sec0(FILE* const in,const char* const filename,const unsigned ma
         default:
             assert(arg.empty());
             while(1){
-                u8c.write_to(arg);
-                u8c=data.input.get(in);
                 switch(u8c.raw()){
                     case yuki::EOF_U8.raw(): eof_error(data.errors()+1);
                     case '/'_u8.raw():
                         switch(data.input.try_skip_comment(in)){
                             case EOF: eof_error(data.errors()+1);
                             case 0: break;
-                            default: goto shipout_1_arg;
+                            default:
+                                u8c=data.input.get(in);
+                                if(!arg.empty())
+                                    goto shipout_1_arg;
+                                else if(yuki::unicode::is_WSpace(u8c))
+                                    goto skip_spaces;
+                                else
+                                    goto parse_arg;
                         }
                         break;
                     default:
@@ -516,6 +521,8 @@ Sec0_Data parse_sec0(FILE* const in,const char* const filename,const unsigned ma
                     case '{'_u8.raw():case '\"'_u8.raw():case '\''_u8.raw(): goto shipout_1_arg;
                     case '%'_u8.raw(): goto shipout;
                 }
+                u8c.write_to(arg);
+                u8c=data.input.get(in);
             }
     } // switch(u8c.raw())
     assert(false);
@@ -858,15 +865,18 @@ Rule_Set<Token_Kind_t> parse_sec12(Sec0_Data& sec0_data,FILE* const in,const cha
         default:
             assert(str_temp.empty());
             while(1){
-                u8c.write_to(str_temp);
-                u8c=sec0_data.input.get(in);
                 switch(u8c.raw()){
                     case yuki::EOF_U8.raw(): goto shipout;
                     case '/'_u8.raw():
                         switch(sec0_data.input.try_skip_comment(in)){
                             case EOF: u8c=yuki::EOF_U8;goto shipout;
                             case 0: break;
-                            default: u8c=sec0_data.input.get(in); goto write_to_rights;
+                            default:
+                                u8c=sec0_data.input.get(in);
+                                if(!str_temp.empty())
+                                    goto write_to_rights;
+                                else
+                                    goto skip_spaces1;
                         }
                         break;
                     default:
@@ -878,6 +888,8 @@ Rule_Set<Token_Kind_t> parse_sec12(Sec0_Data& sec0_data,FILE* const in,const cha
                     case '{'_u8.raw():case '\"'_u8.raw():case '\''_u8.raw():case '%'_u8.raw(): goto write_to_rights;
                     case '|'_u8.raw(): case ';'_u8.raw(): goto shipout;
                 }
+                u8c.write_to(str_temp);
+                u8c=sec0_data.input.get(in);
             }
     } // switch(u8c.raw())
     assert(false);
