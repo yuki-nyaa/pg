@@ -1,36 +1,35 @@
 #pragma once
-#include"lexer.hpp"
-#include<yuki/pg/lr1.hpp>
+
 #include"list.token.hpp"
+
+#ifdef YUKI_PG_Parser_DBG
+#include<yuki/print.hpp>
+#ifndef YUKI_PG_Parser_DBG_LOG
+#define YUKI_PG_Parser_DBG_LOG "YUKI_PG_Parser_DBG.log"
+#endif
 namespace xxx{
-struct Parser_Tables{
-    struct Action_Table{
-      private:
-        Token_Settings::Token_t t_;
-      public:
-        Action_Table(Lexer& l_) noexcept : t_(l_.lex()) {}
-        yuki::pg::lr1_action_return_type operator()(yuki::pg::AbsLR1Parser<Token_Settings>&,Lexer&);
-    };
-    typedef yuki::pg::LR1_Goto_Table<Token_Settings,8> Goto_Table;
-    static constinit Goto_Table goto_table;
-};
+#ifndef YUKI_PG_Parser_DBG_FP
+inline FILE* const YUKI_PG_Parser_DBG_fp_=fopen(YUKI_PG_Parser_DBG_LOG,"w");
+#define YUKI_PG_Parser_DBG_FP xxx::YUKI_PG_Parser_DBG_fp_
+#endif
+} // namespace xxx
+#define YUKI_PG_Parser_DBGO(...) yuki::dbgout_base(fp_dbg_,"YUKI_PG_Parser_DBG",__VA_ARGS__)
+#define CONSTEXPR_YUKI_PG_Parser_DBG // Debug output would render constexpr-functions non-constexpr.
+#else
+#define YUKI_PG_Parser_DBGO(...)
+#define CONSTEXPR_YUKI_PG_Parser_DBG constexpr
+#endif
 
-struct Parser final : yuki::pg::AbsLR1Parser<Token_Settings>, private Parser_Tables {
-    Lexer* lexer;
-
-    using Parser_Tables::Action_Table;
-    using Parser_Tables::Goto_Table;
-    using Parser_Tables::goto_table;
-
-    constexpr Parser() noexcept = default;
-    explicit constexpr Parser(Lexer* const l) noexcept : lexer(l) {}
-
-    int parse(Lexer&);
-
-    virtual int parse() override final {assert(lexer); return parse(*lexer);}
-
-
+namespace xxx{
+struct Parser{
+    template<typename L_>
+    int parse(L_&);
+  private:
+    yuki::pg::stack_t<yuki::pg::Token_State_Pair<Token_Settings::Token_t>> stack_;
+    #ifdef YUKI_PG_Parser_DBG
+    FILE* fp_fbg_=YUKI_PG_Parser_DBG_FP;
+    #endif
+  public:
 
 }; // struct Parser
 } // namespace xxx
-

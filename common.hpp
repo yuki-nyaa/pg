@@ -203,7 +203,7 @@ struct Sec0_Data{
 
         /// @return `EOF` if the quoted section ends with `EOF` (without a matching closing quote); `quote` (as the unsigned value) if the quoted section ends normally.
         template<char quote>
-        int parse_quoted(FILE* const in,std::string& str,const char* const filename){
+        int parse_quoted(FILE* const in,std::string& str,const char* const filename,const bool quote_escaped){
             str.push_back(quote);
             yuki::U8Char u8c;
             while(1){
@@ -218,6 +218,17 @@ struct Sec0_Data{
                         print_loc(stderr,lineno_orig,colno_orig,filename);
                         fputs("Warning: Quoted name across lines!\n",stderr);
                         str.push_back('\n');
+                        break;
+                    case yuki::U8Char(static_cast<unsigned char>('\\')).raw():
+                        if(const int peek=fgetc(in); peek==static_cast<unsigned char>(quote)){
+                            ++colno;
+                            if(quote_escaped)
+                                str.push_back('\\');
+                            str.push_back(quote);
+                        }else{
+                            ungetc(peek,in);
+                            str.push_back('\\');
+                        }
                         break;
                     default: u8c.write_to(str); break;
                 }
@@ -544,3 +555,39 @@ struct Make_FT : protected TC_Context<Token_Kind_t>{
     }
 };
 } // namespace yuki::pg
+
+
+namespace yuki::pg{
+inline void print_escaped(FILE* out,std::string_view s){
+    if(s.empty())
+        return;
+    char back = 0;
+    if(s.front()=='\"' || s.front()=='\''){
+        fputc(static_cast<unsigned char>('\\'),out);
+        fputc(s.front(),out);
+        back=s.back();
+        s.remove_prefix(1);
+        s.remove_suffix(1);
+    }
+    for(const char c : s){
+        switch(c){
+            case '\'': fputs("\\\'",out); break;
+            case '\"': fputs("\\\"",out); break;
+            case '\?': fputs("\\\?",out); break;
+            case '\\': fputs("\\\\",out); break;
+            case '\a': fputs("\\a",out); break;
+            case '\b': fputs("\\b",out); break;
+            case '\f': fputs("\\f",out); break;
+            case '\n': fputs("\\n",out); break;
+            case '\r': fputs("\\r",out); break;
+            case '\t': fputs("\\t",out); break;
+            case '\v': fputs("\\v",out); break;
+            default: fputc(c,out); break;
+        }
+    }
+    if(back!=0){
+        fputc(static_cast<unsigned char>('\\'),out);
+        fputc(back,out);
+    }
+}
+}

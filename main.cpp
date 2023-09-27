@@ -429,14 +429,14 @@ Sec0_Data parse_sec0(FILE* const in,const char* const filename,const unsigned ma
     switch(u8c.raw()){
         case '\"'_u8.raw():
             assert(arg.empty());
-            switch(data.input.parse_quoted<'\"'>(in,arg,filename)){
+            switch(data.input.parse_quoted<'\"'>(in,arg,filename,false)){
                 case EOF: data.advance_errors(); eof_error(data.errors()+1);
                 case '\"'_uc: u8c=data.input.get(in); goto shipout_1_arg;
                 default: assert(false); std::unreachable();
             }
         case '\''_u8.raw():
             assert(arg.empty());
-            switch(data.input.parse_quoted<'\''>(in,arg,filename)){
+            switch(data.input.parse_quoted<'\''>(in,arg,filename,false)){
                 case EOF: data.advance_errors(); eof_error(data.errors()+1);
                 case '\''_uc: u8c=data.input.get(in); goto shipout_1_arg;
                 default: assert(false); std::unreachable();
@@ -473,14 +473,14 @@ Sec0_Data parse_sec0(FILE* const in,const char* const filename,const unsigned ma
                         u8c=data.input.get(in);
                         break;
                     case '\"'_u8.raw():
-                        switch(data.input.parse_quoted<'\"'>(in,arg,filename)){
+                        switch(data.input.parse_quoted<'\"'>(in,arg,filename,true)){
                             case EOF: eof_error(data.errors()+1);
                             case '\"'_uc: u8c=data.input.get(in); break;
                             default: assert(false); std::unreachable();
                         }
                         break;
                     case '\''_u8.raw():
-                        switch(data.input.parse_quoted<'\''>(in,arg,filename)){
+                        switch(data.input.parse_quoted<'\''>(in,arg,filename,true)){
                             case EOF: eof_error(data.errors()+1);
                             case '\''_uc: u8c=data.input.get(in); break;
                             default: assert(false); std::unreachable();
@@ -699,14 +699,14 @@ Rule_Set<Token_Kind_t> parse_sec12(Sec0_Data& sec0_data,FILE* const in,const cha
             goto shipout;
         case '\"'_u8.raw():
             assert(str_temp.empty());
-            switch(sec0_data.input.parse_quoted<'\"'>(in,str_temp,filename)){
+            switch(sec0_data.input.parse_quoted<'\"'>(in,str_temp,filename,false)){
                 case EOF: sec0_data.advance_errors(); str_temp.push_back('\"'); goto shipout;
                 case '\"'_uc: u8c=sec0_data.input.get(in); goto write_to_rights;
                 default: assert(false); std::unreachable();
             }
         case '\''_u8.raw():
             assert(str_temp.empty());
-            switch(sec0_data.input.parse_quoted<'\''>(in,str_temp,filename)){
+            switch(sec0_data.input.parse_quoted<'\''>(in,str_temp,filename,false)){
                 case EOF: sec0_data.advance_errors(); str_temp.push_back('\''); goto shipout;
                 case '\''_uc: u8c=sec0_data.input.get(in); goto write_to_rights;
                 default: assert(false); std::unreachable();
@@ -747,14 +747,14 @@ Rule_Set<Token_Kind_t> parse_sec12(Sec0_Data& sec0_data,FILE* const in,const cha
                         u8c=sec0_data.input.get(in);
                         break;
                     case '\"'_u8.raw():
-                        switch(sec0_data.input.parse_quoted<'\"'>(in,target,filename)){
+                        switch(sec0_data.input.parse_quoted<'\"'>(in,target,filename,true)){
                             case EOF: sec0_data.advance_errors(); target.push_back('\"'); goto shipout;
                             case '\"'_uc: u8c=sec0_data.input.get(in); break;
                             default: assert(false); std::unreachable();
                         }
                         break;
                     case '\''_u8.raw():
-                        switch(sec0_data.input.parse_quoted<'\''>(in,target,filename)){
+                        switch(sec0_data.input.parse_quoted<'\''>(in,target,filename,true)){
                             case EOF: sec0_data.advance_errors(); target.push_back('\''); goto shipout;
                             case '\''_uc: u8c=sec0_data.input.get(in); break;
                             default: assert(false); std::unreachable();

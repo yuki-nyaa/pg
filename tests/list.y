@@ -1,6 +1,8 @@
 %nterm List {std::list<size_t/**/>}
 %nterm Pair size_t
 %terms LB"("RB/*blah*/")"
+%term foo "\"" {decltype('\'')}
+%term foo2 "\'" {decltype('\"')}
 
 %namespace xxx
 
@@ -23,7 +25,7 @@ List
     {
         // }
         $$.merge(/*}*/$0);
-        fputs("}",stdout);
+        fputs("\"}",stdout);
         fputc(static_cast<unsigned char>('}'),stdout);
         $$.push_back($1);
         $$.push_back(2);
