@@ -362,7 +362,7 @@ Sec0_Data parse_sec0(FILE* const in,const char* const filename,const unsigned ma
         case yuki::EOF_U8.raw():
             eof_error(data.errors()+1);
         case '/'_u8.raw():
-            switch(data.input.try_skip_comment(in)){
+            switch(data.input.try_skip_comment(in,filename)){
                 case EOF:
                     eof_error(data.errors()+1);
                 case 0:
@@ -393,7 +393,7 @@ Sec0_Data parse_sec0(FILE* const in,const char* const filename,const unsigned ma
         return data;
     for(; !yuki::unicode::is_WSpace(u8c); u8c.write_to(arg),u8c=data.input.get(in)){
         if(u8c=='/'_u8){
-            switch(data.input.try_skip_comment(in)){
+            switch(data.input.try_skip_comment(in,filename)){
                 case EOF: eof_error(data.errors()+1);
                 case 0: break;
                 default: goto head_done;
@@ -416,7 +416,7 @@ Sec0_Data parse_sec0(FILE* const in,const char* const filename,const unsigned ma
         u8c=data.input.get(in);
     }while(yuki::unicode::is_WSpace(u8c));
     if(u8c=='/'_u8){
-        switch(data.input.try_skip_comment(in)){
+        switch(data.input.try_skip_comment(in,filename)){
             case EOF: eof_error(data.errors()+1);
             case 0: break;
             default: goto skip_spaces;
@@ -461,7 +461,7 @@ Sec0_Data parse_sec0(FILE* const in,const char* const filename,const unsigned ma
                             break;
                         }
                     case '/'_u8.raw():
-                        switch(data.input.try_skip_comment(in)){
+                        switch(data.input.try_skip_comment(in,filename)){
                             case EOF:
                                 print_loc(stderr,data.input.lineno,data.input.colno,filename);
                                 fputs("Error: Missing closing brace!\n",stderr);
@@ -500,7 +500,7 @@ Sec0_Data parse_sec0(FILE* const in,const char* const filename,const unsigned ma
                 switch(u8c.raw()){
                     case yuki::EOF_U8.raw(): eof_error(data.errors()+1);
                     case '/'_u8.raw():
-                        switch(data.input.try_skip_comment(in)){
+                        switch(data.input.try_skip_comment(in,filename)){
                             case EOF: eof_error(data.errors()+1);
                             case 0: break;
                             default:
@@ -566,7 +566,7 @@ Rule_Set<Token_Kind_t> parse_sec12(Sec0_Data& sec0_data,FILE* const in,const cha
         case yuki::EOF_U8.raw():
             return rs;
         case '/'_u8.raw():
-            switch(sec0_data.input.try_skip_comment(in)){
+            switch(sec0_data.input.try_skip_comment(in,filename)){
                 case EOF: return rs;
                 case 0: break;
                 default: goto skip_spaces_before_left;
@@ -591,7 +591,7 @@ Rule_Set<Token_Kind_t> parse_sec12(Sec0_Data& sec0_data,FILE* const in,const cha
 
     for(; !yuki::unicode::is_WSpace(u8c); u8c.write_to(str_temp),u8c=sec0_data.input.get(in)){
         if(u8c=='/'_u8){
-            switch(sec0_data.input.try_skip_comment(in)){
+            switch(sec0_data.input.try_skip_comment(in,filename)){
                 case EOF: goto left_done;
                 case 0: break;
                 default: goto left_done;
@@ -631,7 +631,7 @@ Rule_Set<Token_Kind_t> parse_sec12(Sec0_Data& sec0_data,FILE* const in,const cha
         u8c=sec0_data.input.get(in);
     }while(yuki::unicode::is_WSpace(u8c));
     if(u8c=='/'_u8){
-        switch(sec0_data.input.try_skip_comment(in)){
+        switch(sec0_data.input.try_skip_comment(in,filename)){
             case EOF: u8c=yuki::EOF_U8;goto shipout;
             case 0: break;
             default: goto skip_spaces0;
@@ -644,7 +644,7 @@ Rule_Set<Token_Kind_t> parse_sec12(Sec0_Data& sec0_data,FILE* const in,const cha
     while(yuki::unicode::is_WSpace(u8c))
         u8c=sec0_data.input.get(in);
     if(u8c=='/'_u8){
-        switch(sec0_data.input.try_skip_comment(in)){
+        switch(sec0_data.input.try_skip_comment(in,filename)){
             case EOF: rs.empty(),u8c=yuki::EOF_U8;goto shipout;
             case 0: break;
             default: u8c=sec0_data.input.get(in); goto skip_spaces1;
@@ -676,7 +676,7 @@ Rule_Set<Token_Kind_t> parse_sec12(Sec0_Data& sec0_data,FILE* const in,const cha
                 switch(u8c.raw()){
                     case yuki::EOF_U8.raw(): goto percent_arg_error;
                     case '/'_u8.raw():
-                        switch(sec0_data.input.try_skip_comment(in)){
+                        switch(sec0_data.input.try_skip_comment(in,filename)){
                             case EOF: u8c=yuki::EOF_U8;goto percent_arg_error;
                             case 0: break;
                             default: u8c=sec0_data.input.get(in); goto skip_spaces1;
@@ -741,7 +741,7 @@ Rule_Set<Token_Kind_t> parse_sec12(Sec0_Data& sec0_data,FILE* const in,const cha
                             break;
                         }
                     case '/'_u8.raw():
-                        switch(sec0_data.input.try_skip_comment(in)){
+                        switch(sec0_data.input.try_skip_comment(in,filename)){
                             case EOF:
                                 print_loc(stderr,sec0_data.input.lineno,sec0_data.input.colno,filename);
                                 fputs("Error: Missing closing brace!\n",stderr);
@@ -868,7 +868,7 @@ Rule_Set<Token_Kind_t> parse_sec12(Sec0_Data& sec0_data,FILE* const in,const cha
                 switch(u8c.raw()){
                     case yuki::EOF_U8.raw(): goto shipout;
                     case '/'_u8.raw():
-                        switch(sec0_data.input.try_skip_comment(in)){
+                        switch(sec0_data.input.try_skip_comment(in,filename)){
                             case EOF: u8c=yuki::EOF_U8;goto shipout;
                             case 0: break;
                             default:

@@ -165,7 +165,7 @@ struct Sec0_Data{
 
         /// @return `0` if the next byte is neither '/' nor '*'; `EOF` if the comment ends with `EOF`; `(unsigned char)'\n'` or `(unsigned char)'/'` if the comment end normally.
         /// @note `lineno_orig` and `colno_orig` are not trakced during skipping since they're of no use in this case.
-        int try_skip_comment(FILE* const in){
+        int try_skip_comment(FILE* const in,const char* const filename){
             if(const int peek=fgetc(in); peek==static_cast<unsigned char>('/')){
                 ++colno;
                 while(1){
@@ -182,7 +182,10 @@ struct Sec0_Data{
                 while(1){
                     using namespace yuki::literals;
                     switch(const yuki::U8Char peek1(in); peek1.raw()){
-                        case yuki::EOF_U8.raw(): return EOF;
+                        case yuki::EOF_U8.raw():
+                            print_loc(stderr,lineno,colno,filename);
+                            fputs("Warning: Muiti-line comment ends with EOF!\n",stderr);
+                            return EOF;
                         case '*'_u8.raw():
                             ++colno;
                             if(const int peek2=fgetc(in); peek2==static_cast<unsigned char>('/')){
